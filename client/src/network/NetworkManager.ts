@@ -42,6 +42,8 @@ class NetworkManager {
   private readonly snapshotListeners = new Set<() => void>();
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private resultsSignature = '';
+  /** In-flight connection attempt; concurrent calls (double clicks, StrictMode effects) share it. */
+  private pending: Promise<void> | null = null;
   private lastGameTime = 0;
   private lastGameTimeAt = 0;
 
@@ -62,6 +64,10 @@ class NetworkManager {
   async tryResume(): Promise<boolean> {
     const token = loadToken();
     if (!token || this.room) return false;
+    if (this.pending) {
+      await this.pending.catch(() => undefined);
+      return this.room !== null;
+    }
     try {
       await this.connect(() => this.getClient().reconnect(token, MatchState) as Promise<MatchRoom>, true);
       return true;
@@ -117,8 +123,15 @@ class NetworkManager {
     };
   }
 
-  private async connect(open: () => Promise<MatchRoom>, silent = false): Promise<void> {
-    if (this.room) return;
+  private connect(open: () => Promise<MatchRoom>, silent = false): Promise<void> {
+    if (this.room) return Promise.resolve();
+    this.pending ??= this.doConnect(open, silent).finally(() => {
+      this.pending = null;
+    });
+    return this.pending;
+  }
+
+  private async doConnect(open: () => Promise<MatchRoom>, silent: boolean): Promise<void> {
     sessionStore.set({ status: 'connecting', error: null });
     let room: MatchRoom;
     try {

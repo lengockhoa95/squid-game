@@ -3,8 +3,14 @@
 ## 1. Kiểm thử tự động
 
 ```bash
-./scripts/check.sh        # typecheck + 76 unit/integration test + build
+./scripts/check.sh        # typecheck + unit/integration test + build
+npm run sim -- 500        # 500 trận toàn NPC: luôn kết thúc với 1 người thắng, in tỉ lệ thắng
+./scripts/dev.sh &        # rồi:
+npm run e2e               # Chrome thật: 2 người + 2 NPC (reload, host rời), 1 người + 3 NPC cả trận
 ```
+
+E2E cần Google Chrome (`CHROME_PATH` để đổi đường dẫn, `BASE_URL` để chạy với bản build/Docker,
+ví dụ `BASE_URL=http://localhost:8080/ npm run e2e`). Ảnh chụp lưu ở `e2e-shots/`.
 
 Bao gồm: kinematics dùng chung, prediction/reconciliation, nội suy, rate limiter, chống speed-hack,
 và integration test `MatchRoom` chạy trên server Colyseus thật (tạo/vào phòng, giới hạn 4 người,
@@ -29,12 +35,18 @@ ready/start, khoá phòng, di chuyển, chuyển host, reconnect).
 | 3 | Nhập mã sai (VD `ZZZZZ`) | Báo "Không tìm thấy phòng" |
 | 4 | Host xem nút Bắt đầu khi chưa ai sẵn sàng | Nút bị khoá "Chờ mọi người sẵn sàng" |
 | 5 | Mọi người bấm **Sẵn sàng!** | Nhãn "Sẵn sàng" hiện ở mọi cửa sổ |
-| 6 | Host bấm **Bắt đầu** | Cả 4 cửa sổ đếm ngược 3‑2‑1 rồi vào sân |
-| 7 | Mỗi người di chuyển (click chuột / WASD / nhảy) | Nhân vật của mình mượt; người khác thấy đúng vị trí, trễ ≈ 0.1s |
-| 8 | Tải lại (F5) một cửa sổ đang chơi | Tự vào lại đúng phòng, đúng nhân vật; người khác thấy "Mất kết nối" rồi trở lại |
-| 9 | Host bấm **Về phòng chờ** | Mọi người về lobby, trạng thái Sẵn sàng bị xoá |
-| 10 | Host bấm **Rời phòng** | Người vào sau đó trở thành HOST |
-| 11 | Đóng hẳn một cửa sổ | Sau tối đa 20s người đó biến khỏi danh sách |
+| 6 | Host bấm **Bắt đầu** | Cả 4 cửa sổ hiện thẻ luật cùng một minigame, rồi đếm ngược 3‑2‑1 |
+| 7 | Chơi (click / WASD / Space) | Nhân vật của mình mượt; người khác thấy đúng vị trí, trễ ≈ 0.1s; cùng đèn/kính/dây |
+| 8 | Hết vòng | Cả 4 cửa sổ hiện cùng bảng kết quả; người bị loại thấy banner "đang xem" và click để đổi người xem |
+| 9 | Tải lại (F5) một cửa sổ giữa trận | Vào lại đúng trận, đúng nhân vật |
+| 10 | Host bấm **Rời phòng** giữa trận | Người đó bị xử thua; người tiếp theo có nút host |
+| 11 | Trận kết thúc | Màn người thắng ở mọi cửa sổ, 10s sau về phòng chờ (bot được xoá) |
+| 12 | Lặp lại 2–3 trận, bật F3 | Geometries không tăng dần giữa các trận |
+
+### Test 1 người + 3 NPC
+
+Tạo phòng, để NPC = 3 (mặc định), chọn độ khó khác nhau, Sẵn sàng → Bắt đầu. Chơi đến hết trận:
+NPC phải tham gia mọi minigame, có thể bị loại và có thể thắng.
 
 ## 3. Test qua mạng LAN
 

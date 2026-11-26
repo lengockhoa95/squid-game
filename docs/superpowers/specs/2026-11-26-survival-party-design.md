@@ -1,6 +1,6 @@
 # SURVIVAL PARTY — Design Spec
 
-Ngày: 2026-11-26 · Trạng thái: chờ duyệt
+Ngày: 2026-11-26 · Trạng thái: đã duyệt, đã triển khai (xem mục 16)
 
 ## 1. Mục tiêu
 
@@ -258,3 +258,14 @@ Mỗi phase: `tsc` sạch, build pass, test xanh, cập nhật `PROGRESS.md` tr�
 ## 15. Nghiệm thu
 
 1–3, 6: integration test 4 client + thử 4 cửa sổ. 4–5: 1 người + 3 NPC qua đủ 5 game. 7–10: mô phỏng headless + chơi thử. 11–12: `renderer.info.memory` không tăng sau 10 lần chuyển màn. 13: checklist Chrome & Edge. 14–15: `README.md`, `TESTING.md`.
+
+## 16. Thay đổi trong lúc triển khai (có lý do)
+
+| Mục | Thiết kế ban đầu | Đã làm | Lý do |
+|---|---|---|---|
+| Loại người chơi | Không ai thua → loại người cuối | Chỉ ép loại khi không đủ vòng còn lại; trước vòng cuối giữ ≥ 2 người | Tránh trận kết thúc sau 1 vòng (mô phỏng: Cầu Kính/Kéo Co có thể loại 2–3 người/vòng) |
+| Cầu Kính | 8 hàng, 45s | Số hàng = số người + 1 (3–8) | 8 hàng loại trung bình 4 người — cả phòng |
+| Dừng bằng chuột phải | Dừng tức thì | Huỷ điểm đến, phanh như server (0,15s) | Dừng tức thì ở client lệch với server → giật khi reconcile |
+| Camera tự xoay | Khi di chuyển | Chỉ khi đang click-to-move | Với WASD, camera xoay theo làm nhân vật chạy vòng tròn |
+| Phản Xạ Nhanh | Bấm sớm +500ms | Lượt bấm sớm tính 2000ms; < 60ms sau GO (đã bù trễ) coi là đoán | Đơn giản, công bằng hơn và chống đoán mò |
+| Pha STARTING | Có | Gộp vào ROUND_INTRO + ROUND_COUNTDOWN | Thẻ luật + đếm ngược đã đảm nhiệm |

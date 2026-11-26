@@ -43,8 +43,43 @@
 - Người rời hẳn khi đang chơi bị xoá khỏi phòng; Phase 4 sẽ đổi thành "bị loại".
 - Room code chỉ đảm bảo duy nhất trong 1 tiến trình server (đủ cho triển khai 1 server).
 - Khi FPS rất thấp (< 10) nhân vật của mình đi chậm hơn (giới hạn 6 bước mô phỏng/khung hình để tránh treo).
-## Phase 3 — NPC ⏳
-## Phase 4 — Match / Round / Elimination ⏳
-## Phase 5 — Red Light Green Light ⏳
-## Phase 6 — 4 minigame còn lại ⏳
-## Phase 7 — Polish, anti-cheat, reconnect, tối ưu ⏳
+## Phase 3 — NPC ✅
+
+- [x] NPC chạy trên server, không có WebSocket giả; input của NPC đi qua **cùng đường** với người thật (PlayerSim / handlePlayerInput)
+- [x] 4 cấp độ (thời gian phản ứng, tỉ lệ sai, độ lệch, tốc độ ≤ người, mức liều) + 3 tính cách + RNG riêng → mỗi NPC chơi khác nhau
+- [x] Mỗi minigame có chiến thuật riêng (FSM/rule-based); SMART đọc thời gian còn lại, ô kính đã lộ, lực đội…
+- [x] NPC chỉ đọc thông tin công khai (không biết đường kính an toàn)
+- [x] Host cấu hình số NPC + độ khó từng NPC; tự lấp khi START; NPC có tên/màu riêng, nhãn BOT
+
+## Phase 4 — Match / Round / Elimination ✅
+
+- [x] `MatchController` + bảng chuyển trạng thái (chặn chuyển sai); chạy theo bước thời gian cố định → mô phỏng được cả trận không cần trình duyệt
+- [x] `RoundScheduler`: 3–5 vòng, không lặp game liên tiếp, Kéo Co chỉ khi số người chẵn, ưu tiên game chưa chơi
+- [x] `EliminationPolicy`: thua thì loại; vòng cuối còn đúng 1; không bao giờ loại hết; trước vòng cuối giữ ít nhất 2 người
+- [x] Spectator (click để đổi người xem), màn kết quả từng vòng, màn người thắng, tự về phòng chờ
+- [x] Người rời giữa trận bị xử thua; host rời thì chuyển host
+
+## Phase 5–6 — 5 minigame ✅
+
+Đèn Xanh – Đèn Đỏ · Cầu Kính (cùng lúc) · Vượt Chướng Ngại · Kéo Co · Phản Xạ Nhanh — mỗi game có luật server, NPC strategy, view 3D (tải lazy), HUD, hướng dẫn, đếm ngược, timer, kết quả.
+
+## Phase 7 — Polish / anti-cheat / reconnect / test ✅
+
+- [x] Âm thanh tổng hợp WebAudio (không file), bật/tắt trong cài đặt
+- [x] Anti-cheat: kiểm tra payload, phase, người đã bị loại, rate limit + kick, ngân sách bước mô phỏng, thời gian đo ở server, RTT do server đo (không giả được)
+- [x] Reconnect giữa trận (rớt mạng / tải lại trang)
+- [x] Sửa lỗi kết nối đồng thời (StrictMode / bấm 2 lần) làm mất phiên khi tải lại trang
+- [x] Test: 118 unit/integration; mô phỏng 500 trận NPC; E2E Chrome: 4 người lobby, 1 người + 3 NPC cả trận, 2 người + 2 NPC (reload giữa trận, host rời giữa trận) — qua trên bản build, dev và Docker
+
+### Số liệu mô phỏng (500 trận, EASY/NORMAL/HARD/SMART)
+
+Tỉ lệ thắng: EASY 0% · NORMAL 4% · HARD 28% · SMART 68%. Trung bình 2,7 vòng/trận (4 người).
+
+## Hạn chế đã biết
+
+- **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).
+- Trận 4 người thường 2–3 vòng: trận dừng khi còn 1 người; 4–5 vòng chỉ khi có vòng không ai bị loại.
+- Chỉ hỗ trợ chuột + bàn phím (chưa có điều khiển cảm ứng).
+- Camera chưa tránh tường; khi FPS < 10 nhân vật của mình đi chậm hơn.
+- Room code duy nhất trong 1 tiến trình server (đủ cho triển khai 1 server).
+- Ở chế độ dev, lần E2E đầu tiên ngay sau khi Vite khởi động có thể lỗi do Vite tự tải lại trang khi tối ưu dependency.

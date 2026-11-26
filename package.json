@@ -12,10 +12,13 @@
     "dev:server": "npm run dev -w server",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "node e2e/multiplayer.mjs && node e2e/full-match.mjs",
+    "sim": "npm run sim -w @sp/server --"
   },
   "devDependencies": {
     "@types/node": "^24.19.4",
+    "playwright-core": "^1.65.1",
     "typescript": "^7.0.2",
     "vitest": "^5.1.2"
   }

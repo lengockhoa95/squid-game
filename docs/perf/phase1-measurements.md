@@ -1,4 +1,4 @@
-# Số đo hiệu năng — Phase 1 (sân thử)
+# Số đo hiệu năng
 
 ## Số liệu không phụ thuộc phần cứng (đo bằng Chrome headless, 1280×720)
 
@@ -19,3 +19,12 @@ Mở game → Vào sân thử → nhấn F3, đi lại 30 giây, ghi FPS thấp 
 | Máy (CPU / GPU) | Trình duyệt | LOW | MEDIUM | HIGH |
 |---|---|---|---|---|
 | | | | | |
+
+## Minigame (Chrome headless, 1100×680, preset LOW)
+
+| Màn | Draw calls | Triangles |
+|---|---|---|
+| Đèn Xanh – Đèn Đỏ | 33–50 | ~1.5k–1.9k |
+| Kéo Co | ~24 | ~0.6k |
+
+Geometries giảm khi đổi minigame (15 → 10) và không tăng qua các vòng → view cũ được giải phóng.
