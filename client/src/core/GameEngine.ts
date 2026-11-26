@@ -7,6 +7,7 @@ import { MaterialLibrary } from './MaterialLibrary.ts';
 import { SceneManager, type SceneLoader } from './SceneManager.ts';
 import { keyboardToWorldDir } from './inputMath.ts';
 import type { FrameInput } from './GameScene.ts';
+import type { MatchNetAdapter } from '../network/types.ts';
 
 export interface EngineOptions {
   quality: QualityLevel;
@@ -23,6 +24,13 @@ export const playgroundLoader: SceneLoader = async (ctx) => {
   const mod = await import('../scenes/playground/PlaygroundScene.ts');
   return mod.createPlaygroundScene(ctx);
 };
+
+export function networkArenaLoader(net: MatchNetAdapter): SceneLoader {
+  return async (ctx) => {
+    const mod = await import('../scenes/arena/NetworkArenaScene.ts');
+    return mod.createNetworkArenaScene(ctx, net);
+  };
+}
 
 /** Framework-agnostic game runtime. React mounts it into a div and only talks to it via methods/callbacks. */
 export class GameEngine {

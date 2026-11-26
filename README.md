@@ -3,7 +3,8 @@
 Game web 3D multiplayer (tối đa 4 người, người thật + NPC) gồm nhiều minigame loại trực tiếp.
 Three.js + React + Vite (client), Node.js + Colyseus (server), TypeScript toàn bộ.
 
-> Trạng thái: Phase 0–1 xong (nền tảng + sân thử 3D). Xem [PROGRESS.md](PROGRESS.md).
+> Trạng thái: Phase 0–2 xong (nền tảng 3D + multiplayer: phòng, lobby, đồng bộ di chuyển). Xem [PROGRESS.md](PROGRESS.md).
+> Hướng dẫn test 4 người: [TESTING.md](TESTING.md).
 
 ## Yêu cầu
 
@@ -31,7 +32,15 @@ npm run dev:server     # http://localhost:2567
 npm run dev:client     # http://localhost:5173
 ```
 
-Mở http://localhost:5173 → **Vào sân thử**.
+Mở http://localhost:5173 → nhập tên → **Tạo phòng** (hoặc **Sân thử (offline)**).
+
+### Cấu hình
+
+| Biến | Nơi đặt | Mặc định | Ý nghĩa |
+|---|---|---|---|
+| `PORT` | server | `2567` | Cổng Colyseus |
+| `VITE_SERVER_URL` | client (lúc build) | `http(s)://<host đang mở trang>:2567` | Địa chỉ server khi deploy khác máy/cổng |
+| `COLYSEUS_LATENCY` | server | – | Giả lập độ trễ (ms) để thử prediction |
 
 ## Chạy bằng Docker
 
