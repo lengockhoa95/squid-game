@@ -13,4 +13,17 @@ describe('headless bots-only matches', () => {
       }
     }
   }, 120000);
+
+  it('also end correctly with element mode on and off; bots use their elements', () => {
+    let casts = 0;
+    for (let seed = 20; seed <= 27; seed++) {
+      const on = simulateMatch(seed, ['EASY', 'NORMAL', 'HARD', 'SMART'], undefined, true);
+      expect(on.winnerId, `seed ${seed}`).not.toBe('');
+      casts += on.casts;
+      const off = simulateMatch(seed, ['EASY', 'NORMAL', 'HARD', 'SMART'], undefined, false);
+      expect(off.winnerId).not.toBe('');
+      expect(off.casts).toBe(0);
+    }
+    expect(casts).toBeGreaterThan(20);
+  }, 120000);
 });

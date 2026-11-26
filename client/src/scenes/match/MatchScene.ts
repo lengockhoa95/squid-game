@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { INPUT_BATCH, SLOT_LOOKS, type MinigameId, type MoveBatch, type QualityPreset } from '@sp/shared';
+import {
+  ELEMENTS, INPUT_BATCH, SLOT_LOOKS, effectStep, isElementId, type MinigameId, type MoveBatch, type QualityPreset, type StepFn,
+} from '@sp/shared';
 import type { CameraPreset, ClickHit, FrameInput, GameScene, SceneContext } from '../../core/GameScene.ts';
 import { ResourceTracker } from '../../core/ResourceTracker.ts';
 import { PlayerModel } from '../../player/PlayerModel.ts';
@@ -10,6 +12,8 @@ import { LocalPredictor } from '../../player/LocalPredictor.ts';
 import { RemoteInterpolator, createSample } from '../../player/RemoteInterpolator.ts';
 import type { MatchNetAdapter, NetPlayer } from '../../network/types.ts';
 import { VIEW_LOADERS, type MinigameView, type ViewFrame } from '../../minigames/framework/MinigameView.ts';
+import { ElementEffectsView } from '../../elements/ElementEffectsView.ts';
+import { elementUi } from '../../elements/elementUi.ts';
 
 const MAX_STEPS_PER_FRAME = 6;
 /** Other players are drawn this far in the past so there are always two snapshots to blend. */
@@ -47,6 +51,9 @@ class MatchScene implements GameScene {
   private viewToken = 0;
   private pendingPreset: CameraPreset | null = null;
   private local: PlayerController | null = null;
+  /** Step used for the local prediction: the game's step wrapped with element effects. */
+  private localStep: StepFn | null = null;
+  private readonly effects: ElementEffectsView;
   private seqInitialized = false;
   private generation = 0;
   private accumulator = 0;
@@ -61,6 +68,8 @@ class MatchScene implements GameScene {
     this.root.background = new THREE.Color(0x10131f);
     this.marker = new ClickMarker(this.resources);
     this.root.add(this.marker.mesh);
+    this.effects = new ElementEffectsView(ctx.materials);
+    this.root.add(this.effects.root);
     this.unsubscribe = net.onSnapshot(() => this.onSnapshot(performance.now()));
     this.onSnapshot(performance.now());
   }
@@ -102,6 +111,10 @@ class MatchScene implements GameScene {
       a.anim.update(dt, this.sample.speed, this.sample.grounded);
     }
 
+    this.effects.update(dt, state, gameTime, (id) => {
+      const a = this.actors.get(id);
+      return a && a.model.group.visible ? a.model.group.position : null;
+    });
     this.updateCameraTarget();
     if (this.view) {
       this.frame ??= { gameTime, state, focus: this.cameraTarget, localId: this.net.localId };
@@ -135,6 +148,11 @@ class MatchScene implements GameScene {
       this.spectateIndex++; // spectators click to watch the next player
       return;
     }
+    if (elementUi.get().aiming) {
+      elementUi.set({ aiming: false });
+      this.castAt(hit);
+      return;
+    }
     if (this.net.getPhase() !== 'ROUND_PLAYING' || !this.view || !this.frame) return;
     const action = this.view.actionForClick(hit, this.frame);
     if (action) {
@@ -154,7 +172,15 @@ class MatchScene implements GameScene {
     if (action) this.net.sendAction(action);
   }
 
+  onCastAt(hit: ClickHit | null): void {
+    this.castAt(hit);
+  }
+
   onStop(): void {
+    if (elementUi.get().aiming) {
+      elementUi.set({ aiming: false }); // right click cancels aiming instead of stopping
+      return;
+    }
     this.local?.stop();
     this.marker.hide();
   }
@@ -179,6 +205,8 @@ class MatchScene implements GameScene {
 
   dispose(): void {
     this.unsubscribe();
+    elementUi.set({ aiming: false });
+    this.effects.dispose();
     this.viewToken++;
     this.disposeView();
     for (const a of this.actors.values()) a.model.dispose();
@@ -193,6 +221,16 @@ class MatchScene implements GameScene {
       if (p.id === this.net.localId) me = p;
     });
     return me;
+  }
+
+  /** Use the local player's element. Point elements in movement games need a ground point. */
+  private castAt(hit: ClickHit | null): void {
+    const me = this.localPlayer();
+    if (!me || !me.alive || me.roundState !== 'ACTIVE' || this.net.getPhase() !== 'ROUND_PLAYING') return;
+    if (!isElementId(me.element)) return;
+    const pointAim = ELEMENTS[me.element].aim === 'point' && this.view?.step != null;
+    if (pointAim && !hit) return;
+    this.net.sendCast(pointAim && hit ? hit.x : 0, pointAim && hit ? hit.z : 0);
   }
 
   private updateCameraTarget(): void {
@@ -232,6 +270,7 @@ class MatchScene implements GameScene {
     if (!state) return;
     const phase = this.net.getPhase();
     if (state.currentGame && state.currentGame !== this.viewGame) void this.loadView(state.currentGame as MinigameId);
+    this.effects.syncField(state);
     if (phase === 'ROUND_INTRO' && this.lastPhase !== 'ROUND_INTRO') {
       this.participants.clear();
       state.players.forEach((p) => {
@@ -290,8 +329,10 @@ class MatchScene implements GameScene {
       this.predictor.setNextSeq(p.lastSeq + 1);
       this.seqInitialized = true;
     }
-    if (!this.local) {
-      this.local = new PlayerController(step, actor.model, p.x, p.z, p.yaw);
+    if (!this.local || !this.localStep) {
+      // NetPlayer is the live schema object, so stun/haste changes reach the wrapped step automatically.
+      this.localStep = effectStep(step, this.effects.field, p, this.net.localId);
+      this.local = new PlayerController(this.localStep, actor.model, p.x, p.z, p.yaw);
       this.predictor.clear();
       this.accumulator = 0;
     }
@@ -299,7 +340,7 @@ class MatchScene implements GameScene {
     const bx = s.x;
     const by = s.y;
     const bz = s.z;
-    this.predictor.reconcile(s, p, p.lastSeq, step);
+    this.predictor.reconcile(s, p, p.lastSeq, this.localStep);
     this.local.applyCorrection(s.x - bx, s.y - by, s.z - bz);
     // Keep the interpolator primed so switching back to interpolation does not jump.
     actor.interp.push(now, p.x, p.y, p.z, p.yaw, Math.hypot(p.vx, p.vz), p.grounded);

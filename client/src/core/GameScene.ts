@@ -44,6 +44,8 @@ export interface GameScene {
   takeCameraPreset?(): CameraPreset | null;
   onStop(): void;
   onJump(): void;
+  /** Cast key pressed: `hit` is the ground point under the cursor (null if unknown). */
+  onCastAt?(hit: ClickHit | null): void;
   applyQuality(p: QualityPreset): void;
   entityCount(): number;
   dispose(): void;

@@ -6,7 +6,8 @@
 ./scripts/check.sh        # typecheck + unit/integration test + build
 npm run sim -- 500        # 500 trận toàn NPC: luôn kết thúc với 1 người thắng, in tỉ lệ thắng
 ./scripts/dev.sh &        # rồi:
-npm run e2e               # Chrome thật: 2 người + 2 NPC (reload, host rời), 1 người + 3 NPC cả trận
+npm run e2e               # Chrome thật: 2 người + 2 NPC (reload, host rời), 1 người + 3 NPC cả trận, chế độ Nguyên tố
+node e2e/elements.mjs     # riêng chế độ Nguyên tố; PICKS="Đất,Nước" chọn nguyên tố; server SP_GAMES=RLGL để ép minigame
 ```
 
 E2E cần Google Chrome (`CHROME_PATH` để đổi đường dẫn, `BASE_URL` để chạy với bản build/Docker,

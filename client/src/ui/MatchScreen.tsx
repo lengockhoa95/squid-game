@@ -14,6 +14,7 @@ import {
   CountdownOverlay, PlayerList, ResultsCard, RoundHeader, RulesCard, StatusBanner, WinnerCard,
 } from './match/MatchOverlays.tsx';
 import { useMatchSounds } from './match/useMatchSounds.ts';
+import { ElementBar, ElementPicker } from '../elements/ElementHud.tsx';
 import { RlglHud } from '../minigames/RedLightGreenLight/Hud.tsx';
 import { BridgeHud } from '../minigames/GlassBridge/Hud.tsx';
 import { RaceHud } from '../minigames/ObstacleRace/Hud.tsx';
@@ -33,13 +34,13 @@ function PhaseLayer({ net }: { net: MatchNetAdapter }) {
   const game = useStore(sessionStore, (s) => s.currentGame);
   switch (phase) {
     case 'ROUND_INTRO':
-      return <RulesCard />;
+      return <><RulesCard /><ElementPicker net={net} /></>;
     case 'ROUND_COUNTDOWN':
-      return <CountdownOverlay />;
+      return <><CountdownOverlay /><ElementPicker net={net} /></>;
     case 'ROUND_PLAYING': {
       if (!game) return null;
       const Hud = HUDS[game];
-      return <Hud net={net} />;
+      return <><Hud net={net} /><ElementBar net={net} /></>;
     }
     case 'ROUND_RESULT':
       return <ResultsCard />;
@@ -55,6 +56,7 @@ export function MatchScreen() {
   const roomCode = useStore(sessionStore, (s) => s.roomCode);
   const amHost = useStore(sessionStore, (s) => s.myId !== '' && s.myId === s.hostId);
   const game = useStore(sessionStore, (s) => s.currentGame);
+  const playing = useStore(sessionStore, (s) => s.phase === 'ROUND_PLAYING');
   useMatchSounds();
   // The adapter and scene loader are bound to the current session; created once per mounted match screen.
   const adapter = useMemo(() => network.getAdapter(), []);
@@ -78,7 +80,7 @@ export function MatchScreen() {
       <StatusBanner />
       <PhaseLayer net={adapter} />
       <DebugOverlay />
-      {movement && <ControlsHint />}
+      {movement && playing && <ControlsHint />}
     </div>
   );
 }

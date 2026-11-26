@@ -14,6 +14,7 @@ export interface LobbyPlayer {
   alive: boolean;
   roundState: string;
   team: number;
+  element: string;
 }
 
 export interface ResultRow {
@@ -42,6 +43,7 @@ export interface SessionState {
   /** Whole seconds left in the current phase (rounded up) — changes at most once per second. */
   timerSeconds: number;
   winnerId: string;
+  elementsEnabled: boolean;
   results: readonly ResultRow[];
   /** Sorted by slot. Only replaced when listed fields change (never on movement patches). */
   players: readonly LobbyPlayer[];
@@ -62,6 +64,7 @@ export const sessionStore = createStore<SessionState>({
   currentGame: '',
   timerSeconds: 0,
   winnerId: '',
+  elementsEnabled: true,
   results: [],
   players: [],
 });

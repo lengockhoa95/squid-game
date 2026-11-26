@@ -35,6 +35,10 @@ export interface ServerMinigame {
   readonly id: MinigameId;
   /** Movement games return the step function used for player simulation; null if players do not walk. */
   readonly step: StepFn | null;
+  /** Movement games: playable area (element clones stay inside it). */
+  readonly bounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
+  /** Non-movement games that support the SWAP element: exchange two players' progress. */
+  swapPlayers?(a: string, b: string): boolean;
   initialize(ctx: MinigameContext): void;
   start(): void;
   handlePlayerInput(playerId: string, action: GameAction, gameTime: number): void;

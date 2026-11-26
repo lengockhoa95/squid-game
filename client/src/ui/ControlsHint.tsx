@@ -10,6 +10,7 @@ export function ControlsHint() {
       <span>{vi.controlWheel}</span>
       <span>{vi.controlMiddle}</span>
       <span>{vi.controlKeys}</span>
+      <span>{vi.controlElement}</span>
       <span>{vi.controlDebug}</span>
     </div>
   );

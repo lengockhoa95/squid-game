@@ -1,7 +1,7 @@
 import { Client, CloseCode, type Room } from '@colyseus/sdk';
 import {
   MSG, ROOM_NAME, isDifficulty, vi,
-  type Difficulty, type ErrorMessage, type GameAction, type MinigameId, type MoveBatch, type NpcConfigMessage, type Phase,
+  type Difficulty, type ElementId, type ErrorMessage, type GameAction, type MinigameId, type MoveBatch, type NpcConfigMessage, type Phase,
 } from '@sp/shared';
 import { MatchState } from '@sp/shared/schema';
 import { getServerUrl } from './serverUrl.ts';
@@ -100,6 +100,10 @@ class NetworkManager {
     this.room?.send(MSG.NPC_CONFIG, config);
   }
 
+  setElementsEnabled(enabled: boolean): void {
+    this.room?.send(MSG.ELEMENTS_TOGGLE, { enabled });
+  }
+
   /** Adapter for the networked scene; null when not in a room. */
   getAdapter(): MatchNetAdapter | null {
     if (!this.room) return null;
@@ -115,6 +119,8 @@ class NetworkManager {
       },
       sendMove: (batch: MoveBatch) => this.room?.send(MSG.MOVE, batch),
       sendAction: (action: GameAction) => this.room?.send(MSG.ACTION, action),
+      sendCast: (x: number, z: number) => this.room?.send(MSG.CAST, { x, z }),
+      pickElement: (element: ElementId) => this.room?.send(MSG.PICK_ELEMENT, { element }),
       gameTimeNow: () => {
         const phase = this.room?.state.phase;
         if (phase !== 'ROUND_PLAYING') return this.lastGameTime;
@@ -212,6 +218,7 @@ class NetworkManager {
       currentGame: state.currentGame as MinigameId | '',
       timerSeconds: Math.ceil(state.timer),
       winnerId: state.winnerId,
+      elementsEnabled: state.elementsEnabled,
     });
 
     let resultsSig = '';
@@ -227,7 +234,7 @@ class NetworkManager {
 
     let signature = '';
     state.players.forEach((p) => {
-      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.difficulty}|${p.ready}|${p.connected}|${p.alive}|${p.roundState}|${p.team};`;
+      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.difficulty}|${p.ready}|${p.connected}|${p.alive}|${p.roundState}|${p.team}|${p.element};`;
     });
     if (signature === this.lobbySignature) return;
     this.lobbySignature = signature;
@@ -235,7 +242,7 @@ class NetworkManager {
     state.players.forEach((p) => {
       players.push({
         id: p.id, nickname: p.nickname, slot: p.slot, isBot: p.isBot, difficulty: p.difficulty, ready: p.ready,
-        connected: p.connected, alive: p.alive, roundState: p.roundState, team: p.team,
+        connected: p.connected, alive: p.alive, roundState: p.roundState, team: p.team, element: p.element,
       });
     });
     players.sort((a, b) => a.slot - b.slot);

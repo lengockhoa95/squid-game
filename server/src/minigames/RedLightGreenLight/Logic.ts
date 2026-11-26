@@ -8,7 +8,9 @@ import { rankPlayers, type GamePlayer, type MinigameContext, type RoundOutcome, 
  */
 export class RedLightGreenLight implements ServerMinigame {
   readonly id = 'RLGL' as const;
-  readonly step: StepFn = staticWorldStep(createRlglWorld());
+  private readonly world = createRlglWorld();
+  readonly step: StepFn = staticWorldStep(this.world);
+  readonly bounds = this.world.bounds;
   private ctx!: MinigameContext;
   private state!: RlglState;
   private light: LightColor = 'GREEN';

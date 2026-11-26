@@ -75,6 +75,18 @@
 
 Tỉ lệ thắng: EASY 0% · NORMAL 4% · HARD 28% · SMART 68%. Trung bình 2,7 vòng/trận (4 người).
 
+## Phase 8 — Chế độ Nguyên tố ✅
+
+Thiết kế: [docs/superpowers/specs/2026-11-26-elements-design.md](docs/superpowers/specs/2026-11-26-elements-design.md). Không cân bằng (theo yêu cầu: vui là chính).
+
+- [x] 9 nguyên tố: Đất, Nước, Lôi, Gió, Lửa, Hoán đổi, Phân thân, Không gian, Bóng tối; danh sách riêng cho game không di chuyển
+- [x] Host bật/tắt trong lobby; chọn lúc hiện luật/đếm ngược; nút HUD + click ngắm hoặc phím F tại con trỏ
+- [x] Server quyết định mọi thứ (phase, hồi chiêu, choáng, tầm xa, mục tiêu); hiệu ứng di chuyển dùng chung `effectStep` cho server và client prediction
+- [x] NPC dùng nguyên tố theo luật (nhắm người dẫn đầu / người ở gần)
+- [x] Hiệu ứng 3D (cột, vũng, sét, vòng gió, dịch chuyển, bản sao, choáng, lửa), lớp phủ bóng tối, âm thanh
+- [x] Test: 139 unit/integration; mô phỏng trận bật/tắt nguyên tố; E2E `e2e/elements.mjs` (chọn + dùng chiêu bằng nút và phím F)
+- [x] `SP_GAMES` để giới hạn minigame khi test
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).
@@ -82,4 +94,5 @@ Tỉ lệ thắng: EASY 0% · NORMAL 4% · HARD 28% · SMART 68%. Trung bình 2,
 - Chỉ hỗ trợ chuột + bàn phím (chưa có điều khiển cảm ứng).
 - Camera chưa tránh tường; khi FPS < 10 nhân vật của mình đi chậm hơn.
 - Room code duy nhất trong 1 tiến trình server (đủ cho triển khai 1 server).
+- Chế độ Nguyên tố cố tình không cân bằng; hiệu ứng tức thời (gió, hoán đổi, dịch chuyển) làm nhân vật của mình giật nhẹ một lần do server sửa vị trí.
 - Ở chế độ dev, lần E2E đầu tiên ngay sau khi Vite khởi động có thể lỗi do Vite tự tải lại trang khi tối ưu dependency.

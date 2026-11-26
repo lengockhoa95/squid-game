@@ -179,4 +179,35 @@ describe('MatchRoom match flow', () => {
     // Only one player left: the match ends with the host as winner.
     await waitFor(() => state.winnerId === host.sessionId, 10000);
   }, 20000);
+
+  it('element mode: only the host toggles it; players pick during the intro and cast while playing', async () => {
+    const { host, others, state } = await createLobby(['Host', 'Guest']);
+    const guest = others[0]!;
+    const denied = guest.waitForMessage(MSG.ERROR);
+    guest.send(MSG.ELEMENTS_TOGGLE, { enabled: false });
+    expect(await denied).toEqual({ code: 'NOT_HOST' });
+    host.send(MSG.ELEMENTS_TOGGLE, { enabled: false });
+    await waitFor(() => !state.elementsEnabled);
+    host.send(MSG.ELEMENTS_TOGGLE, { enabled: true });
+    await waitFor(() => state.elementsEnabled);
+
+    host.send(MSG.NPC_CONFIG, { count: 0, difficulties: [] });
+    host.send(MSG.READY, { ready: true });
+    guest.send(MSG.READY, { ready: true });
+    await waitFor(() => [...state.players.values()].every((p) => p.ready));
+    host.send(MSG.START);
+    await waitFor(() => state.phase === 'ROUND_INTRO');
+    const me = state.players.get(host.sessionId)!;
+    expect(me.element).not.toBe('');
+    host.send(MSG.PICK_ELEMENT, { element: 'THUNDER' }); // allowed in every game
+    await waitFor(() => me.element === 'THUNDER');
+    host.send(MSG.PICK_ELEMENT, { element: 'NUKE' });
+    host.send(MSG.CAST, { x: 'a', z: 0 });
+    await waitFor(() => state.phase === 'ROUND_PLAYING', 5000);
+    await waitFor(() => state.gameTime > 1.1, 5000);
+    const g = state.players.get(guest.sessionId)!;
+    host.send(MSG.CAST, { x: g.x, z: g.z });
+    await waitFor(() => me.elementReadyAt > state.gameTime, 3000);
+    expect(state.effects.some((e) => e.kind === 'BOLT')).toBe(true);
+  }, 20000);
 });

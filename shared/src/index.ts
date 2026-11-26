@@ -21,3 +21,6 @@ export * from './validation/roomCode.ts';
 export * from './validation/nickname.ts';
 export * from './validation/moveBatch.ts';
 export * from './validation/action.ts';
+export * from './elements/elements.ts';
+export * from './elements/effectStep.ts';
+export * from './elements/messages.ts';

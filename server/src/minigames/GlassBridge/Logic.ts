@@ -104,6 +104,25 @@ export class GlassBridge implements ServerMinigame {
     };
   }
 
+  /** SWAP element: two standing players exchange places and progress. */
+  swapPlayers(a: string, b: string): boolean {
+    const pa = this.ctx.players.find((p) => p.id === a);
+    const pb = this.ctx.players.find((p) => p.id === b);
+    if (!pa || !pb || a === b) return false;
+    for (const p of [pa, pb]) {
+      if (p.state.roundState !== 'ACTIVE' || this.jumps.has(p.id) || this.falls.has(p.id)) return false;
+    }
+    const ax = pa.state.x, az = pa.state.z, ay = pa.state.y;
+    this.place(pa, pb.state.x, pb.state.z, pb.state.y);
+    this.place(pb, ax, az, ay);
+    const progA = this.progress.get(a) ?? 0;
+    this.progress.set(a, this.progress.get(b) ?? 0);
+    this.progress.set(b, progA);
+    pa.state.score = this.progress.get(a)!;
+    pb.state.score = progA;
+    return true;
+  }
+
   getState(): BridgeState {
     return this.state;
   }

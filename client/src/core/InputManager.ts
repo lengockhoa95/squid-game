@@ -18,7 +18,7 @@ const LEFT_KEYS = ['KeyA', 'ArrowLeft'];
 const RIGHT_KEYS = ['KeyD', 'ArrowRight'];
 const GAME_KEYS = new Set([
   ...FORWARD_KEYS, ...BACK_KEYS, ...LEFT_KEYS, ...RIGHT_KEYS,
-  'Space', 'KeyQ', 'KeyE', 'KeyX', 'F3', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract',
+  'Space', 'KeyQ', 'KeyE', 'KeyX', 'KeyF', 'F3', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract',
 ]);
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -43,6 +43,8 @@ export class InputManager {
   private rightTotalDy = 0;
   private rightDragging = false;
   private enabled = true;
+  /** Last pointer position over the view in NDC (for "cast at cursor"). */
+  readonly pointer = { x: 0, y: 0, valid: false };
 
   constructor(host: HTMLElement, handlers: InputHandlers) {
     this.host = host;
@@ -132,6 +134,12 @@ export class InputManager {
   };
 
   private readonly onPointerMove = (e: PointerEvent): void => {
+    const rect = this.host.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.pointer.valid = true;
+    }
     if (!this.enabled) return;
     if (this.rightDown) {
       this.rightTotalDx += e.movementX;

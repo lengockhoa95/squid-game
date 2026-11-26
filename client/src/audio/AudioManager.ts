@@ -3,7 +3,7 @@
  * The AudioContext is created lazily on first use; browsers only allow it after a user gesture,
  * which every sound here follows (clicks in menus / in game).
  */
-type Cue = 'tick' | 'go' | 'red' | 'green' | 'out' | 'pass' | 'win' | 'break' | 'pull' | 'click';
+type Cue = 'tick' | 'go' | 'red' | 'green' | 'out' | 'pass' | 'win' | 'break' | 'pull' | 'click' | 'cast' | 'zap' | 'whoosh' | 'rumble';
 
 const CUES: Record<Cue, ReadonlyArray<[freq: number, start: number, dur: number, type: OscillatorType]>> = {
   tick: [[660, 0, 0.09, 'square']],
@@ -16,6 +16,10 @@ const CUES: Record<Cue, ReadonlyArray<[freq: number, start: number, dur: number,
   break: [[1800, 0, 0.05, 'square'], [1200, 0.03, 0.08, 'square'], [700, 0.07, 0.12, 'sawtooth']],
   pull: [[180, 0, 0.07, 'square']],
   click: [[900, 0, 0.04, 'triangle']],
+  cast: [[440, 0, 0.08, 'triangle'], [880, 0.05, 0.12, 'triangle']],
+  zap: [[2200, 0, 0.04, 'sawtooth'], [600, 0.03, 0.1, 'square'], [1800, 0.1, 0.06, 'sawtooth']],
+  whoosh: [[300, 0, 0.25, 'triangle'], [520, 0.05, 0.2, 'sine']],
+  rumble: [[90, 0, 0.3, 'sawtooth'], [70, 0.1, 0.3, 'square']],
 };
 
 class AudioManager {

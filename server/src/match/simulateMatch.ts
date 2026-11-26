@@ -17,10 +17,16 @@ export interface SimulatedMatch {
 const MAX_TICKS = 60 * 60 * 15; // 15 simulated minutes: a match must end well before this
 
 /** Run a full bots-only match headless at the fixed simulation step. Throws if it never ends. */
-export function simulateMatch(seed: number, difficulties: readonly Difficulty[], available?: MinigameId[]): SimulatedMatch {
+export function simulateMatch(
+  seed: number,
+  difficulties: readonly Difficulty[],
+  available?: MinigameId[],
+  elements = true,
+): SimulatedMatch & { casts: number } {
   const rng = createRng(seed);
   const state = new MatchState();
   state.phase = 'LOBBY';
+  state.elementsEnabled = elements;
   const sims = new Map<string, PlayerSim>();
   const npcs = new NPCManager(seed * 7919);
   const specs = NPCManager.planBots(Math.min(MAX_PLAYERS, difficulties.length), difficulties, new Set(), rng);
@@ -37,8 +43,16 @@ export function simulateMatch(seed: number, difficulties: readonly Difficulty[],
   const phasesSeen = new Set<string>();
   controller.begin();
   let ticks = 0;
+  let casts = 0;
+  let lastEffect = 0;
   while (!over) {
     controller.update(SIM_DT);
+    for (const e of state.effects) {
+      if (e.id > lastEffect) {
+        lastEffect = e.id;
+        casts++;
+      }
+    }
     phasesSeen.add(state.phase);
     if (++ticks > MAX_TICKS) throw new Error(`Match did not finish (phase ${state.phase}, round ${state.roundIndex})`);
   }
@@ -50,5 +64,6 @@ export function simulateMatch(seed: number, difficulties: readonly Difficulty[],
     games: controller.playedGames,
     ticks,
     phasesSeen,
+    casts,
   };
 }

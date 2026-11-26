@@ -1,4 +1,4 @@
-import { MINIGAMES, type GameAction, type MinigameId, type MoveBatch, type Phase } from '@sp/shared';
+import { MINIGAMES, type ElementId, type GameAction, type MinigameId, type MoveBatch, type Phase, type StepFn } from '@sp/shared';
 import { RoundResultEntry, type MatchState, type PlayerState } from '@sp/shared/schema';
 import type { PlayerSim } from '../players/PlayerSim.ts';
 import { syncPlayerFromSim } from '../players/sync.ts';
@@ -9,6 +9,7 @@ import { MINIGAME_FACTORIES, availableMinigames } from '../minigames/framework/r
 import { pickNextGame, planRoundCount } from './RoundScheduler.ts';
 import { decideEliminations } from './EliminationPolicy.ts';
 import { assertTransition } from './MatchStateMachine.ts';
+import { ElementSystem, type CastResult } from '../elements/ElementSystem.ts';
 
 export const PHASE_SECONDS = {
   ROUND_INTRO: 5,
@@ -40,10 +41,13 @@ export class MatchController {
   private participants: GamePlayer[] = [];
   private history: MinigameId[] = [];
   private readonly available: MinigameId[];
+  private readonly steps = new Map<string, StepFn>();
+  readonly elements: ElementSystem;
 
   constructor(deps: MatchDeps, available: MinigameId[] = availableMinigames()) {
     this.d = deps;
     this.available = available;
+    this.elements = new ElementSystem(deps.state, deps.rng);
   }
 
   get phase(): Phase {
@@ -106,7 +110,16 @@ export class MatchController {
     if (this.phase !== 'ROUND_PLAYING' || !this.game) return;
     const p = this.participant(id);
     if (!p || !p.state.alive || p.state.roundState !== 'ACTIVE') return;
+    if (this.d.state.gameTime < p.state.stunUntil) return; // struck by lightning: actions are locked
     this.game.handlePlayerInput(id, action, this.d.state.gameTime);
+  }
+
+  pickElement(id: string, element: ElementId): boolean {
+    return this.elements.pick(id, element);
+  }
+
+  castElement(id: string, x: number, z: number): CastResult {
+    return this.elements.cast(id, x, z, this.d.state.gameTime);
   }
 
   /** A human left for good during the match: they forfeit (eliminated). */
@@ -122,6 +135,8 @@ export class MatchController {
 
   /** Stop the match immediately (e.g. the room returns to the lobby). */
   abort(): void {
+    this.elements.clear();
+    this.steps.clear();
     this.game?.dispose();
     this.game = null;
     this.strategy = null;
@@ -158,6 +173,10 @@ export class MatchController {
       rttOf: (pid) => this.d.rttOf(pid),
     });
     if (this.game.step) for (const p of this.participants) syncPlayerFromSim(p.state, p.sim);
+    this.elements.beginRound(this.participants, this.game);
+    this.steps.clear();
+    const base = this.game.step;
+    if (base) for (const p of this.participants) this.steps.set(p.id, this.elements.wrapStep(base, p));
     this.d.npcs.resetRound();
     this.setPhase('ROUND_INTRO', this.scaled(PHASE_SECONDS.ROUND_INTRO));
   }
@@ -177,11 +196,19 @@ export class MatchController {
     s.timer = Math.max(0, s.timer - dt);
 
     this.d.npcs.update(this.strategy, game.step !== null, dt, s.gameTime, (id, action) => this.handleAction(id, action));
+    if (this.elements.enabled) {
+      this.d.npcs.updateElements(dt, s.gameTime, {
+        movement: game.step !== null,
+        others: (botId) => this.participants.filter((p) => p.id !== botId && p.state.alive && p.state.roundState === 'ACTIVE'),
+        cast: (botId, x, z) => void this.castElement(botId, x, z),
+      });
+    }
     if (game.step) {
       for (const p of this.participants) {
-        if (p.state.alive && p.state.roundState === 'ACTIVE') p.sim.tick(game.step, s.gameTime);
+        if (p.state.alive && p.state.roundState === 'ACTIVE') p.sim.tick(this.steps.get(p.id) ?? game.step, s.gameTime);
       }
     }
+    this.elements.update(dt, s.gameTime);
     game.update(dt, s.gameTime);
     if (game.step) for (const p of this.participants) syncPlayerFromSim(p.state, p.sim);
 
@@ -194,6 +221,8 @@ export class MatchController {
     if (!game) return;
     const s = this.d.state;
     const outcome = game.finish();
+    this.elements.clear();
+    this.steps.clear();
     game.dispose();
     this.game = null;
     this.strategy = null;

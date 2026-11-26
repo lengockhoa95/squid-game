@@ -1,4 +1,4 @@
-import type { GameAction, MoveBatch, Phase } from '@sp/shared';
+import type { ElementId, GameAction, MoveBatch, Phase } from '@sp/shared';
 import type { MatchState } from '@sp/shared/schema';
 
 /** Read-only view of a synced player (structurally matches the PlayerState schema). */
@@ -22,6 +22,11 @@ export interface NetPlayer {
   readonly yaw: number;
   readonly grounded: boolean;
   readonly lastSeq: number;
+  readonly element: string;
+  readonly elementReadyAt: number;
+  readonly stunUntil: number;
+  readonly hasteUntil: number;
+  readonly blindUntil: number;
 }
 
 /** What networked scenes/HUDs need from the session — keeps them SDK-agnostic. */
@@ -35,6 +40,9 @@ export interface MatchNetAdapter {
   onSnapshot(cb: () => void): () => void;
   sendMove(batch: MoveBatch): void;
   sendAction(action: GameAction): void;
+  /** Use the chosen element aimed at a ground point (self/auto elements ignore the point). */
+  sendCast(x: number, z: number): void;
+  pickElement(element: ElementId): void;
   /** Estimated server game time (seconds) now, extrapolated from the last patch. */
   gameTimeNow(): number;
 }

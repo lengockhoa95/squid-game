@@ -6,7 +6,7 @@ import { InputManager } from './InputManager.ts';
 import { MaterialLibrary } from './MaterialLibrary.ts';
 import { SceneManager, type SceneLoader } from './SceneManager.ts';
 import { keyboardToWorldDir } from './inputMath.ts';
-import type { FrameInput } from './GameScene.ts';
+import type { ClickHit, FrameInput } from './GameScene.ts';
 import type { MatchNetAdapter } from '../network/types.ts';
 
 export interface EngineOptions {
@@ -63,7 +63,10 @@ export class GameEngine {
       onCameraRotate: (dx, dy) => this.camera.rotateByMouse(dx, dy),
       onZoom: (steps) => this.camera.zoom(steps),
       onToggleDebug: () => this.opts.onToggleDebug(),
-      onKeyPress: (code) => this.scenes.active?.onKeyPress?.(code),
+      onKeyPress: (code) => {
+        if (code === 'KeyF') this.castAtPointer();
+        else this.scenes.active?.onKeyPress?.(code);
+      },
     });
   }
 
@@ -124,7 +127,21 @@ export class GameEngine {
     }
   }
 
+  private castAtPointer(): void {
+    const scene = this.scenes.active;
+    if (!scene?.onCastAt) return;
+    const p = this.input.pointer;
+    if (!p.valid) return scene.onCastAt(null);
+    this.raycastGround(p.x, p.y, (hit) => scene.onCastAt?.(hit), () => scene.onCastAt?.(null));
+  }
+
   private handleGroundPoint(ndcX: number, ndcY: number): void {
+    const scene = this.scenes.active;
+    if (!scene) return;
+    this.raycastGround(ndcX, ndcY, (hit) => scene.onGroundClick(hit));
+  }
+
+  private raycastGround(ndcX: number, ndcY: number, onHit: (hit: ClickHit) => void, onMiss?: () => void): void {
     const scene = this.scenes.active;
     if (!scene) return;
     this.ndc.set(ndcX, ndcY);
@@ -135,11 +152,13 @@ export class GameEngine {
     // Clicked a walkable top surface: use it. Clicked a wall side: fall back to the ground plane.
     // Instanced/interactive targets (e.g. glass tiles) count on any face; walkable surfaces only on top faces.
     if (top && (top.instanceId !== undefined || (top.face && top.face.normal.y > UP_NORMAL_MIN))) {
-      scene.onGroundClick({ x: top.point.x, y: top.point.y, z: top.point.z, object: top.object, instanceId: top.instanceId });
+      onHit({ x: top.point.x, y: top.point.y, z: top.point.z, object: top.object, instanceId: top.instanceId });
       return;
     }
     if (this.raycaster.ray.intersectPlane(this.groundPlane, this.hitPoint)) {
-      scene.onGroundClick({ x: this.hitPoint.x, y: 0, z: this.hitPoint.z, object: null, instanceId: undefined });
+      onHit({ x: this.hitPoint.x, y: 0, z: this.hitPoint.z, object: null, instanceId: undefined });
+    } else {
+      onMiss?.();
     }
   }
 }

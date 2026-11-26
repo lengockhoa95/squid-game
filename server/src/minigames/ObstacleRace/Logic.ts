@@ -10,6 +10,7 @@ export class ObstacleRace implements ServerMinigame {
   readonly id = 'OBSTACLE_RACE' as const;
   private readonly raceWorld = createRaceWorld();
   readonly step: StepFn = raceStep(this.raceWorld, MOVEMENT.radius);
+  readonly bounds = this.raceWorld.world.bounds;
   private ctx!: MinigameContext;
   private readonly finishTimes = new Map<string, number>();
   private readonly best = new Map<string, number>(); // furthest z reached (lower = further)

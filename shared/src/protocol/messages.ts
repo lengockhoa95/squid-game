@@ -12,6 +12,10 @@ export const MSG = {
   /** Server-initiated latency probe: server sends {t}, client echoes it back unchanged. */
   PING: 'ping',
   PONG: 'pong',
+  /** Element mode: pick an element during the round intro, cast it while playing, host toggles the mode. */
+  PICK_ELEMENT: 'pickElement',
+  CAST: 'cast',
+  ELEMENTS_TOGGLE: 'elementsToggle',
 } as const;
 
 export type Phase = 'LOBBY' | 'ROUND_INTRO' | 'ROUND_COUNTDOWN' | 'ROUND_PLAYING' | 'ROUND_RESULT' | 'MATCH_END';

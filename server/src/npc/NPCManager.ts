@@ -2,6 +2,7 @@ import { NPC_IDENTITIES, createRng, type Difficulty, type GameAction, type Minig
 import type { PlayerState } from '@sp/shared/schema';
 import type { PlayerSim } from '../players/PlayerSim.ts';
 import { NPCBot, type BotIO, type NpcStrategy } from './NPCBot.ts';
+import { updateBotElement, type ElementBotView } from '../elements/ElementBrain.ts';
 
 export interface BotSpec {
   id: string;
@@ -51,6 +52,14 @@ export class NPCManager {
 
   resetRound(): void {
     for (const bot of this.bots.values()) bot.resetRound();
+  }
+
+  /** Let every active bot consider using its element this tick. */
+  updateElements(dt: number, gameTime: number, view: ElementBotView): void {
+    for (const bot of this.bots.values()) {
+      if (!bot.state.alive || bot.state.roundState !== 'ACTIVE') continue;
+      updateBotElement(bot, dt, gameTime, view);
+    }
   }
 
   /**

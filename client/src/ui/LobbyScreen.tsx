@@ -5,6 +5,7 @@ import { sessionStore, type LobbyPlayer } from '../network/sessionStore.ts';
 import { useStore } from '../store/UIStore.ts';
 import { Avatar } from './Avatar.tsx';
 import { NpcSettings, DIFFICULTY_LABEL } from './NpcSettings.tsx';
+import { ElementsToggle } from '../elements/ElementsToggle.tsx';
 
 function PlayerCard({ p, isHost, isMe }: { p: LobbyPlayer; isHost: boolean; isMe: boolean }) {
   return (
@@ -85,6 +86,7 @@ export function LobbyScreen() {
         </ul>
 
         <NpcSettings editable={amHost} />
+        <ElementsToggle editable={amHost} />
 
         <div className="lobby-actions">
           <button
