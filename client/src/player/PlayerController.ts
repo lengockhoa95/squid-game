@@ -32,12 +32,14 @@ export class PlayerController {
   private prevZ: number;
   private visualYaw = 0;
 
-  constructor(world: SimWorld, model: PlayerModel, spawnX: number, spawnZ: number) {
+  constructor(world: SimWorld, model: PlayerModel, spawnX: number, spawnZ: number, spawnYaw = 0) {
     this.world = world;
     this.model = model;
     this.spawnX = spawnX;
     this.spawnZ = spawnZ;
     this.state = createCharacterState(spawnX, spawnZ);
+    this.state.yaw = spawnYaw;
+    this.visualYaw = spawnYaw;
     this.prevX = spawnX;
     this.prevY = 0;
     this.prevZ = spawnZ;

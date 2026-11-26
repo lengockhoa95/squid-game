@@ -65,7 +65,7 @@ class PlaygroundScene implements GameScene {
     const playerModel = new PlayerModel(ctx.materials, 0x3df5c8, 'none');
     this.models.push(playerModel);
     this.root.add(playerModel.group);
-    this.player = new PlayerController(this.world, playerModel, 0, 0);
+    this.player = new PlayerController(this.world, playerModel, 0, 0, Math.PI); // face away from the camera
 
     DEMO_BOTS.forEach((b, i) => {
       const model = new PlayerModel(ctx.materials, b.color, b.accessory);
