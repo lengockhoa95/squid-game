@@ -12,6 +12,17 @@ Three.js + React + Vite (client), Node.js + Colyseus (server), TypeScript toàn 
 - (tuỳ chọn) Docker 24+ và Docker Compose v2
 - Trình duyệt: Chrome hoặc Edge bản mới
 
+## Script tiện dụng
+
+| Script | Việc làm |
+|---|---|
+| `./scripts/setup.sh` | Kiểm tra Node 24+ và cài dependency |
+| `./scripts/dev.sh` | Chạy server (:2567) + client (:5173) cùng lúc, Ctrl+C tắt cả hai |
+| `./scripts/check.sh` | Typecheck + unit test + build (chạy trước khi push) |
+| `./scripts/docker-up.sh` | Build và chạy bằng Docker (client :8080, server :2567) |
+| `./scripts/docker-logs.sh [server\|client]` | Xem log Docker |
+| `./scripts/docker-down.sh` | Tắt Docker |
+
 ## Chạy local (phát triển)
 
 ```bash
