@@ -8,8 +8,17 @@ export const PlayerState = schema(
     slot: t.uint8(),
     joinOrder: t.uint32(),
     isBot: t.boolean(),
+    difficulty: t.string(),
     ready: t.boolean(),
     connected: t.boolean(),
+    /** Still in the match (not eliminated). */
+    alive: t.boolean().default(true),
+    /** Per-round status: ACTIVE, FINISHED (passed the goal) or OUT (failed this round). */
+    roundState: t.string().default('ACTIVE'),
+    /** Team index for team games, -1 otherwise. */
+    team: t.int8().default(-1),
+    /** Game-specific number shown in HUD/results (e.g. reaction total ms, bridge row). */
+    score: t.float32(),
     x: t.float32(),
     y: t.float32(),
     z: t.float32(),
@@ -25,13 +34,55 @@ export const PlayerState = schema(
 );
 export type PlayerState = InstanceType<typeof PlayerState>;
 
+export const RoundResultEntry = schema(
+  {
+    id: t.string(),
+    nickname: t.string(),
+    rank: t.uint8(),
+    passed: t.boolean(),
+    eliminated: t.boolean(),
+    detail: t.string(),
+  },
+  'RoundResultEntry',
+);
+export type RoundResultEntry = InstanceType<typeof RoundResultEntry>;
+
+export const RlglState = schema({ light: t.string(), songProgress: t.float32() }, 'RlglState');
+export type RlglState = InstanceType<typeof RlglState>;
+
+/** Tile values: 0 unknown, 1 broken, 2 revealed safe. Index = row * 2 + side. */
+export const BridgeState = schema({ rows: t.uint8(), tiles: t.array('uint8') }, 'BridgeState');
+export type BridgeState = InstanceType<typeof BridgeState>;
+
+/** Rope position in [-1, 1]: -1 = team 0 wins, +1 = team 1 wins. */
+export const TugState = schema({ rope: t.float32() }, 'TugState');
+export type TugState = InstanceType<typeof TugState>;
+
+export const ReactionState = schema({ stage: t.string(), attempt: t.uint8() }, 'ReactionState');
+export type ReactionState = InstanceType<typeof ReactionState>;
+
 export const MatchState = schema(
   {
     phase: t.string(),
     roomCode: t.string(),
     hostId: t.string(),
-    countdown: t.uint8(),
+    /** Desired NPC count and per-NPC difficulty, set by the host in the lobby. */
+    npcCount: t.uint8(),
+    npcDifficulties: t.array('string'),
+    totalRounds: t.uint8(),
+    roundIndex: t.uint8(),
+    currentGame: t.string(),
+    /** Seconds left in the current phase (intro / countdown / playing / result). */
+    timer: t.float32(),
+    /** Seconds since the current round started playing (drives moving hazards). */
+    gameTime: t.float32(),
+    winnerId: t.string(),
+    results: t.array(RoundResultEntry),
     players: t.map(PlayerState),
+    rlgl: t.ref(RlglState).optional(),
+    bridge: t.ref(BridgeState).optional(),
+    tug: t.ref(TugState).optional(),
+    reaction: t.ref(ReactionState).optional(),
   },
   'MatchState',
 );

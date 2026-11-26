@@ -8,6 +8,8 @@ export interface InputHandlers {
   onCameraRotate(dx: number, dy: number): void;
   onZoom(steps: number): void;
   onToggleDebug(): void;
+  /** Any game key pressed (not repeated). */
+  onKeyPress(code: string): void;
 }
 
 const FORWARD_KEYS = ['KeyW', 'ArrowUp'];
@@ -178,6 +180,7 @@ export class InputManager {
     }
     if (e.repeat) return;
     this.keys.add(e.code);
+    this.handlers.onKeyPress(e.code);
     if (e.code === 'Space') this.handlers.onJump();
     else if (e.code === 'KeyX') this.handlers.onStop();
     else if (e.code === 'Equal' || e.code === 'NumpadAdd') this.handlers.onZoom(-1);

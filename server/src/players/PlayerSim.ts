@@ -1,4 +1,4 @@
-import { createCharacterState, stepCharacter, SIM_DT, type CharacterState, type MoveBatch, type MoveIntent, type SimWorld } from '@sp/shared';
+import { createCharacterState, SIM_DT, type CharacterState, type MoveBatch, type MoveIntent, type StepFn } from '@sp/shared';
 
 const QUEUE_CAP = 12; // ~200ms of inputs
 const MAX_CREDIT = 4; // max steps per tick when catching up after jitter
@@ -48,8 +48,8 @@ export class PlayerSim {
     return accepted;
   }
 
-  /** Called once per server simulation tick (SIM_HZ). */
-  tick(world: SimWorld): void {
+  /** Called once per server simulation tick (SIM_HZ). `t` is the round game time for moving hazards. */
+  tick(step: StepFn, t = 0): void {
     this.credit = Math.min(MAX_CREDIT, this.credit + 1);
     let processed = 0;
     while (this.credit >= 1 && this.count > 0) {
@@ -57,7 +57,7 @@ export class PlayerSim {
       this.intent.dirX = this.qDx[idx]!;
       this.intent.dirZ = this.qDz[idx]!;
       this.intent.jump = this.qJump[idx] === 1;
-      stepCharacter(this.state, this.intent, SIM_DT, world);
+      step(this.state, this.intent, SIM_DT, t);
       this.lastProcessedSeq = this.qSeq[idx]!;
       this.head = (this.head + 1) % QUEUE_CAP;
       this.count--;
@@ -74,9 +74,14 @@ export class PlayerSim {
       this.intent.dirX = 0;
       this.intent.dirZ = 0;
       this.intent.jump = false;
-      stepCharacter(this.state, this.intent, SIM_DT, world);
+      step(this.state, this.intent, SIM_DT, t);
       this.credit--;
     }
+  }
+
+  /** Next sequence number a server-side driver (NPC) should use. */
+  get nextSeq(): number {
+    return this.lastQueuedSeq + 1;
   }
 
   reset(x: number, z: number, yaw: number): void {
@@ -91,5 +96,7 @@ export class PlayerSim {
     this.count = 0;
     this.credit = 0;
     this.starved = 0;
+    // Queued inputs were discarded: accept any sequence after the last simulated one.
+    this.lastQueuedSeq = this.lastProcessedSeq;
   }
 }

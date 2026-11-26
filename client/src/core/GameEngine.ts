@@ -25,10 +25,10 @@ export const playgroundLoader: SceneLoader = async (ctx) => {
   return mod.createPlaygroundScene(ctx);
 };
 
-export function networkArenaLoader(net: MatchNetAdapter): SceneLoader {
+export function matchSceneLoader(net: MatchNetAdapter): SceneLoader {
   return async (ctx) => {
-    const mod = await import('../scenes/arena/NetworkArenaScene.ts');
-    return mod.createNetworkArenaScene(ctx, net);
+    const mod = await import('../scenes/match/MatchScene.ts');
+    return mod.createMatchScene(ctx, net);
   };
 }
 
@@ -63,6 +63,7 @@ export class GameEngine {
       onCameraRotate: (dx, dy) => this.camera.rotateByMouse(dx, dy),
       onZoom: (steps) => this.camera.zoom(steps),
       onToggleDebug: () => this.opts.onToggleDebug(),
+      onKeyPress: (code) => this.scenes.active?.onKeyPress?.(code),
     });
   }
 
@@ -109,6 +110,8 @@ export class GameEngine {
     this.camera.rotateByKeys(this.input.getKeyRotate(), dt);
 
     scene.update(dt, this.frameInput);
+    const preset = scene.takeCameraPreset?.();
+    if (preset) this.camera.applyPreset(preset);
 
     this.camera.setAspect(this.render.aspect);
     this.camera.update(dt, scene.getCameraTarget(), scene.getAutoAlignYaw());
@@ -130,12 +133,13 @@ export class GameEngine {
     this.raycaster.intersectObjects(scene.getClickTargets() as THREE.Object3D[], false, this.hits);
     const top = this.hits[0];
     // Clicked a walkable top surface: use it. Clicked a wall side: fall back to the ground plane.
-    if (top && top.face && top.face.normal.y > UP_NORMAL_MIN) {
-      scene.onGroundClick(top.point.x, top.point.y, top.point.z);
+    // Instanced/interactive targets (e.g. glass tiles) count on any face; walkable surfaces only on top faces.
+    if (top && (top.instanceId !== undefined || (top.face && top.face.normal.y > UP_NORMAL_MIN))) {
+      scene.onGroundClick({ x: top.point.x, y: top.point.y, z: top.point.z, object: top.object, instanceId: top.instanceId });
       return;
     }
     if (this.raycaster.ray.intersectPlane(this.groundPlane, this.hitPoint)) {
-      scene.onGroundClick(this.hitPoint.x, 0, this.hitPoint.z);
+      scene.onGroundClick({ x: this.hitPoint.x, y: 0, z: this.hitPoint.z, object: null, instanceId: undefined });
     }
   }
 }

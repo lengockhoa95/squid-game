@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createCharacterState, createPlaygroundWorld, stepCharacter, SIM_DT, type MoveIntent } from '@sp/shared';
+import { createCharacterState, createPlaygroundWorld, staticWorldStep, stepCharacter, SIM_DT, type MoveIntent } from '@sp/shared';
 import { LocalPredictor } from './LocalPredictor.ts';
 
 const world = createPlaygroundWorld();
+const step = staticWorldStep(world);
 
 function inputs(n: number): MoveIntent[] {
   return Array.from({ length: n }, (_, k) => ({ dirX: Math.sin(k / 7), dirZ: -1, jump: k === 10 }));
@@ -30,7 +31,7 @@ describe('LocalPredictor', () => {
     for (const intent of list.slice(0, 18)) stepCharacter(server, intent, SIM_DT, world);
 
     const reconciled = { ...client };
-    predictor.reconcile(reconciled, server, 18, world);
+    predictor.reconcile(reconciled, server, 18, step);
     expect(reconciled.x).toBeCloseTo(client.x, 9);
     expect(reconciled.y).toBeCloseTo(client.y, 9);
     expect(reconciled.z).toBeCloseTo(client.z, 9);
@@ -46,7 +47,7 @@ describe('LocalPredictor', () => {
       stepCharacter(state, intent, SIM_DT, world);
     }
     const server = createCharacterState(3, 0); // server says we were somewhere else
-    predictor.reconcile(state, server, 0, world);
+    predictor.reconcile(state, server, 0, step);
 
     const expected = createCharacterState(3, 0);
     for (const intent of inputs(5)) stepCharacter(expected, intent, SIM_DT, world);
@@ -60,7 +61,7 @@ describe('LocalPredictor', () => {
     for (const intent of inputs(5)) predictor.record(intent);
     predictor.clear();
     const state = createCharacterState(9, 9);
-    predictor.reconcile(state, createCharacterState(1, 2), 0, world);
+    predictor.reconcile(state, createCharacterState(1, 2), 0, step);
     expect(state.x).toBe(1);
     expect(state.z).toBe(2);
   });

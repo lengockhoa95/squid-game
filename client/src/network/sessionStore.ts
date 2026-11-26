@@ -1,4 +1,4 @@
-import type { Phase } from '@sp/shared';
+import type { Difficulty, MinigameId, Phase } from '@sp/shared';
 import { createStore } from '../store/UIStore.ts';
 
 export type SessionStatus = 'idle' | 'connecting' | 'in-room' | 'reconnecting';
@@ -8,8 +8,21 @@ export interface LobbyPlayer {
   nickname: string;
   slot: number;
   isBot: boolean;
+  difficulty: string;
   ready: boolean;
   connected: boolean;
+  alive: boolean;
+  roundState: string;
+  team: number;
+}
+
+export interface ResultRow {
+  id: string;
+  nickname: string;
+  rank: number;
+  passed: boolean;
+  eliminated: boolean;
+  detail: string;
 }
 
 export interface SessionState {
@@ -19,10 +32,18 @@ export interface SessionState {
   toast: string | null;
   roomCode: string;
   phase: Phase;
-  countdown: number;
   hostId: string;
   myId: string;
-  /** Sorted by slot. Only replaced when lobby-relevant fields change (not on every movement patch). */
+  npcCount: number;
+  npcDifficulties: readonly Difficulty[];
+  totalRounds: number;
+  roundIndex: number;
+  currentGame: MinigameId | '';
+  /** Whole seconds left in the current phase (rounded up) — changes at most once per second. */
+  timerSeconds: number;
+  winnerId: string;
+  results: readonly ResultRow[];
+  /** Sorted by slot. Only replaced when listed fields change (never on movement patches). */
   players: readonly LobbyPlayer[];
 }
 
@@ -32,8 +53,15 @@ export const sessionStore = createStore<SessionState>({
   toast: null,
   roomCode: '',
   phase: 'LOBBY',
-  countdown: 0,
   hostId: '',
   myId: '',
+  npcCount: 0,
+  npcDifficulties: [],
+  totalRounds: 0,
+  roundIndex: 0,
+  currentGame: '',
+  timerSeconds: 0,
+  winnerId: '',
+  results: [],
   players: [],
 });

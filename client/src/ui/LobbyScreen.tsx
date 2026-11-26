@@ -4,6 +4,7 @@ import { network } from '../network/NetworkManager.ts';
 import { sessionStore, type LobbyPlayer } from '../network/sessionStore.ts';
 import { useStore } from '../store/UIStore.ts';
 import { Avatar } from './Avatar.tsx';
+import { NpcSettings, DIFFICULTY_LABEL } from './NpcSettings.tsx';
 
 function PlayerCard({ p, isHost, isMe }: { p: LobbyPlayer; isHost: boolean; isMe: boolean }) {
   return (
@@ -37,7 +38,10 @@ export function LobbyScreen() {
   const me = players.find((p) => p.id === myId);
   const amHost = myId === hostId;
   const allReady = players.length > 0 && players.every((p) => p.isBot || p.ready);
-  const emptySlots = Math.max(0, MAX_PLAYERS - players.length);
+  const npcCount = useStore(sessionStore, (s) => s.npcCount);
+  const npcDifficulties = useStore(sessionStore, (s) => s.npcDifficulties);
+  const plannedBots = Math.min(npcCount, MAX_PLAYERS - players.length);
+  const emptySlots = Math.max(0, MAX_PLAYERS - players.length - plannedBots);
 
   const copy = async () => {
     try {
@@ -66,10 +70,21 @@ export function LobbyScreen() {
           {players.map((p) => (
             <PlayerCard key={p.id} p={p} isHost={p.id === hostId} isMe={p.id === myId} />
           ))}
+          {Array.from({ length: plannedBots }, (_, i) => (
+            <li key={`bot-${i}`} className="slot-card slot-bot">
+              <div className="avatar avatar-bot" aria-hidden="true"><span>AI</span></div>
+              <div className="slot-info">
+                <div className="slot-name">NPC {i + 1}<span className="tag tag-bot">{vi.bot}</span></div>
+                <div className="slot-meta">{vi.npcPreview} · {DIFFICULTY_LABEL[npcDifficulties[i] ?? 'NORMAL']}</div>
+              </div>
+            </li>
+          ))}
           {Array.from({ length: emptySlots }, (_, i) => (
             <li key={`empty-${i}`} className="slot-card slot-empty">{vi.waitingSlot}</li>
           ))}
         </ul>
+
+        <NpcSettings editable={amHost} />
 
         <div className="lobby-actions">
           <button

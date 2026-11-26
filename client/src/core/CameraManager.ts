@@ -98,6 +98,14 @@ export class CameraManager {
     this.camera.lookAt(this.focus.x, this.focus.y + 1.2, this.focus.z);
   }
 
+  /** Set yaw/pitch/distance (clamped) and blend to them; also suppresses auto-align briefly. */
+  applyPreset(p: { yaw: number; pitch: number; distance: number }): void {
+    this.yaw = p.yaw;
+    this.pitch = THREE.MathUtils.clamp(p.pitch, CAMERA_LIMITS.pitchMin, CAMERA_LIMITS.pitchMax);
+    this.distance = THREE.MathUtils.clamp(p.distance, CAMERA_LIMITS.distanceMin, CAMERA_LIMITS.distanceMax);
+    this.lastManualRotate = performance.now();
+  }
+
   /** Jump straight to the target (used when a scene loads). */
   snapTo(target: Readonly<THREE.Vector3>): void {
     this.focus.copy(target);

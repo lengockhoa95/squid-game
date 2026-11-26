@@ -8,7 +8,7 @@ import type { MatchRoom } from './MatchRoom.ts';
 let colyseus: ColyseusTestServer;
 
 beforeAll(async () => {
-  colyseus = await boot(createServer(), 2611);
+  colyseus = await boot(createServer({ phaseScale: 0.05 }), 2611);
 });
 afterEach(async () => {
   await colyseus.cleanup();
@@ -109,35 +109,74 @@ describe('MatchRoom match flow', () => {
     expect(state.players.get(host.sessionId)!.z).toBe(before);
   });
 
-  it('counts down, locks the room, then simulates validated movement', async () => {
+  it('host configures NPCs; START fills empty slots with bots and locks the room', async () => {
     const { host, others, room, state } = await createLobby(['Host', 'Guest']);
+    expect(state.npcCount).toBe(2); // default fills the room, clamped to free slots
+
+    const denied = others[0]!.waitForMessage(MSG.ERROR);
+    others[0]!.send(MSG.NPC_CONFIG, { count: 1, difficulties: ['HARD'] });
+    expect(await denied).toEqual({ code: 'NOT_HOST' });
+
+    host.send(MSG.NPC_CONFIG, { count: 1, difficulties: ['SMART', 'EASY'] });
+    await waitFor(() => state.npcCount === 1 && state.npcDifficulties[0] === 'SMART');
+
     host.send(MSG.READY, { ready: true });
     others[0]!.send(MSG.READY, { ready: true });
     await waitFor(() => [...state.players.values()].every((p) => p.ready));
-
     host.send(MSG.START);
-    await waitFor(() => state.phase === 'STARTING');
+    await waitFor(() => state.phase === 'ROUND_INTRO');
     expect(room.locked).toBe(true);
+    const bots = [...state.players.values()].filter((p) => p.isBot);
+    expect(bots).toHaveLength(1);
+    expect(bots[0]!.difficulty).toBe('SMART');
+    expect(state.totalRounds).toBeGreaterThanOrEqual(3);
+    expect(state.currentGame).not.toBe('');
     await expect(colyseus.sdk.joinById(host.roomId, { nickname: 'Late' })).rejects.toThrow();
 
-    await waitFor(() => state.phase === 'PLAYING', 5000);
-    const me = state.players.get(host.sessionId)!;
-    const startZ = me.z;
-    host.send(MSG.MOVE, forwardBatch(1));
-    host.send(MSG.MOVE, forwardBatch(4));
-    await waitFor(() => me.lastSeq === 6);
-    expect(me.z).toBeLessThan(startZ);
-
-    // Malformed / oversized payloads are dropped without crashing the room.
-    host.send(MSG.MOVE, { s: 7, i: [999, 0, 5] });
-    host.send(MSG.MOVE, 'garbage');
-    await room.waitForNextPatch();
-    expect(me.lastSeq).toBe(6);
-
-    // Host returns everyone to the lobby: room unlocks and ready flags reset.
+    // Host aborts back to the lobby: bots removed, room unlocked, ready flags reset.
     host.send(MSG.BACK_TO_LOBBY);
     await waitFor(() => state.phase === 'LOBBY');
     await waitFor(() => room.locked === false);
+    expect([...state.players.values()].some((p) => p.isBot)).toBe(false);
     expect([...state.players.values()].every((p) => !p.ready)).toBe(true);
   }, 15000);
+
+  it('simulates validated movement only while the round is playing', async () => {
+    const { host, room, state } = await createLobby(['Solo']);
+    host.send(MSG.NPC_CONFIG, { count: 1, difficulties: ['EASY'] });
+    host.send(MSG.READY, { ready: true });
+    await waitFor(() => state.players.get(host.sessionId)!.ready);
+    host.send(MSG.START);
+    await waitFor(() => state.phase === 'ROUND_PLAYING', 5000);
+    const me = state.players.get(host.sessionId)!;
+    if (state.currentGame === 'RLGL' || state.currentGame === 'OBSTACLE_RACE') {
+      const startZ = me.z;
+      host.send(MSG.MOVE, forwardBatch(1));
+      host.send(MSG.MOVE, forwardBatch(4));
+      await waitFor(() => me.lastSeq === 6);
+      expect(me.z).toBeLessThan(startZ);
+    }
+    // Malformed / oversized payloads are dropped without crashing the room.
+    host.send(MSG.MOVE, { s: 100, i: [999, 0, 5] });
+    host.send(MSG.MOVE, 'garbage');
+    host.send(MSG.ACTION, { kind: 'WIN_ROUND' });
+    await room.waitForNextPatch();
+    expect(state.phase).toBe('ROUND_PLAYING');
+  }, 15000);
+
+  it('a human leaving mid-match forfeits but stays listed until the lobby', async () => {
+    const { host, others, state } = await createLobby(['Host', 'Quitter']);
+    host.send(MSG.NPC_CONFIG, { count: 0, difficulties: [] });
+    host.send(MSG.READY, { ready: true });
+    others[0]!.send(MSG.READY, { ready: true });
+    await waitFor(() => [...state.players.values()].every((p) => p.ready));
+    host.send(MSG.START);
+    await waitFor(() => state.phase === 'ROUND_INTRO');
+    const quitterId = others[0]!.sessionId;
+    await others[0]!.leave();
+    await waitFor(() => state.players.get(quitterId)?.alive === false);
+    expect(state.players.get(quitterId)?.connected).toBe(false);
+    // Only one player left: the match ends with the host as winner.
+    await waitFor(() => state.winnerId === host.sessionId, 10000);
+  }, 20000);
 });

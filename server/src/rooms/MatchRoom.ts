@@ -1,27 +1,42 @@
-import { Room, type Client, type Delayed } from '@colyseus/core';
+import { Room, type Client } from '@colyseus/core';
 import {
-  COUNTDOWN_SECONDS, ERROR_CODES, MAX_PLAYERS, MSG, PATCH_MS, PLAYGROUND_SPAWNS, RECONNECT_SECONDS, SIM_HZ,
-  createPlaygroundWorld, parseMoveBatch, sanitizeNickname,
-  type ErrorCodeName, type JoinOptions, type Phase, type SimWorld,
+  ERROR_CODES, IN_MATCH_PHASES, MAX_PLAYERS, MSG, PATCH_MS, PLAYGROUND_SPAWNS, RECONNECT_SECONDS, SIM_DT, SIM_HZ,
+  DEFAULT_NPC_DIFFICULTIES, isDifficulty, parseGameAction, parseMoveBatch, parseNpcConfig, sanitizeNickname,
+  type ErrorCodeName, type JoinOptions, type Phase,
 } from '@sp/shared';
-import { MatchState, PlayerState } from '@sp/shared/schema';
+import { MatchState } from '@sp/shared/schema';
 import { PlayerSim } from '../players/PlayerSim.ts';
 import { freeSlot, pickNextHost } from '../players/HostManager.ts';
+import { addPlayer } from '../players/factory.ts';
+import { syncPlayerFromSim } from '../players/sync.ts';
 import { RateLimiter } from '../validation/RateLimiter.ts';
+import { LatencyTracker } from '../network/LatencyTracker.ts';
 import { roomCodes } from '../network/RoomCodeRegistry.ts';
+import { NPCManager } from '../npc/NPCManager.ts';
+import { MatchController } from '../match/MatchController.ts';
 
 const RATE_LIMITS = {
   [MSG.MOVE]: { perSecond: 30, burst: 15 }, // client sends ~20/s
+  [MSG.ACTION]: { perSecond: 12, burst: 6 },
   [MSG.READY]: { perSecond: 4, burst: 4 },
   [MSG.START]: { perSecond: 2, burst: 2 },
+  [MSG.NPC_CONFIG]: { perSecond: 6, burst: 6 },
   [MSG.BACK_TO_LOBBY]: { perSecond: 2, burst: 2 },
+  [MSG.PONG]: { perSecond: 4, burst: 4 },
 };
 const KICK_AFTER_VIOLATIONS = 300;
 const KICK_CLOSE_CODE = 4002;
+const PING_INTERVAL_MS = 2000;
+
+export interface MatchRoomOptions {
+  /** Multiplier for intro/countdown/result durations (tests use a small value). */
+  phaseScale?: number;
+}
 
 /**
- * Lobby + (Phase 2) free-roam match room. The server owns every position:
- * clients only send movement intents, which are validated, rate-limited and simulated here.
+ * Lobby + match room. The server owns every outcome: clients send movement intents and discrete
+ * actions, which are validated, rate-limited and handed to the MatchController. Bots are driven
+ * server-side through the same paths.
  */
 export class MatchRoom extends Room {
   override maxClients = MAX_PLAYERS;
@@ -31,44 +46,57 @@ export class MatchRoom extends Room {
 
   private readonly sims = new Map<string, PlayerSim>();
   private readonly limiter = new RateLimiter(RATE_LIMITS, KICK_AFTER_VIOLATIONS);
-  private readonly world: SimWorld = createPlaygroundWorld();
+  private readonly latency = new LatencyTracker();
+  private readonly npcs = new NPCManager(Math.floor(Math.random() * 1e9));
+  private readonly rng = Math.random;
   private joinCounter = 0;
-  private countdownTimer: Delayed | null = null;
+  private controller!: MatchController;
 
-  override onCreate(): void {
+  override onCreate(options?: MatchRoomOptions): void {
     const code = roomCodes.reserve();
     this.roomId = code;
     this.state.roomCode = code;
-    this.setPhase('LOBBY');
+    this.state.phase = 'LOBBY';
+    this.state.npcCount = MAX_PLAYERS - 1;
+    for (const d of DEFAULT_NPC_DIFFICULTIES) this.state.npcDifficulties.push(d);
+    this.controller = new MatchController({
+      state: this.state,
+      sims: this.sims,
+      npcs: this.npcs,
+      rng: this.rng,
+      rttOf: (id) => this.latency.rttOf(id),
+      onMatchOver: () => this.returnToLobby(),
+      phaseScale: options?.phaseScale ?? 1,
+    });
 
     this.onMessage(MSG.READY, (client, msg: unknown) => this.handleReady(client, msg));
     this.onMessage(MSG.START, (client) => this.handleStart(client));
+    this.onMessage(MSG.NPC_CONFIG, (client, msg: unknown) => this.handleNpcConfig(client, msg));
     this.onMessage(MSG.BACK_TO_LOBBY, (client) => this.handleBackToLobby(client));
     this.onMessage(MSG.MOVE, (client, msg: unknown) => this.handleMove(client, msg));
-    this.setSimulationInterval(() => this.tick(), 1000 / SIM_HZ);
+    this.onMessage(MSG.ACTION, (client, msg: unknown) => this.handleAction(client, msg));
+    this.onMessage(MSG.PONG, (client, msg: unknown) => {
+      if (!this.allow(client, MSG.PONG)) return;
+      this.latency.receive(client.sessionId, (msg as { t?: unknown } | null)?.t, Date.now());
+    });
+    this.setSimulationInterval(() => this.controller.update(SIM_DT), 1000 / SIM_HZ);
+    this.clock.setInterval(() => this.pingAll(), PING_INTERVAL_MS);
   }
 
   override onJoin(client: Client, options?: JoinOptions): void {
     if (this.state.phase !== 'LOBBY') throw new Error('Trận đấu đã bắt đầu');
-    const slot = freeSlot(this.state.players.values(), MAX_PLAYERS);
+    const slot = freeSlot(this.humans(), MAX_PLAYERS);
     if (slot < 0) throw new Error('Phòng đã đủ người');
-
-    const spawn = PLAYGROUND_SPAWNS[slot]!;
-    const p = new PlayerState();
-    p.id = client.sessionId;
-    p.nickname = sanitizeNickname(options?.nickname, `Người chơi ${slot + 1}`);
-    p.slot = slot;
-    p.joinOrder = ++this.joinCounter;
-    p.isBot = false;
-    p.ready = false;
-    p.connected = true;
-    this.state.players.set(client.sessionId, p);
-
-    const sim = new PlayerSim(spawn.x, spawn.z, spawn.yaw);
-    this.sims.set(client.sessionId, sim);
-    this.syncPlayer(p, sim);
-
+    addPlayer(this.state, this.sims, {
+      id: client.sessionId,
+      nickname: sanitizeNickname(options?.nickname, `Người chơi ${slot + 1}`),
+      slot,
+      joinOrder: ++this.joinCounter,
+      isBot: false,
+    });
     if (!this.state.hostId) this.state.hostId = client.sessionId;
+    this.clampNpcCount();
+    this.pingClient(client);
   }
 
   override onDrop(client: Client): void {
@@ -84,14 +112,19 @@ export class MatchRoom extends Room {
 
   override onLeave(client: Client): void {
     const id = client.sessionId;
-    this.state.players.delete(id);
-    this.sims.delete(id);
     this.limiter.forget(id);
-    if (this.state.hostId === id) this.state.hostId = pickNextHost(this.state.players.values());
+    this.latency.forget(id);
+    if (this.inMatch()) {
+      this.controller.playerLeft(id); // keep the record for results; removed on return to lobby
+    } else {
+      this.state.players.delete(id);
+      this.sims.delete(id);
+    }
+    if (this.state.hostId === id) this.state.hostId = pickNextHost([...this.state.players.values()].filter((p) => p.connected));
   }
 
   override onDispose(): void {
-    this.countdownTimer?.clear();
+    this.controller.abort();
     roomCodes.release(this.state.roomCode);
   }
 
@@ -103,86 +136,111 @@ export class MatchRoom extends Room {
     p.ready = typeof msg === 'object' && msg !== null && (msg as { ready?: unknown }).ready === true;
   }
 
+  private handleNpcConfig(client: Client, msg: unknown): void {
+    if (!this.allow(client, MSG.NPC_CONFIG)) return;
+    if (client.sessionId !== this.state.hostId) return this.sendError(client, ERROR_CODES.NOT_HOST);
+    if (this.state.phase !== 'LOBBY') return this.sendError(client, ERROR_CODES.BAD_PHASE);
+    const cfg = parseNpcConfig(msg);
+    if (!cfg) return;
+    this.state.npcCount = cfg.count;
+    cfg.difficulties.forEach((d, i) => {
+      this.state.npcDifficulties[i] = d;
+    });
+    this.clampNpcCount();
+  }
+
   private handleStart(client: Client): void {
     if (!this.allow(client, MSG.START)) return;
     if (client.sessionId !== this.state.hostId) return this.sendError(client, ERROR_CODES.NOT_HOST);
     if (this.state.phase !== 'LOBBY') return this.sendError(client, ERROR_CODES.BAD_PHASE);
-    for (const p of this.state.players.values()) {
-      if (!p.isBot && !p.ready) return this.sendError(client, ERROR_CODES.NOT_ALL_READY);
+    const humans = this.humans();
+    if (humans.some((p) => !p.ready)) return this.sendError(client, ERROR_CODES.NOT_ALL_READY);
+
+    // 1. count humans 2. fill with NPCs per config 3. lock the roster 4. start (intro + countdown)
+    this.clampNpcCount();
+    const used = new Set(humans.map((p) => p.nickname));
+    const difficulties = this.state.npcDifficulties.map((d) => (isDifficulty(d) ? d : 'NORMAL'));
+    const specs = NPCManager.planBots(this.state.npcCount, difficulties, used, this.rng);
+    for (const spec of specs) {
+      const slot = freeSlot(this.state.players.values(), MAX_PLAYERS);
+      if (slot < 0) break;
+      const { state, sim } = addPlayer(this.state, this.sims, {
+        id: spec.id, nickname: spec.nickname, slot, joinOrder: ++this.joinCounter, isBot: true, difficulty: spec.difficulty,
+      });
+      this.npcs.add(spec, state, sim);
     }
-    void this.beginCountdown();
+    void this.lock();
+    this.controller.begin();
   }
 
   private handleBackToLobby(client: Client): void {
     if (!this.allow(client, MSG.BACK_TO_LOBBY)) return;
     if (client.sessionId !== this.state.hostId) return this.sendError(client, ERROR_CODES.NOT_HOST);
-    if (this.state.phase === 'LOBBY') return this.sendError(client, ERROR_CODES.BAD_PHASE);
-    this.countdownTimer?.clear();
-    this.countdownTimer = null;
-    for (const p of this.state.players.values()) p.ready = false;
-    this.respawnAll();
-    this.setPhase('LOBBY');
-    void this.unlock();
+    if (!this.inMatch()) return this.sendError(client, ERROR_CODES.BAD_PHASE);
+    this.returnToLobby();
   }
 
   private handleMove(client: Client, msg: unknown): void {
     if (!this.allow(client, MSG.MOVE)) return;
-    if (this.state.phase !== 'PLAYING') return; // silently ignore: inputs may arrive just after a phase change
-    const sim = this.sims.get(client.sessionId);
     const batch = parseMoveBatch(msg);
-    if (!sim || !batch) return;
-    sim.enqueue(batch);
+    if (batch) this.controller.handleMove(client.sessionId, batch);
   }
 
-  private async beginCountdown(): Promise<void> {
-    await this.lock();
-    this.respawnAll();
-    this.setPhase('STARTING');
-    this.state.countdown = COUNTDOWN_SECONDS;
-    this.countdownTimer = this.clock.setInterval(() => {
-      this.state.countdown = Math.max(0, this.state.countdown - 1);
-      if (this.state.countdown === 0) {
-        this.countdownTimer?.clear();
-        this.countdownTimer = null;
-        this.setPhase('PLAYING');
+  private handleAction(client: Client, msg: unknown): void {
+    if (!this.allow(client, MSG.ACTION)) return;
+    const action = parseGameAction(msg);
+    if (action) this.controller.handleAction(client.sessionId, action);
+  }
+
+  /** End of match (or host abort): drop bots and departed humans, reset everyone for a new game. */
+  private returnToLobby(): void {
+    this.controller.abort();
+    this.npcs.clear();
+    for (const [id, p] of [...this.state.players.entries()]) {
+      if (p.isBot || !p.connected) {
+        this.state.players.delete(id);
+        this.sims.delete(id);
       }
-    }, 1000);
-  }
-
-  private tick(): void {
-    if (this.state.phase !== 'PLAYING') return;
-    for (const [id, sim] of this.sims) {
-      sim.tick(this.world);
-      const p = this.state.players.get(id);
-      if (p) this.syncPlayer(p, sim);
     }
-  }
-
-  private respawnAll(): void {
-    for (const [id, sim] of this.sims) {
-      const p = this.state.players.get(id);
-      if (!p) continue;
+    for (const p of this.state.players.values()) {
+      p.ready = false;
+      p.alive = true;
+      p.roundState = 'ACTIVE';
+      p.team = -1;
+      p.score = 0;
+      const sim = this.sims.get(p.id)!;
       const spawn = PLAYGROUND_SPAWNS[p.slot]!;
       sim.reset(spawn.x, spawn.z, spawn.yaw);
-      this.syncPlayer(p, sim);
+      syncPlayerFromSim(p, sim);
     }
+    this.state.phase = 'LOBBY';
+    this.state.currentGame = '';
+    this.state.timer = 0;
+    this.state.roundIndex = 0;
+    this.state.results.clear();
+    this.clampNpcCount();
+    void this.unlock();
   }
 
-  private syncPlayer(p: PlayerState, sim: PlayerSim): void {
-    const s = sim.state;
-    p.x = s.x;
-    p.y = s.y;
-    p.z = s.z;
-    p.vx = s.vx;
-    p.vy = s.vy;
-    p.vz = s.vz;
-    p.yaw = s.yaw;
-    p.grounded = s.grounded;
-    p.lastSeq = sim.lastProcessedSeq;
+  private humans() {
+    return [...this.state.players.values()].filter((p) => !p.isBot);
   }
 
-  private setPhase(phase: Phase): void {
-    this.state.phase = phase;
+  private clampNpcCount(): void {
+    const maxBots = Math.max(0, MAX_PLAYERS - this.humans().length);
+    if (this.state.npcCount > maxBots) this.state.npcCount = maxBots;
+  }
+
+  private inMatch(): boolean {
+    return IN_MATCH_PHASES.includes(this.state.phase as Phase);
+  }
+
+  private pingAll(): void {
+    for (const client of this.clients) this.pingClient(client);
+  }
+
+  private pingClient(client: Client): void {
+    client.send(MSG.PING, { t: this.latency.issue(client.sessionId, Date.now()) });
   }
 
   private allow(client: Client, type: string): boolean {

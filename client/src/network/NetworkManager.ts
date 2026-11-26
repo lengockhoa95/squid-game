@@ -1,8 +1,11 @@
 import { Client, CloseCode, type Room } from '@colyseus/sdk';
-import { MSG, ROOM_NAME, vi, type ErrorMessage, type MoveBatch, type Phase } from '@sp/shared';
+import {
+  MSG, ROOM_NAME, isDifficulty, vi,
+  type Difficulty, type ErrorMessage, type GameAction, type MinigameId, type MoveBatch, type NpcConfigMessage, type Phase,
+} from '@sp/shared';
 import { MatchState } from '@sp/shared/schema';
 import { getServerUrl } from './serverUrl.ts';
-import { sessionStore, type LobbyPlayer } from './sessionStore.ts';
+import { sessionStore, type LobbyPlayer, type ResultRow } from './sessionStore.ts';
 import { joinErrorText, serverErrorText } from './errors.ts';
 import type { MatchNetAdapter, NetPlayer } from './types.ts';
 
@@ -38,6 +41,9 @@ class NetworkManager {
   private lobbySignature = '';
   private readonly snapshotListeners = new Set<() => void>();
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
+  private resultsSignature = '';
+  private lastGameTime = 0;
+  private lastGameTimeAt = 0;
 
   private getClient(): Client {
     this.client ??= new Client(getServerUrl());
@@ -84,6 +90,10 @@ class NetworkManager {
     this.room?.send(MSG.BACK_TO_LOBBY);
   }
 
+  setNpcConfig(config: NpcConfigMessage): void {
+    this.room?.send(MSG.NPC_CONFIG, config);
+  }
+
   /** Adapter for the networked scene; null when not in a room. */
   getAdapter(): MatchNetAdapter | null {
     if (!this.room) return null;
@@ -91,12 +101,19 @@ class NetworkManager {
     return {
       localId: this.room.sessionId,
       getPhase: () => (this.room?.state.phase as Phase | undefined) ?? 'LOBBY',
+      getState: () => this.room?.state ?? null,
       forEachPlayer: (cb) => this.room?.state.players.forEach((p) => cb(p as NetPlayer)),
       onSnapshot: (cb) => {
         this.snapshotListeners.add(cb);
         return () => this.snapshotListeners.delete(cb);
       },
       sendMove: (batch: MoveBatch) => this.room?.send(MSG.MOVE, batch),
+      sendAction: (action: GameAction) => this.room?.send(MSG.ACTION, action),
+      gameTimeNow: () => {
+        const phase = this.room?.state.phase;
+        if (phase !== 'ROUND_PLAYING') return this.lastGameTime;
+        return this.lastGameTime + (performance.now() - this.lastGameTimeAt) / 1000;
+      },
     };
   }
 
@@ -120,10 +137,14 @@ class NetworkManager {
     sessionStore.set({ status: 'in-room', error: null, myId: room.sessionId });
 
     room.onStateChange((state) => {
+      this.lastGameTime = state.gameTime;
+      this.lastGameTimeAt = performance.now();
       this.syncSession(state);
       for (const l of this.snapshotListeners) l();
     });
     room.onMessage(MSG.ERROR, (msg: ErrorMessage) => this.showToast(serverErrorText(msg.code)));
+    // Echo the server's latency probe immediately (the server measures RTT itself).
+    room.onMessage(MSG.PING, (msg: unknown) => room.send(MSG.PONG, msg));
     room.onDrop(() => sessionStore.set({ status: 'reconnecting' }));
     room.onReconnect(() => {
       saveToken(room.reconnectionToken);
@@ -155,25 +176,54 @@ class NetworkManager {
     this.room = null;
     this.snapshotListeners.clear();
     this.lobbySignature = '';
-    sessionStore.set({ status: 'idle', error, roomCode: '', phase: 'LOBBY', countdown: 0, hostId: '', myId: '', players: [] });
+    this.resultsSignature = '';
+    sessionStore.set({
+      status: 'idle', error, roomCode: '', phase: 'LOBBY', hostId: '', myId: '', players: [], results: [],
+      currentGame: '', winnerId: '', timerSeconds: 0, roundIndex: 0, totalRounds: 0,
+    });
   }
 
   private syncSession(state: MatchState): void {
-    const phase = state.phase as Phase;
+    // sessionStore.set() ignores unchanged values, so this only re-renders React when something
+    // visible changed (timer is whole seconds). Position patches never touch these fields.
+    const difficulties = state.npcDifficulties.map((d) => (isDifficulty(d) ? d : 'NORMAL')) as Difficulty[];
     const s = sessionStore.get();
-    if (s.phase !== phase || s.countdown !== state.countdown || s.hostId !== state.hostId || s.roomCode !== state.roomCode) {
-      sessionStore.set({ phase, countdown: state.countdown, hostId: state.hostId, roomCode: state.roomCode });
+    sessionStore.set({
+      phase: state.phase as Phase,
+      hostId: state.hostId,
+      roomCode: state.roomCode,
+      npcCount: state.npcCount,
+      npcDifficulties: difficulties.join() === s.npcDifficulties.join() ? s.npcDifficulties : difficulties,
+      totalRounds: state.totalRounds,
+      roundIndex: state.roundIndex,
+      currentGame: state.currentGame as MinigameId | '',
+      timerSeconds: Math.ceil(state.timer),
+      winnerId: state.winnerId,
+    });
+
+    let resultsSig = '';
+    state.results.forEach((r) => {
+      resultsSig += `${r.id}|${r.rank}|${r.passed}|${r.eliminated}|${r.detail};`;
+    });
+    if (resultsSig !== this.resultsSignature) {
+      this.resultsSignature = resultsSig;
+      const results: ResultRow[] = [];
+      state.results.forEach((r) => results.push({ id: r.id, nickname: r.nickname, rank: r.rank, passed: r.passed, eliminated: r.eliminated, detail: r.detail }));
+      sessionStore.set({ results });
     }
-    // Only rebuild the player list when lobby fields change — position patches must not re-render React.
+
     let signature = '';
     state.players.forEach((p) => {
-      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.ready}|${p.connected};`;
+      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.difficulty}|${p.ready}|${p.connected}|${p.alive}|${p.roundState}|${p.team};`;
     });
     if (signature === this.lobbySignature) return;
     this.lobbySignature = signature;
     const players: LobbyPlayer[] = [];
     state.players.forEach((p) => {
-      players.push({ id: p.id, nickname: p.nickname, slot: p.slot, isBot: p.isBot, ready: p.ready, connected: p.connected });
+      players.push({
+        id: p.id, nickname: p.nickname, slot: p.slot, isBot: p.isBot, difficulty: p.difficulty, ready: p.ready,
+        connected: p.connected, alive: p.alive, roundState: p.roundState, team: p.team,
+      });
     });
     players.sort((a, b) => a.slot - b.slot);
     sessionStore.set({ players });

@@ -1,6 +1,6 @@
 import {
-  createCharacterState, intentTowardTarget, stepCharacter,
-  type CharacterState, type MoveIntent, type SimWorld,
+  createCharacterState, intentTowardTarget,
+  type CharacterState, type MoveIntent, type StepFn,
 } from '@sp/shared';
 import type { PlayerModel } from './PlayerModel.ts';
 import { AnimationController } from './AnimationController.ts';
@@ -22,7 +22,8 @@ export class PlayerController {
   readonly state: CharacterState;
   readonly model: PlayerModel;
   private readonly anim: AnimationController;
-  private readonly world: SimWorld;
+  private step: StepFn;
+  private readonly killY: number | null;
   private readonly spawnX: number;
   private readonly spawnZ: number;
   private readonly intent: MoveIntent = { dirX: 0, dirZ: 0, jump: false };
@@ -38,8 +39,12 @@ export class PlayerController {
   private offY = 0;
   private offZ = 0;
 
-  constructor(world: SimWorld, model: PlayerModel, spawnX: number, spawnZ: number, spawnYaw = 0) {
-    this.world = world;
+  /**
+   * @param killY when set, falling below it respawns locally (offline only; online the server respawns).
+   */
+  constructor(step: StepFn, model: PlayerModel, spawnX: number, spawnZ: number, spawnYaw = 0, killY: number | null = null) {
+    this.step = step;
+    this.killY = killY;
     this.model = model;
     this.spawnX = spawnX;
     this.spawnZ = spawnZ;
@@ -76,18 +81,21 @@ export class PlayerController {
     this.hasTarget = false;
   }
 
-  /** Stop immediately: cancel the target and kill horizontal velocity. */
+  setStep(step: StepFn): void {
+    this.step = step;
+  }
+
+  /** Stop: cancel the click target; the character brakes with normal deceleration (same as the server). */
   stop(): void {
     this.hasTarget = false;
-    this.state.vx = 0;
-    this.state.vz = 0;
   }
 
   requestJump(): void {
     this.jumpQueued = true;
   }
 
-  fixedUpdate(keyDirX: number, keyDirZ: number): void {
+  /** @param t game time used by moving hazards */
+  fixedUpdate(keyDirX: number, keyDirZ: number, t = 0): void {
     const s = this.state;
     this.prevX = s.x;
     this.prevY = s.y;
@@ -106,9 +114,9 @@ export class PlayerController {
     this.intent.jump = this.jumpQueued;
     this.jumpQueued = false;
 
-    stepCharacter(s, this.intent, FIXED_DT, this.world);
+    this.step(s, this.intent, FIXED_DT, t);
 
-    if (s.y < this.world.killY) this.respawn();
+    if (this.killY !== null && s.y < this.killY) this.respawn();
   }
 
   /**

@@ -1,30 +1,34 @@
 import { QUALITY_LEVELS, QUALITY_PRESETS, type FpsCap, type QualityLevel } from '@sp/shared';
 import { createStore } from './UIStore.ts';
+import { audio } from '../audio/AudioManager.ts';
 
 export interface Settings {
   quality: QualityLevel;
   fpsCap: FpsCap;
+  sound: boolean;
 }
 
 const KEY = 'sp.settings.v1';
 
 function load(): Settings {
-  const fallback: Settings = { quality: 'MEDIUM', fpsCap: QUALITY_PRESETS.MEDIUM.fpsCap };
+  const fallback: Settings = { quality: 'MEDIUM', fpsCap: QUALITY_PRESETS.MEDIUM.fpsCap, sound: true };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<Settings>;
     const quality = QUALITY_LEVELS.includes(parsed.quality as QualityLevel) ? (parsed.quality as QualityLevel) : fallback.quality;
     const fpsCap: FpsCap = parsed.fpsCap === 30 ? 30 : parsed.fpsCap === 60 ? 60 : QUALITY_PRESETS[quality].fpsCap;
-    return { quality, fpsCap };
+    return { quality, fpsCap, sound: parsed.sound !== false };
   } catch {
     return fallback;
   }
 }
 
 export const settingsStore = createStore<Settings>(load());
+audio.enabled = settingsStore.get().sound;
 
 settingsStore.subscribe(() => {
+  audio.enabled = settingsStore.get().sound;
   try {
     localStorage.setItem(KEY, JSON.stringify(settingsStore.get()));
   } catch {

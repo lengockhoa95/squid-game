@@ -54,6 +54,8 @@ function releaseGeometries(): void {
  */
 export class PlayerModel {
   readonly group = new THREE.Group();
+  /** Inner pivot used for whole-body poses (falling over) without touching position/yaw on `group`. */
+  readonly poseGroup = new THREE.Group();
   /** Everything above the hips; bobbed by the animation. */
   readonly torso = new THREE.Group();
   readonly head: THREE.Mesh;
@@ -104,7 +106,8 @@ export class PlayerModel {
     this.head.add(eyeL, eyeR);
 
     this.addAccessory(accessory, g, materials, color);
-    this.group.add(this.legL, this.legR, this.torso);
+    this.poseGroup.add(this.legL, this.legR, this.torso);
+    this.group.add(this.poseGroup);
   }
 
   dispose(): void {

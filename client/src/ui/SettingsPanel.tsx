@@ -8,6 +8,7 @@ const FPS_OPTIONS: readonly FpsCap[] = [30, 60];
 export function SettingsPanel() {
   const quality = useStore(settingsStore, (s) => s.quality);
   const fpsCap = useStore(settingsStore, (s) => s.fpsCap);
+  const sound = useStore(settingsStore, (s) => s.sound);
 
   return (
     <div className="settings">
@@ -34,6 +35,13 @@ export function SettingsPanel() {
               {f}
             </button>
           ))}
+        </div>
+      </div>
+      <div className="field">
+        <span className="field-label">{vi.sound}</span>
+        <div className="segmented">
+          <button type="button" className={sound ? 'active' : ''} onClick={() => settingsStore.set({ sound: true })}>{vi.soundOn}</button>
+          <button type="button" className={!sound ? 'active' : ''} onClick={() => settingsStore.set({ sound: false })}>{vi.soundOff}</button>
         </div>
       </div>
     </div>

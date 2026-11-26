@@ -13,6 +13,21 @@ export interface FrameInput {
   keyDirZ: number;
 }
 
+export interface ClickHit {
+  x: number;
+  y: number;
+  z: number;
+  /** Object hit by the ray, or null when the ground-plane fallback was used. */
+  object: THREE.Object3D | null;
+  instanceId: number | undefined;
+}
+
+export interface CameraPreset {
+  yaw: number;
+  pitch: number;
+  distance: number;
+}
+
 export interface GameScene {
   readonly root: THREE.Scene;
   update(dt: number, input: Readonly<FrameInput>): void;
@@ -22,7 +37,11 @@ export interface GameScene {
   getAutoAlignYaw(): number | null;
   /** Meshes that accept ground clicks for click-to-move. */
   getClickTargets(): readonly THREE.Object3D[];
-  onGroundClick(x: number, y: number, z: number): void;
+  onGroundClick(hit: ClickHit): void;
+  /** Any game key pressed (KeyA, KeyD, Space…), after movement handling. */
+  onKeyPress?(code: string): void;
+  /** One-shot camera preset (e.g. when a new minigame loads). */
+  takeCameraPreset?(): CameraPreset | null;
   onStop(): void;
   onJump(): void;
   applyQuality(p: QualityPreset): void;
