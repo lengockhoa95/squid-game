@@ -1,0 +1,25 @@
+export const vi = {
+  appTitle: 'SURVIVAL PARTY',
+  tagline: 'Sống sót qua từng trò chơi. Chỉ một người chiến thắng.',
+  enterPlayground: 'Vào sân thử',
+  settings: 'Cài đặt',
+  quality: 'Chất lượng đồ họa',
+  fpsCap: 'Giới hạn FPS',
+  qualityLow: 'Thấp',
+  qualityMedium: 'Trung bình',
+  qualityHigh: 'Cao',
+  backToMenu: 'Về menu',
+  loading: 'Đang tải…',
+  controlsTitle: 'Điều khiển',
+  controlClickMove: 'Chuột trái: đi tới điểm',
+  controlRightTap: 'Nhấp chuột phải: dừng',
+  controlRightDrag: 'Giữ chuột phải + kéo: xoay camera',
+  controlWheel: 'Con lăn: zoom',
+  controlMiddle: 'Chuột giữa / Space: nhảy',
+  controlKeys: 'WASD / mũi tên: di chuyển · Q/E: xoay camera',
+  controlDebug: 'F3: thông tin hiệu năng',
+  debugEntities: 'Entity',
+  comingSoon: 'Chơi online sẽ có ở Phase 2',
+} as const;
+
+export type Strings = typeof vi;
