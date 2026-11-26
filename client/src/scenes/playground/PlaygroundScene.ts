@@ -1,11 +1,13 @@
 import * as THREE from 'three';
-import { createRng, type QualityPreset, type SimWorld } from '@sp/shared';
+import {
+  ARENA_HALF, PLAYGROUND_BOXES, createPlaygroundWorld, createRng, scatterDecor,
+  type DecorPlacement, type QualityPreset, type SimWorld,
+} from '@sp/shared';
 import type { FrameInput, GameScene, SceneContext } from '../../core/GameScene.ts';
 import { ResourceTracker } from '../../core/ResourceTracker.ts';
 import { PlayerModel, type Accessory } from '../../player/PlayerModel.ts';
 import { FIXED_DT, PlayerController } from '../../player/PlayerController.ts';
 import { ClickMarker } from '../../player/ClickMarker.ts';
-import { ARENA_HALF, PLAYGROUND_BOXES, createPlaygroundWorld, scatterDecor, type DecorPlacement } from './playgroundLayout.ts';
 
 const SKY = 0x9fd8ff;
 const FLOOR = 0x8fcf8a;

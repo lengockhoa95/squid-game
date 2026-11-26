@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ARENA_HALF, PLAYGROUND_BOXES, scatterDecor } from './playgroundLayout.ts';
+import { ARENA_HALF, PLAYGROUND_BOXES, scatterDecor } from './playground.ts';
 
 describe('playground layout', () => {
   it('keeps every obstacle inside the arena', () => {

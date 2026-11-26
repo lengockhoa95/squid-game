@@ -1,4 +1,5 @@
-import { createRng, type Box, type SimWorld } from '@sp/shared';
+import { createRng } from '../sim/rng.ts';
+import type { Box, SimWorld } from '../sim/kinematics.ts';
 
 export const ARENA_HALF = 28;
 
@@ -45,3 +46,11 @@ export function scatterDecor(seed: number, count: number, minR: number, maxR: nu
   }
   return out;
 }
+
+/** Spawn points per lobby slot (0..3), facing -Z (away from the default camera). */
+export const PLAYGROUND_SPAWNS: ReadonlyArray<{ x: number; z: number; yaw: number }> = [
+  { x: -3, z: 2, yaw: Math.PI },
+  { x: -1, z: 2, yaw: Math.PI },
+  { x: 1, z: 2, yaw: Math.PI },
+  { x: 3, z: 2, yaw: Math.PI },
+];
