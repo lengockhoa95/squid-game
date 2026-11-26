@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Tự chuyển sang bash nếu bị gọi bằng `sh` (dash).
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
 # Chạy server (:2567) và client (:5173) cùng lúc. Ctrl+C để tắt cả hai.
 source "$(dirname "$0")/_common.sh"
 require_node
