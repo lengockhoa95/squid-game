@@ -8,6 +8,7 @@ import { PlayerModel } from '../../player/PlayerModel.ts';
 import { AnimationController, type Pose } from '../../player/AnimationController.ts';
 import { FIXED_DT, PlayerController } from '../../player/PlayerController.ts';
 import { ClickMarker } from '../../player/ClickMarker.ts';
+import { NameTag } from '../../player/NameTag.ts';
 import { LocalPredictor } from '../../player/LocalPredictor.ts';
 import { RemoteInterpolator, createSample } from '../../player/RemoteInterpolator.ts';
 import type { MatchNetAdapter, NetPlayer } from '../../network/types.ts';
@@ -24,6 +25,8 @@ interface Actor {
   anim: AnimationController;
   interp: RemoteInterpolator;
   generation: number;
+  /** Nickname above the head (none for the local player). */
+  tag: NameTag | null;
 }
 
 /**
@@ -217,7 +220,10 @@ class MatchScene implements GameScene {
     this.effects.dispose();
     this.viewToken++;
     this.disposeView();
-    for (const a of this.actors.values()) a.model.dispose();
+    for (const a of this.actors.values()) {
+      a.tag?.dispose();
+      a.model.dispose();
+    }
     this.actors.clear();
     this.resources.dispose();
     this.root.clear();
@@ -336,6 +342,7 @@ class MatchScene implements GameScene {
     });
     for (const [id, a] of this.actors) {
       if (a.generation === gen) continue;
+      a.tag?.dispose();
       a.model.dispose();
       this.actors.delete(id);
     }
@@ -348,7 +355,12 @@ class MatchScene implements GameScene {
       const model = new PlayerModel(this.ctx.materials, look.color, look.accessory);
       model.group.position.set(p.x, p.y, p.z);
       this.root.add(model.group);
-      a = { model, anim: new AnimationController(model), interp: new RemoteInterpolator(), generation: gen };
+      let tag: NameTag | null = null;
+      if (p.id !== this.net.localId) {
+        tag = new NameTag(p.nickname, look.color);
+        tag.attach(model.group);
+      }
+      a = { model, anim: new AnimationController(model), interp: new RemoteInterpolator(), generation: gen, tag };
       this.actors.set(p.id, a);
     }
     a.generation = gen;

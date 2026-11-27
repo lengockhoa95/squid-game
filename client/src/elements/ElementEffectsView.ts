@@ -5,12 +5,13 @@ import type { MaterialLibrary } from '../core/MaterialLibrary.ts';
 import { ResourceTracker } from '../core/ResourceTracker.ts';
 import { PlayerModel } from '../player/PlayerModel.ts';
 import { AnimationController } from '../player/AnimationController.ts';
+import { NameTag } from '../player/NameTag.ts';
 import { audio } from '../audio/AudioManager.ts';
 
 interface Drawn {
   object: THREE.Object3D;
   kind: string;
-  clone?: { model: PlayerModel; anim: AnimationController };
+  clone?: { model: PlayerModel; anim: AnimationController; tag: NameTag | null };
 }
 
 interface StatusMarks {
@@ -79,7 +80,7 @@ export class ElementEffectsView {
       live.add(e.id);
       let d = this.drawn.get(e.id);
       if (!d) {
-        d = this.create(e);
+        d = this.create(e, state);
         this.drawn.set(e.id, d);
         this.root.add(d.object);
         if (!this.seen.has(e.id)) {
@@ -92,6 +93,7 @@ export class ElementEffectsView {
     for (const [id, d] of this.drawn) {
       if (live.has(id)) continue;
       d.object.removeFromParent();
+      d.clone?.tag?.dispose();
       d.clone?.model.dispose();
       this.drawn.delete(id);
     }
@@ -121,7 +123,10 @@ export class ElementEffectsView {
   }
 
   dispose(): void {
-    for (const d of this.drawn.values()) d.clone?.model.dispose();
+    for (const d of this.drawn.values()) {
+      d.clone?.tag?.dispose();
+      d.clone?.model.dispose();
+    }
     this.drawn.clear();
     this.marks.clear();
     this.root.removeFromParent();
@@ -129,7 +134,7 @@ export class ElementEffectsView {
     this.res.dispose();
   }
 
-  private create(e: ElementEffect): Drawn {
+  private create(e: ElementEffect, state: MatchState): Drawn {
     switch (e.kind) {
       case 'PILLAR': {
         const m = new THREE.Mesh(this.geo.pillar, this.mat.pillar);
@@ -144,8 +149,14 @@ export class ElementEffectsView {
       case 'CLONE': {
         const look = SLOT_LOOKS[e.slot] ?? SLOT_LOOKS[0]!;
         const model = new PlayerModel(this.materials, look.color, look.accessory);
-        model.setElement('CLONE'); // same tattoo as the caster: clones are indistinguishable
-        return { object: model.group, kind: e.kind, clone: { model, anim: new AnimationController(model) } };
+        model.setElement('CLONE'); // same tattoo and name as the caster: clones are indistinguishable
+        const owner = state.players.get(e.owner);
+        let tag: NameTag | null = null;
+        if (owner) {
+          tag = new NameTag(owner.nickname, look.color);
+          tag.attach(model.group);
+        }
+        return { object: model.group, kind: e.kind, clone: { model, anim: new AnimationController(model), tag } };
       }
       case 'SWAP': {
         const g = new THREE.Group();
