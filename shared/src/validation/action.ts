@@ -6,7 +6,7 @@ import type { GameAction, NpcConfigMessage } from '../protocol/messages.ts';
 export function parseGameAction(raw: unknown): GameAction | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const { kind, side } = raw as { kind?: unknown; side?: unknown };
-  if (kind === 'JUMP_TILE') return side === 0 || side === 1 ? { kind, side } : null;
+  if (kind === 'JUMP_TILE') return side === 0 || side === 1 || side === 2 ? { kind, side } : null;
   if (kind === 'PULL' || kind === 'REACT') return { kind };
   return null;
 }

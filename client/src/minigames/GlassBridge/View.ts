@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   BRIDGE, TILE_BROKEN, TILE_SAFE, bridgeFinishZ, bridgeRowZ, bridgeRowsFor,
-  type GameAction, type QualityPreset,
+  type BridgeSide, type GameAction, type QualityPreset,
 } from '@sp/shared';
 import type { ClickHit, SceneContext } from '../../core/GameScene.ts';
 import type { ResourceTracker } from '../../core/ResourceTracker.ts';
@@ -9,7 +9,8 @@ import type { MinigameView, ViewFrame } from '../framework/MinigameView.ts';
 import { StageLights, placeBox, setSky } from '../framework/stage.ts';
 
 const DEG = Math.PI / 180;
-const TILE_CAPACITY = BRIDGE.maxRows * 2;
+const PER_ROW = BRIDGE.tilesPerRow;
+const TILE_CAPACITY = BRIDGE.maxRows * PER_ROW;
 const SHARDS = 48;
 const UNKNOWN_COLOR = 0xaee9ff;
 const SAFE_COLOR = 0x7dffb2;
@@ -45,8 +46,8 @@ class BridgeView implements MinigameView {
     const unit = res.track(new THREE.BoxGeometry(1, 1, 1));
     const lastZ = bridgeFinishZ(BRIDGE.maxRows); // repositioned in layout() once the row count is known
 
-    const start = placeBox(new THREE.Mesh(unit, m.lambert(0x6c7aa8)), -4, 4, BRIDGE.startZ - 1.6, BRIDGE.startZ + 4, -1.5, 0);
-    this.finish = placeBox(new THREE.Mesh(unit, m.lambert(0x6c7aa8)), -4, 4, lastZ - 6, lastZ + 1.4, -1.5, 0);
+    const start = placeBox(new THREE.Mesh(unit, m.lambert(0x6c7aa8)), -5, 5, BRIDGE.startZ - 1.6, BRIDGE.startZ + 4, -1.5, 0);
+    this.finish = placeBox(new THREE.Mesh(unit, m.lambert(0x6c7aa8)), -5, 5, lastZ - 6, lastZ + 1.4, -1.5, 0);
     for (const p of [start, this.finish]) {
       p.receiveShadow = true;
       p.castShadow = true;
@@ -56,7 +57,7 @@ class BridgeView implements MinigameView {
     this.finishLine = placeBox(new THREE.Mesh(unit, m.lambert(0xffd23f)), -4, 4, lastZ + 1.1, lastZ + 1.4, 0, 0.03);
     root.add(this.finishLine);
 
-    for (const x of [-2.75, 0, 2.75]) {
+    for (const x of [-3.95, -1.3, 1.3, 3.95]) {
       const beam = new THREE.Mesh(unit, m.lambert(0x3c4466));
       beam.castShadow = true;
       beam.userData.x = x;
@@ -115,14 +116,15 @@ class BridgeView implements MinigameView {
     const nextRow = Math.round(me.score); // score = rows cleared; the next row index
     if (hit.object === this.finish) return nextRow >= this.rows ? { kind: 'JUMP_TILE', side: 0 } : null;
     if (hit.object !== this.tiles || hit.instanceId === undefined) return null;
-    const row = Math.floor(hit.instanceId / 2);
-    const side = (hit.instanceId % 2) as 0 | 1;
+    const row = Math.floor(hit.instanceId / PER_ROW);
+    const side = (hit.instanceId % PER_ROW) as BridgeSide;
     return row === nextRow ? { kind: 'JUMP_TILE', side } : null;
   }
 
   actionForKey(code: string): GameAction | null {
     if (code === 'KeyA' || code === 'ArrowLeft') return { kind: 'JUMP_TILE', side: 0 };
-    if (code === 'KeyD' || code === 'ArrowRight') return { kind: 'JUMP_TILE', side: 1 };
+    if (code === 'KeyS' || code === 'KeyW' || code === 'ArrowDown' || code === 'ArrowUp') return { kind: 'JUMP_TILE', side: 1 };
+    if (code === 'KeyD' || code === 'ArrowRight') return { kind: 'JUMP_TILE', side: 2 };
     return null;
   }
 
@@ -138,9 +140,9 @@ class BridgeView implements MinigameView {
   private layout(rows: number): void {
     this.rows = rows;
     this.known.fill(0);
-    for (let i = 0; i < TILE_CAPACITY; i++) this.setTile(i, i < rows * 2, UNKNOWN_COLOR);
+    for (let i = 0; i < TILE_CAPACITY; i++) this.setTile(i, i < rows * PER_ROW, UNKNOWN_COLOR);
     const lastZ = bridgeFinishZ(rows);
-    placeBox(this.finish, -4, 4, lastZ - 6, lastZ + 1.4, -1.5, 0);
+    placeBox(this.finish, -5, 5, lastZ - 6, lastZ + 1.4, -1.5, 0);
     placeBox(this.finishLine, -4, 4, lastZ + 1.1, lastZ + 1.4, 0, 0.03);
     for (const beam of this.beams) {
       const x = beam.userData.x as number;
@@ -149,9 +151,9 @@ class BridgeView implements MinigameView {
   }
 
   private setTile(index: number, visible: boolean, color: number): void {
-    const row = Math.floor(index / 2);
-    const side = index % 2;
-    this.pos.set(BRIDGE.tileX[side as 0 | 1], -0.07, bridgeRowZ(row));
+    const row = Math.floor(index / PER_ROW);
+    const side = index % PER_ROW;
+    this.pos.set(BRIDGE.tileX[side as BridgeSide], -0.07, bridgeRowZ(row));
     this.scl.setScalar(visible ? 1 : 0);
     this.mtx.compose(this.pos, this.quat, this.scl);
     this.tiles.setMatrixAt(index, this.mtx);
@@ -161,8 +163,8 @@ class BridgeView implements MinigameView {
   }
 
   private burst(index: number): void {
-    const row = Math.floor(index / 2);
-    const x = BRIDGE.tileX[(index % 2) as 0 | 1];
+    const row = Math.floor(index / PER_ROW);
+    const x = BRIDGE.tileX[(index % PER_ROW) as BridgeSide];
     const z = bridgeRowZ(row);
     for (let k = 0; k < 12; k++) {
       const i = this.nextShard;

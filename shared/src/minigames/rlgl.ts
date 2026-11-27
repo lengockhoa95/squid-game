@@ -1,8 +1,8 @@
 import type { SimWorld } from '../sim/kinematics.ts';
 
 export const RLGL = {
-  halfWidth: 10,
-  startZ: 26,
+  halfWidth: 13,
+  startZ: 56,
   finishZ: -24,
   dollZ: -30,
   greenMinS: 2.2,

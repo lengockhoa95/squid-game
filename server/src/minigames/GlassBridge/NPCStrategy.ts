@@ -1,4 +1,4 @@
-import { BRIDGE, TILE_BROKEN, TILE_SAFE, tileIndex } from '@sp/shared';
+import { BRIDGE, TILE_BROKEN, TILE_SAFE, tileIndex, type BridgeSide } from '@sp/shared';
 import type { MatchState } from '@sp/shared/schema';
 import type { NPCBot, BotIO, NpcStrategy } from '../../npc/NPCBot.ts';
 import type { GlassBridge } from './Logic.ts';
@@ -9,6 +9,8 @@ import type { GlassBridge } from './Logic.ts';
  * running out. SMART bots compute exactly how long they can afford to wait. EASY bots sometimes
  * ignore what has been revealed (errorRate).
  */
+const SIDES: readonly BridgeSide[] = [0, 1, 2];
+
 export class BridgeStrategy implements NpcStrategy {
   private readonly game: GlassBridge;
   private readonly match: MatchState;
@@ -52,7 +54,7 @@ export class BridgeStrategy implements NpcStrategy {
     );
     // Wait while patient, unless nobody else can test this row for us.
     if (!hurry && someoneBehindOrLevel && (m.waited as number) < (m.patience as number)) return;
-    const side = known ?? (this.preferredSide(view.tiles, row, bot) as 0 | 1);
+    const side = known ?? this.preferredSide(view.tiles, row, bot);
     io.act({ kind: 'JUMP_TILE', side });
   }
 
@@ -66,16 +68,15 @@ export class BridgeStrategy implements NpcStrategy {
     return range[0]! + bot.rng() * (range[1]! - range[0]!);
   }
 
-  private knownSafe(tiles: readonly number[], row: number): 0 | 1 | null {
-    for (const side of [0, 1] as const) {
-      if (tiles[tileIndex(row, side)] === TILE_SAFE) return side;
-      if (tiles[tileIndex(row, side)] === TILE_BROKEN) return (1 - side) as 0 | 1;
-    }
+  private knownSafe(tiles: readonly number[], row: number): BridgeSide | null {
+    for (const side of SIDES) if (tiles[tileIndex(row, side)] === TILE_SAFE) return side;
     return null;
   }
 
-  private preferredSide(_tiles: readonly number[], _row: number, bot: NPCBot): number {
-    return bot.rng() < 0.5 ? 0 : 1;
+  /** Random among tiles not known to be broken. */
+  private preferredSide(tiles: readonly number[], row: number, bot: NPCBot): BridgeSide {
+    const options = SIDES.filter((side) => tiles[tileIndex(row, side)] !== TILE_BROKEN);
+    return options[Math.floor(bot.rng() * options.length)] ?? 0;
   }
 
   private isActive(id: string): boolean {

@@ -8,7 +8,8 @@ describe('parseGameAction', () => {
     expect(parseGameAction({ kind: 'REACT' })).toEqual({ kind: 'REACT' });
   });
   it('rejects malformed actions', () => {
-    expect(parseGameAction({ kind: 'JUMP_TILE', side: 2 })).toBeNull();
+    expect(parseGameAction({ kind: 'JUMP_TILE', side: 3 })).toBeNull();
+    expect(parseGameAction({ kind: 'JUMP_TILE', side: 2 })).toEqual({ kind: 'JUMP_TILE', side: 2 });
     expect(parseGameAction({ kind: 'WIN_ROUND' })).toBeNull();
     expect(parseGameAction('PULL')).toBeNull();
   });

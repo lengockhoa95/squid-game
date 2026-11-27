@@ -31,7 +31,8 @@ export class GlassBridge implements ServerMinigame {
   readonly step = null;
   private ctx!: MinigameContext;
   private state!: BridgeState;
-  private safeSide: number[] = [];
+  /** Index of the tile that breaks in each row. */
+  private brokenSide: number[] = [];
   private rows: number = BRIDGE.maxRows;
   private readonly progress = new Map<string, number>(); // rows cleared (0 = on start platform)
   private readonly jumps = new Map<string, Jump>();
@@ -45,9 +46,9 @@ export class GlassBridge implements ServerMinigame {
     this.state = new BridgeState();
     this.rows = bridgeRowsFor(ctx.players.length);
     this.state.rows = this.rows;
-    for (let i = 0; i < this.rows * 2; i++) this.state.tiles.push(TILE_UNKNOWN);
+    for (let i = 0; i < this.rows * BRIDGE.tilesPerRow; i++) this.state.tiles.push(TILE_UNKNOWN);
     ctx.match.bridge = this.state;
-    this.safeSide = Array.from({ length: this.rows }, () => (ctx.rng() < 0.5 ? 0 : 1));
+    this.brokenSide = Array.from({ length: this.rows }, () => Math.floor(ctx.rng() * BRIDGE.tilesPerRow));
     for (const p of ctx.players) {
       this.progress.set(p.id, 0);
       const o = bridgeSlotOffset(p.state.slot);
@@ -175,14 +176,16 @@ export class GlassBridge implements ServerMinigame {
       return;
     }
     const idx = tileIndex(jump.row, jump.side);
-    if (this.safeSide[jump.row] === jump.side) {
+    if (this.brokenSide[jump.row] !== jump.side) {
       this.state.tiles[idx] = TILE_SAFE;
       this.progress.set(p.id, jump.row + 1);
       p.state.score = jump.row + 1;
     } else {
       this.state.tiles[idx] = TILE_BROKEN;
-      // The other tile of this row is now known to be safe.
-      this.state.tiles[tileIndex(jump.row, 1 - jump.side)] = TILE_SAFE;
+      // The other tiles of this row are now known to be safe.
+      for (let side = 0; side < BRIDGE.tilesPerRow; side++) {
+        if (side !== jump.side) this.state.tiles[tileIndex(jump.row, side)] = TILE_SAFE;
+      }
       p.state.roundState = 'OUT';
       this.fellAt.set(p.id, jump.row);
       this.falls.set(p.id, { elapsed: 0 });

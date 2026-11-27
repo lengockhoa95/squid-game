@@ -5,20 +5,22 @@ import type { StepFn } from '../sim/step.ts';
 export const RACE = {
   halfWidth: 6,
   startZ: 30,
-  finishZ: -44,
+  finishZ: -106,
   killY: -6,
   /** Checkpoint z values, from start to end. Respawn at the last one passed. */
-  checkpoints: [30, 11, -9, -23] as const,
+  checkpoints: [30, 11, -9, -23, -50, -73.5, -88] as const,
 } as const;
 
 /** Floor segments (gaps between them must be jumped). */
 const FLOOR: ReadonlyArray<[number, number]> = [
   [33, 13.6],
   [11.6, -5.6],
-  [-7.4, -48],
+  [-7.4, -46],
+  [-48.2, -70],
+  [-72, -110],
 ];
 const WALL_HEIGHT = 0.9;
-const WALL_ZS = [20, -13];
+const WALL_ZS = [20, -13, -56, -84];
 
 export interface Pusher {
   z: number;
@@ -33,6 +35,9 @@ export const PUSHERS: readonly Pusher[] = [
   { z: 5, depth: 1.6, width: 3.2, amplitude: 3.8, speed: 1.4, phase: 0, top: 1.8 },
   { z: -0.5, depth: 1.6, width: 3.2, amplitude: 3.8, speed: 1.7, phase: Math.PI, top: 1.8 },
   { z: -18, depth: 1.6, width: 4, amplitude: 3.4, speed: 1.2, phase: 1, top: 1.8 },
+  { z: -61, depth: 1.6, width: 3.6, amplitude: 3.8, speed: 1.6, phase: 2, top: 1.8 },
+  { z: -65.5, depth: 1.6, width: 3.6, amplitude: 3.8, speed: 1.9, phase: 0.5, top: 1.8 },
+  { z: -93, depth: 1.6, width: 4.2, amplitude: 3.4, speed: 1.4, phase: 2.5, top: 1.8 },
 ];
 
 export interface Sweeper {
@@ -46,6 +51,8 @@ export interface Sweeper {
 export const SWEEPERS: readonly Sweeper[] = [
   { x: 0, z: -30, length: 5, speed: 1.5, height: 0.7 },
   { x: 0, z: -40, length: 4.5, speed: -1.9, height: 0.7 },
+  { x: 0, z: -80, length: 5, speed: 2.1, height: 0.7 },
+  { x: 0, z: -101, length: 4.5, speed: -2.3, height: 0.7 },
 ];
 const SWEEP_KNOCKBACK = 9;
 
@@ -63,7 +70,7 @@ export function createRaceWorld(): RaceWorld {
   const pushers = PUSHERS.map((p) => ({ minX: 0, maxX: 0, minZ: p.z - p.depth / 2, maxZ: p.z + p.depth / 2, top: p.top }));
   boxes.push(...pushers);
   const rw: RaceWorld = {
-    world: { bounds: { minX: -hw, maxX: hw, minZ: -48, maxZ: 33 }, boxes, killY: RACE.killY, noFloor: true },
+    world: { bounds: { minX: -hw, maxX: hw, minZ: -110, maxZ: 33 }, boxes, killY: RACE.killY, noFloor: true },
     pushers,
   };
   updateRaceWorld(rw, 0);

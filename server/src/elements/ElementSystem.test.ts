@@ -160,7 +160,8 @@ describe('ElementSystem', () => {
     match.phase = 'ROUND_PLAYING';
     bridge.start();
     // p1 clears row 0 on the safe tile
-    const safe = (bridge as unknown as { safeSide: number[] }).safeSide[0] as 0 | 1;
+    const broken = (bridge as unknown as { brokenSide: number[] }).brokenSide[0]!;
+    const safe = ((broken + 1) % 3) as 0 | 1 | 2;
     bridge.handlePlayerInput('p1', { kind: 'JUMP_TILE', side: safe }, 0);
     run(bridge, players, 0, 2);
     expect(players[1]!.state.score).toBe(1);

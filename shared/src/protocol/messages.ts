@@ -40,7 +40,7 @@ export interface MoveBatch {
 
 /** Discrete game actions (non-movement minigames). */
 export type GameAction =
-  | { kind: 'JUMP_TILE'; side: 0 | 1 }
+  | { kind: 'JUMP_TILE'; side: 0 | 1 | 2 }
   | { kind: 'PULL' }
   | { kind: 'REACT' };
 

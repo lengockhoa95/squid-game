@@ -1,5 +1,5 @@
 export const REACTION = {
-  attempts: 3,
+  attempts: 5,
   waitMinS: 1.5,
   waitMaxS: 4,
   goWindowS: 1.5,
