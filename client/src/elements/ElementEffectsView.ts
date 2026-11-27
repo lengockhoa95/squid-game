@@ -111,7 +111,7 @@ export class ElementEffectsView {
       m.stun.visible = stunned && pos !== null;
       m.fire.visible = hasted && pos !== null;
       if (!pos) return;
-      m.stun.position.set(pos.x, pos.y + 2.1, pos.z);
+      m.stun.position.set(pos.x, pos.y + 1.75, pos.z);
       m.stun.rotation.y += dt * 8;
       m.fire.position.set(pos.x, pos.y + 0.3, pos.z);
       m.fire.rotation.x = Math.PI; // flame points down = trail under the feet
@@ -143,6 +143,7 @@ export class ElementEffectsView {
       case 'CLONE': {
         const look = SLOT_LOOKS[e.slot] ?? SLOT_LOOKS[0]!;
         const model = new PlayerModel(this.materials, look.color, look.accessory);
+        model.setElement('CLONE'); // same tattoo as the caster: clones are indistinguishable
         return { object: model.group, kind: e.kind, clone: { model, anim: new AnimationController(model) } };
       }
       case 'SWAP': {

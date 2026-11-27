@@ -15,6 +15,7 @@ export interface LobbyPlayer {
   roundState: string;
   team: number;
   element: string;
+  points: number;
 }
 
 export interface ResultRow {
@@ -24,6 +25,7 @@ export interface ResultRow {
   passed: boolean;
   eliminated: boolean;
   detail: string;
+  gained: number;
 }
 
 export interface SessionState {
@@ -44,6 +46,7 @@ export interface SessionState {
   timerSeconds: number;
   winnerId: string;
   elementsEnabled: boolean;
+  noElimination: boolean;
   results: readonly ResultRow[];
   /** Sorted by slot. Only replaced when listed fields change (never on movement patches). */
   players: readonly LobbyPlayer[];
@@ -65,6 +68,7 @@ export const sessionStore = createStore<SessionState>({
   timerSeconds: 0,
   winnerId: '',
   elementsEnabled: true,
+  noElimination: false,
   results: [],
   players: [],
 });

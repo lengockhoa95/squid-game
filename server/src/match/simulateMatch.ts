@@ -22,11 +22,13 @@ export function simulateMatch(
   difficulties: readonly Difficulty[],
   available?: MinigameId[],
   elements = true,
-): SimulatedMatch & { casts: number } {
+  noElimination = false,
+): SimulatedMatch & { casts: number; eliminatedCount: number; points: number[]; winnerPoints: number } {
   const rng = createRng(seed);
   const state = new MatchState();
   state.phase = 'LOBBY';
   state.elementsEnabled = elements;
+  state.noElimination = noElimination;
   const sims = new Map<string, PlayerSim>();
   const npcs = new NPCManager(seed * 7919);
   const specs = NPCManager.planBots(Math.min(MAX_PLAYERS, difficulties.length), difficulties, new Set(), rng);
@@ -65,5 +67,8 @@ export function simulateMatch(
     ticks,
     phasesSeen,
     casts,
+    eliminatedCount: [...state.players.values()].filter((p) => !p.alive).length,
+    points: [...state.players.values()].map((p) => p.points),
+    winnerPoints: winner?.points ?? -1,
   };
 }

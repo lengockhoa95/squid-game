@@ -27,6 +27,7 @@ const RATE_LIMITS = {
   [MSG.PICK_ELEMENT]: { perSecond: 6, burst: 6 },
   [MSG.CAST]: { perSecond: 8, burst: 4 },
   [MSG.ELEMENTS_TOGGLE]: { perSecond: 4, burst: 4 },
+  [MSG.NO_ELIMINATION_TOGGLE]: { perSecond: 4, burst: 4 },
 };
 const KICK_AFTER_VIOLATIONS = 300;
 const KICK_CLOSE_CODE = 4002;
@@ -97,6 +98,13 @@ export class MatchRoom extends Room {
       if (this.state.phase !== 'LOBBY') return this.sendError(client, ERROR_CODES.BAD_PHASE);
       const toggle = parseElementsToggle(msg);
       if (toggle) this.state.elementsEnabled = toggle.enabled;
+    });
+    this.onMessage(MSG.NO_ELIMINATION_TOGGLE, (client, msg: unknown) => {
+      if (!this.allow(client, MSG.NO_ELIMINATION_TOGGLE)) return;
+      if (client.sessionId !== this.state.hostId) return this.sendError(client, ERROR_CODES.NOT_HOST);
+      if (this.state.phase !== 'LOBBY') return this.sendError(client, ERROR_CODES.BAD_PHASE);
+      const toggle = parseElementsToggle(msg); // same {enabled: boolean} payload
+      if (toggle) this.state.noElimination = toggle.enabled;
     });
     this.onMessage(MSG.PONG, (client, msg: unknown) => {
       if (!this.allow(client, MSG.PONG)) return;

@@ -1,0 +1,145 @@
+import * as THREE from 'three';
+import { ELEMENTS, isElementId, type ElementId } from '@sp/shared';
+import type { MaterialLibrary } from '../core/MaterialLibrary.ts';
+
+/**
+ * Element "tattoo": a glowing chest emblem, bands on both arms and a small element charm
+ * orbiting the head. Purely cosmetic; driven by the synced PlayerState.element.
+ */
+
+type Shape = 'rock' | 'drop' | 'bolt' | 'ring' | 'flame' | 'cube' | 'orb';
+
+interface LookGeometries {
+  emblem: THREE.BufferGeometry;
+  band: THREE.BufferGeometry;
+  shapes: Record<Shape, THREE.BufferGeometry>;
+}
+
+const SHAPE_OF: Record<ElementId, Shape> = {
+  EARTH: 'rock',
+  WATER: 'drop',
+  THUNDER: 'bolt',
+  WIND: 'ring',
+  FIRE: 'flame',
+  SWAP: 'cube',
+  CLONE: 'orb',
+  BLINK: 'ring',
+  DARK: 'orb',
+};
+
+let shared: LookGeometries | null = null;
+let users = 0;
+
+function acquire(): LookGeometries {
+  users++;
+  if (!shared) {
+    const drop = new THREE.SphereGeometry(0.1, 8, 6);
+    drop.scale(1, 1.4, 1);
+    shared = {
+      emblem: new THREE.OctahedronGeometry(0.14, 0).scale(1, 1, 0.3),
+      band: new THREE.CylinderGeometry(0.16, 0.16, 0.08, 8, 1, true),
+      shapes: {
+        rock: new THREE.DodecahedronGeometry(0.11, 0),
+        drop,
+        bolt: new THREE.OctahedronGeometry(0.12, 0).scale(0.6, 1.5, 0.6),
+        ring: new THREE.TorusGeometry(0.1, 0.03, 4, 10),
+        flame: new THREE.ConeGeometry(0.09, 0.24, 6),
+        cube: new THREE.BoxGeometry(0.14, 0.14, 0.14),
+        orb: new THREE.IcosahedronGeometry(0.1, 0),
+      },
+    };
+  }
+  return shared;
+}
+
+function release(): void {
+  users = Math.max(0, users - 1);
+  if (users === 0 && shared) {
+    shared.emblem.dispose();
+    shared.band.dispose();
+    for (const g of Object.values(shared.shapes)) g.dispose();
+    shared = null;
+  }
+}
+
+const hex = (css: string): number => Number.parseInt(css.slice(1), 16);
+
+export interface LookTargets {
+  torso: THREE.Object3D;
+  armL: THREE.Object3D;
+  armR: THREE.Object3D;
+}
+
+export class ElementLook {
+  private readonly materials: MaterialLibrary;
+  private readonly targets: LookTargets;
+  private readonly geo: LookGeometries;
+  private readonly parts: THREE.Mesh[] = [];
+  private readonly orbit = new THREE.Group();
+  private current: ElementId | null = null;
+  private time = 0;
+
+  constructor(materials: MaterialLibrary, targets: LookTargets) {
+    this.materials = materials;
+    this.targets = targets;
+    this.geo = acquire();
+    this.orbit.position.y = 1.45; // above the head (torso space)
+    targets.torso.add(this.orbit);
+  }
+
+  get element(): ElementId | null {
+    return this.current;
+  }
+
+  set(raw: string): void {
+    const next = isElementId(raw) ? raw : null;
+    if (next === this.current) return;
+    this.clear();
+    this.current = next;
+    if (!next) return;
+    const color = hex(ELEMENTS[next].color);
+    const glow = this.materials.basic(color);
+
+    const emblem = new THREE.Mesh(this.geo.emblem, glow);
+    emblem.position.set(0, 0.42, 0.39); // chest, in front of the body cylinder
+    this.targets.torso.add(emblem);
+    this.parts.push(emblem);
+
+    for (const arm of [this.targets.armL, this.targets.armR]) {
+      const band = new THREE.Mesh(this.geo.band, glow);
+      band.position.y = -0.16;
+      arm.add(band);
+      this.parts.push(band);
+    }
+
+    const shape = this.geo.shapes[SHAPE_OF[next]];
+    for (let i = 0; i < 2; i++) {
+      const charm = new THREE.Mesh(shape, glow);
+      const a = i * Math.PI;
+      charm.position.set(Math.cos(a) * 0.42, 0, Math.sin(a) * 0.42);
+      if (next === 'BLINK') charm.rotation.x = Math.PI / 2;
+      this.orbit.add(charm);
+      this.parts.push(charm);
+    }
+  }
+
+  update(dt: number): void {
+    if (!this.current) return;
+    this.time += dt;
+    this.orbit.rotation.y += dt * 2.2;
+    this.orbit.position.y = 1.45 + Math.sin(this.time * 3) * 0.05;
+    const spin = this.current === 'FIRE' ? 0 : dt * 4;
+    for (const c of this.orbit.children) c.rotation.y += spin;
+  }
+
+  dispose(): void {
+    this.clear();
+    this.orbit.removeFromParent();
+    release();
+  }
+
+  private clear(): void {
+    for (const p of this.parts) p.removeFromParent();
+    this.parts.length = 0;
+  }
+}

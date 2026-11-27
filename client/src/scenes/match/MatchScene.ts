@@ -288,6 +288,7 @@ class MatchScene implements GameScene {
       const pose: Pose =
         p.roundState === 'OUT' ? 'fallen' : p.roundState === 'FINISHED' || (phase === 'MATCH_END' && p.id === winnerId) ? 'cheer' : 'normal';
       actor.anim.setPose(pose);
+      actor.model.setElement(p.element);
       if (p.id === this.net.localId) this.syncLocal(p, actor, now);
       else actor.interp.push(now, p.x, p.y, p.z, p.yaw, Math.hypot(p.vx, p.vz), p.grounded);
     });

@@ -10,14 +10,17 @@ export interface MovementParams {
   arriveRadius: number;
 }
 
+/** Visual scale of characters (smaller, nimbler players). Collision radius matches it. */
+export const CHARACTER_SCALE = 0.75;
+
 export const MOVEMENT: Readonly<MovementParams> = {
-  walkSpeed: 6,
-  accel: 50,
-  decel: 40,
-  airControl: 0.4,
+  walkSpeed: 6.5,
+  accel: 80,
+  decel: 60,
+  airControl: 0.85,
   gravity: 28,
   jumpVelocity: 9,
-  radius: 0.45,
+  radius: 0.32,
   stepHeight: 0.35,
   arriveRadius: 0.2,
 };

@@ -3,7 +3,7 @@
 Game web 3D multiplayer (tối đa 4 người, người thật + NPC) gồm nhiều minigame loại trực tiếp.
 Three.js + React + Vite (client), Node.js + Colyseus (server), TypeScript toàn bộ.
 
-> Trạng thái: Phase 0–8 xong — chơi được đầy đủ: phòng, lobby, NPC 4 cấp độ, 5 minigame, loại trực tiếp, spectator, người thắng, chế độ Nguyên tố. Xem [PROGRESS.md](PROGRESS.md).
+> Trạng thái: Phase 0–8 xong — chơi được đầy đủ: phòng, lobby, NPC 4 cấp độ, 5 minigame, loại trực tiếp, spectator, người thắng, chế độ Nguyên tố, chế độ Không bị loại. Xem [PROGRESS.md](PROGRESS.md).
 > Hướng dẫn test 4 người: [TESTING.md](TESTING.md).
 
 ## Yêu cầu
@@ -79,6 +79,11 @@ docker compose down
 | Kéo Co | Click/Space khi kim vào vùng xanh |
 | Phản Xạ Nhanh | Click/Space khi màn hình chuyển xanh (BẤM!) |
 
+### Chế độ Không bị loại (tắt mặc định, host bật trong lobby)
+
+Thua vòng vẫn chơi tiếp. Trận luôn đủ 5 vòng; mỗi vòng cộng điểm theo thứ hạng (4 người: 4/3/2/1 điểm).
+Hết trận ai nhiều điểm nhất thắng, bằng điểm thì ai xếp trên ở vòng cuối thắng. Điểm hiện cạnh tên trong danh sách người chơi.
+
 ### Chế độ Nguyên tố (bật mặc định, host tắt được trong lobby)
 
 Lúc hiện luật mỗi vòng, chọn 1 trong 9 nguyên tố. Khi chơi, bấm nút nguyên tố (góc phải dưới) rồi click xuống đất để ngắm,
@@ -98,6 +103,7 @@ hoặc nhấn **F** để dùng ngay tại con trỏ. Chiêu không giới hạn
 
 Cầu Kính chỉ có Lôi / Hoán đổi / Bóng tối (Hoán đổi = đổi tiến độ với người dẫn đầu). Kéo Co và Phản Xạ Nhanh chỉ có Lôi
 (khoá thao tác của 1 đối thủ) và Bóng tối (che màn hình mọi đối thủ). NPC cũng dùng nguyên tố.
+Mỗi nguyên tố đổi ngoại hình nhân vật: hình xăm phát sáng trên ngực, vòng xăm ở hai tay và vật thể nhỏ bay quanh đầu (đá, giọt nước, tia sét…).
 
 ## Điều khiển
 

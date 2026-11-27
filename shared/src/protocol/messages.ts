@@ -16,6 +16,8 @@ export const MSG = {
   PICK_ELEMENT: 'pickElement',
   CAST: 'cast',
   ELEMENTS_TOGGLE: 'elementsToggle',
+  /** Host toggles "no elimination" mode: everyone plays every round and scores points. */
+  NO_ELIMINATION_TOGGLE: 'noEliminationToggle',
 } as const;
 
 export type Phase = 'LOBBY' | 'ROUND_INTRO' | 'ROUND_COUNTDOWN' | 'ROUND_PLAYING' | 'ROUND_RESULT' | 'MATCH_END';

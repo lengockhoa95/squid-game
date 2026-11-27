@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { CHARACTER_SCALE } from '@sp/shared';
 import type { MaterialLibrary } from '../core/MaterialLibrary.ts';
+import { ElementLook } from './ElementLook.ts';
 
 export type Accessory = 'none' | 'cap' | 'glasses' | 'band';
 
@@ -64,8 +66,11 @@ export class PlayerModel {
   readonly legL = new THREE.Group();
   readonly legR = new THREE.Group();
   private disposed = false;
+  private readonly materials: MaterialLibrary;
+  private look: ElementLook | null = null;
 
   constructor(materials: MaterialLibrary, color: number, accessory: Accessory) {
+    this.materials = materials;
     const g = acquireGeometries();
     const bodyMat = materials.lambert(color);
     const skinMat = materials.lambert(SKIN_COLOR);
@@ -108,11 +113,26 @@ export class PlayerModel {
     this.addAccessory(accessory, g, materials, color);
     this.poseGroup.add(this.legL, this.legR, this.torso);
     this.group.add(this.poseGroup);
+    this.group.scale.setScalar(CHARACTER_SCALE);
+  }
+
+  /** Show the element tattoo/charm for this element id ('' = none). */
+  setElement(element: string): void {
+    if (!element && !this.look) return;
+    this.look ??= new ElementLook(this.materials, { torso: this.torso, armL: this.armL, armR: this.armR });
+    this.look.set(element);
+  }
+
+  /** Animate cosmetic extras (element charm). */
+  updateExtras(dt: number): void {
+    this.look?.update(dt);
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.look?.dispose();
+    this.look = null;
     this.group.removeFromParent();
     releaseGeometries();
   }

@@ -59,6 +59,7 @@ export function ResultsCard() {
   const round = useStore(sessionStore, (s) => s.roundIndex);
   const total = useStore(sessionStore, (s) => s.totalRounds);
   const isLast = aliveCount <= 1 || round >= total;
+  const noElim = useStore(sessionStore, (s) => s.noElimination);
   return (
     <div className="overlay-card results-card">
       <h2 className="card-title">{vi.resultTitle}</h2>
@@ -73,9 +74,15 @@ export function ResultsCard() {
                 <strong>{r.nickname}{r.id === myId ? ` (${vi.you})` : ''}</strong>
                 <span>{r.detail}</span>
               </div>
-              <span className={`badge ${r.eliminated ? 'badge-out' : 'badge-pass'}`}>
-                {r.eliminated ? vi.eliminatedBadge : vi.passedBadge}
-              </span>
+              {noElim && !r.eliminated ? (
+                <span className={`badge ${r.passed ? 'badge-pass' : 'badge-lost'}`}>
+                  +{r.gained} {vi.points}
+                </span>
+              ) : (
+                <span className={`badge ${r.eliminated ? 'badge-out' : 'badge-pass'}`}>
+                  {r.eliminated ? vi.eliminatedBadge : vi.passedBadge}
+                </span>
+              )}
             </li>
           );
         })}
@@ -91,6 +98,11 @@ export function WinnerCard() {
   const timer = useStore(sessionStore, (s) => s.timerSeconds);
   const amHost = useStore(sessionStore, (s) => s.myId !== '' && s.myId === s.hostId);
   const winner = players.find((p) => p.id === winnerId);
+  const noElim = useStore(sessionStore, (s) => s.noElimination);
+  // Winner first (the server breaks ties by the last round's ranking), then by points.
+  const standings = [...players]
+    .filter((p) => p.alive)
+    .sort((a, b) => Number(b.id === winnerId) - Number(a.id === winnerId) || b.points - a.points);
   return (
     <div className="overlay-card winner-card">
       <span className="eyebrow">{vi.winnerTitle}</span>
@@ -103,6 +115,18 @@ export function WinnerCard() {
       ) : (
         <h2 className="card-title">{vi.noWinner}</h2>
       )}
+      {noElim && (
+        <ol className="standings" aria-label={vi.standings}>
+          {standings.map((p, i) => (
+            <li key={p.id} className={p.id === winnerId ? 'is-winner' : ''}>
+              <span className="rank">#{i + 1}</span>
+              <Avatar slot={p.slot} name={p.nickname} />
+              <span className="standings-name">{p.nickname}</span>
+              <b>{p.points} {vi.points}</b>
+            </li>
+          ))}
+        </ol>
+      )}
       <p className="muted">{vi.backToLobbyIn} {timer}s</p>
       {amHost && <button type="button" className="btn btn-primary" onClick={() => network.backToLobby()}>{vi.backToLobby}</button>}
     </div>
@@ -112,19 +136,22 @@ export function WinnerCard() {
 export function StatusBanner() {
   const phase = useStore(sessionStore, (s) => s.phase);
   const me = useStore(sessionStore, (s) => s.players.find((p) => p.id === s.myId));
+  const noElim = useStore(sessionStore, (s) => s.noElimination);
   if (!me || phase === 'MATCH_END' || phase === 'ROUND_RESULT') return null;
   if (!me.alive) {
     return <div className="status-banner is-spectating">{vi.spectating} · <small>{vi.spectateHint}</small></div>;
   }
   if (phase !== 'ROUND_PLAYING') return null;
   if (me.roundState === 'FINISHED') return <div className="status-banner is-pass">{vi.youFinished}</div>;
-  if (me.roundState === 'OUT') return <div className="status-banner is-out">{vi.youOut}</div>;
+  if (me.roundState === 'OUT') return <div className="status-banner is-out">{noElim ? vi.youLostRound : vi.youOut}</div>;
   return null;
 }
 
 export function PlayerList() {
   const players = useStore(sessionStore, (s) => s.players);
   const myId = useStore(sessionStore, (s) => s.myId);
+  const noElim = useStore(sessionStore, (s) => s.noElimination);
+  const inMatch = useStore(sessionStore, (s) => s.phase !== 'LOBBY');
   return (
     <ul className="hud-players">
       {players.map((p) => {
@@ -135,6 +162,7 @@ export function PlayerList() {
             <span className="hud-name">{p.nickname}{p.id === myId ? ` (${vi.you})` : ''}</span>
             {p.isBot && <span className="tag tag-bot">{vi.bot}</span>}
             {!p.connected && !p.isBot && <em>{vi.disconnected}</em>}
+            {noElim && inMatch && <span className="hud-points">{p.points}</span>}
           </li>
         );
       })}

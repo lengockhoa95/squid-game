@@ -87,6 +87,13 @@ Thiết kế: [docs/superpowers/specs/2026-11-26-elements-design.md](docs/superp
 - [x] Test: 139 unit/integration; mô phỏng trận bật/tắt nguyên tố; E2E `e2e/elements.mjs` (chọn + dùng chiêu bằng nút và phím F)
 - [x] `SP_GAMES` để giới hạn minigame khi test
 
+## Phase 9 — Không bị loại, nhân vật nhỏ, ngoại hình nguyên tố ✅
+
+- [x] Chế độ Không bị loại (host bật/tắt): đủ 5 vòng, điểm theo thứ hạng, bảng điểm cuối trận, điểm trên HUD
+- [x] Nhân vật nhỏ lại (×0.75, bán kính va chạm 0.32) và linh hoạt hơn (tăng tốc/phanh nhanh hơn, điều khiển trên không 0.85, tốc độ 6.5)
+- [x] Ngoại hình theo nguyên tố: hình xăm ngực + vòng tay + vật thể bay quanh đầu; bản sao Phân thân mang cùng ngoại hình
+- [x] Test: 142 unit/integration (mô phỏng trận không bị loại, chọn người thắng khi bằng điểm, toggle qua phòng thật); E2E `NO_ELIM=1 node e2e/elements.mjs`
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).

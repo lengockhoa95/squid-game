@@ -104,6 +104,10 @@ class NetworkManager {
     this.room?.send(MSG.ELEMENTS_TOGGLE, { enabled });
   }
 
+  setNoElimination(enabled: boolean): void {
+    this.room?.send(MSG.NO_ELIMINATION_TOGGLE, { enabled });
+  }
+
   /** Adapter for the networked scene; null when not in a room. */
   getAdapter(): MatchNetAdapter | null {
     if (!this.room) return null;
@@ -219,22 +223,23 @@ class NetworkManager {
       timerSeconds: Math.ceil(state.timer),
       winnerId: state.winnerId,
       elementsEnabled: state.elementsEnabled,
+      noElimination: state.noElimination,
     });
 
     let resultsSig = '';
     state.results.forEach((r) => {
-      resultsSig += `${r.id}|${r.rank}|${r.passed}|${r.eliminated}|${r.detail};`;
+      resultsSig += `${r.id}|${r.rank}|${r.passed}|${r.eliminated}|${r.detail}|${r.gained};`;
     });
     if (resultsSig !== this.resultsSignature) {
       this.resultsSignature = resultsSig;
       const results: ResultRow[] = [];
-      state.results.forEach((r) => results.push({ id: r.id, nickname: r.nickname, rank: r.rank, passed: r.passed, eliminated: r.eliminated, detail: r.detail }));
+      state.results.forEach((r) => results.push({ id: r.id, nickname: r.nickname, rank: r.rank, passed: r.passed, eliminated: r.eliminated, detail: r.detail, gained: r.gained }));
       sessionStore.set({ results });
     }
 
     let signature = '';
     state.players.forEach((p) => {
-      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.difficulty}|${p.ready}|${p.connected}|${p.alive}|${p.roundState}|${p.team}|${p.element};`;
+      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.difficulty}|${p.ready}|${p.connected}|${p.alive}|${p.roundState}|${p.team}|${p.element}|${p.points};`;
     });
     if (signature === this.lobbySignature) return;
     this.lobbySignature = signature;
@@ -242,7 +247,7 @@ class NetworkManager {
     state.players.forEach((p) => {
       players.push({
         id: p.id, nickname: p.nickname, slot: p.slot, isBot: p.isBot, difficulty: p.difficulty, ready: p.ready,
-        connected: p.connected, alive: p.alive, roundState: p.roundState, team: p.team, element: p.element,
+        connected: p.connected, alive: p.alive, roundState: p.roundState, team: p.team, element: p.element, points: p.points,
       });
     });
     players.sort((a, b) => a.slot - b.slot);

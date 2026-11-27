@@ -521,3 +521,13 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
   .element-option small { display: none; }
   .element-bar { right: 10px; bottom: 10px; }
 }
+
+/* No-elimination mode */
+.badge-lost { background: rgba(255, 210, 63, 0.16); color: #ffd23f; }
+.hud-points { margin-left: auto; padding: 1px 8px; border-radius: 8px; background: rgba(61, 245, 200, 0.16); color: var(--neon); font-weight: 800; font-variant-numeric: tabular-nums; font-size: 12px; }
+.standings { list-style: none; margin: 6px 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.standings li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+.standings li.is-winner { border-color: rgba(61, 245, 200, 0.5); }
+.standings .rank { width: 26px; color: var(--muted); font-weight: 800; }
+.standings-name { flex: 1; text-align: left; }
+.elements-toggle .segmented-sm, .no-elim-toggle .segmented-sm { flex: 0 0 140px; min-width: 0; }

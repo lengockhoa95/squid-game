@@ -11,6 +11,8 @@ import { decideEliminations } from './EliminationPolicy.ts';
 import { assertTransition } from './MatchStateMachine.ts';
 import { ElementSystem, type CastResult } from '../elements/ElementSystem.ts';
 
+export const NO_ELIMINATION_ROUNDS = 5;
+
 export const PHASE_SECONDS = {
   ROUND_INTRO: 5,
   ROUND_COUNTDOWN: 3,
@@ -60,7 +62,8 @@ export class MatchController {
 
   begin(): void {
     const s = this.d.state;
-    s.totalRounds = planRoundCount(this.d.rng);
+    // No-elimination mode plays every round (one of each game); classic mode 3–5 rounds.
+    s.totalRounds = s.noElimination ? NO_ELIMINATION_ROUNDS : planRoundCount(this.d.rng);
     s.roundIndex = 0;
     s.winnerId = '';
     s.results.clear();
@@ -68,6 +71,7 @@ export class MatchController {
     for (const p of s.players.values()) {
       p.alive = true;
       p.roundState = 'ACTIVE';
+      p.points = 0;
     }
     this.nextRound();
   }
@@ -228,14 +232,18 @@ export class MatchController {
     this.strategy = null;
 
     const aliveIds = this.participants.filter((p) => p.state.alive).map((p) => p.id);
+    const noElim = s.noElimination;
     const eliminated = new Set(
-      decideEliminations({
-        alive: aliveIds,
-        ranking: outcome.ranking,
-        passed: outcome.passed,
-        roundsLeftAfter: s.totalRounds - s.roundIndex,
-      }),
+      noElim
+        ? []
+        : decideEliminations({
+            alive: aliveIds,
+            ranking: outcome.ranking,
+            passed: outcome.passed,
+            roundsLeftAfter: s.totalRounds - s.roundIndex,
+          }),
     );
+    const ranked = outcome.ranking.filter((id) => aliveIds.includes(id));
 
     s.results.clear();
     outcome.ranking.forEach((id, index) => {
@@ -247,15 +255,29 @@ export class MatchController {
       entry.id = id;
       entry.nickname = p.nickname;
       entry.rank = index + 1;
-      entry.passed = !eliminated.has(id) && !forfeited;
-      entry.eliminated = eliminated.has(id) || forfeited;
-      const spared = !outcome.passed.has(id) && !eliminated.has(id) && !forfeited;
-      entry.detail = forfeited ? 'Rời trận' : `${outcome.details.get(id) ?? ''}${spared ? ' · được giữ lại nhờ xếp hạng' : ''}`;
+      if (noElim) {
+        // Rank points: 1st gets one point per participant, last gets 1; forfeits get nothing.
+        const gained = forfeited ? 0 : ranked.length - ranked.indexOf(id);
+        p.points += gained;
+        entry.gained = gained;
+        entry.passed = outcome.passed.has(id) && !forfeited;
+        entry.eliminated = forfeited;
+        entry.detail = forfeited ? 'Rời trận' : (outcome.details.get(id) ?? '');
+      } else {
+        entry.passed = !eliminated.has(id) && !forfeited;
+        entry.eliminated = eliminated.has(id) || forfeited;
+        const spared = !outcome.passed.has(id) && !eliminated.has(id) && !forfeited;
+        entry.detail = forfeited ? 'Rời trận' : `${outcome.details.get(id) ?? ''}${spared ? ' · được giữ lại nhờ xếp hạng' : ''}`;
+      }
       s.results.push(entry);
     });
 
     const survivors = this.alivePlayers();
-    if (survivors.length === 1) s.winnerId = survivors[0]!.id;
+    if (noElim) {
+      if (survivors.length <= 1 || s.roundIndex >= s.totalRounds) s.winnerId = pointsLeader(survivors, ranked);
+    } else if (survivors.length === 1) {
+      s.winnerId = survivors[0]!.id;
+    }
     this.participants = [];
     this.setPhase('ROUND_RESULT', this.scaled(PHASE_SECONDS.ROUND_RESULT));
   }
@@ -284,4 +306,14 @@ export class MatchController {
     this.d.state.phase = phase;
     this.d.state.timer = seconds;
   }
+}
+
+/** Most points wins; ties go to whoever ranked better in the last round. */
+export function pointsLeader(players: readonly PlayerState[], lastRanking: readonly string[]): string {
+  const rankOf = (id: string) => {
+    const i = lastRanking.indexOf(id);
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const best = [...players].sort((a, b) => b.points - a.points || rankOf(a.id) - rankOf(b.id))[0];
+  return best?.id ?? '';
 }

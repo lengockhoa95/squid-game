@@ -28,6 +28,7 @@ export class AnimationController {
 
   update(dt: number, horizontalSpeed: number, grounded: boolean): void {
     this.time += dt;
+    this.model.updateExtras(dt);
     const k = 1 - Math.exp(-BLEND * dt);
     this.fallAmount += ((this.pose === 'fallen' ? 1 : 0) - this.fallAmount) * (1 - Math.exp(-6 * dt));
     this.cheerAmount += ((this.pose === 'cheer' ? 1 : 0) - this.cheerAmount) * k;

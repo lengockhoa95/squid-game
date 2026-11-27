@@ -35,6 +35,8 @@ export const PlayerState = schema(
     stunUntil: t.float32(),
     hasteUntil: t.float32(),
     blindUntil: t.float32(),
+    /** No-elimination mode: match points (rank points summed over rounds). */
+    points: t.uint16(),
   },
   'PlayerState',
 );
@@ -48,6 +50,8 @@ export const RoundResultEntry = schema(
     passed: t.boolean(),
     eliminated: t.boolean(),
     detail: t.string(),
+    /** Points gained this round (no-elimination mode). */
+    gained: t.uint8(),
   },
   'RoundResultEntry',
 );
@@ -109,6 +113,8 @@ export const MatchState = schema(
     results: t.array(RoundResultEntry),
     players: t.map(PlayerState),
     elementsEnabled: t.boolean().default(true),
+    /** When true nobody is eliminated: all rounds are played and the most points wins. */
+    noElimination: t.boolean().default(false),
     effects: t.array(ElementEffect),
     rlgl: t.ref(RlglState).optional(),
     bridge: t.ref(BridgeState).optional(),

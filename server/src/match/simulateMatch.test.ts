@@ -26,4 +26,16 @@ describe('headless bots-only matches', () => {
     }
     expect(casts).toBeGreaterThan(20);
   }, 120000);
+
+  it('no-elimination mode: nobody is eliminated, all 5 rounds are played, most points wins', async () => {
+    for (let seed = 40; seed <= 45; seed++) {
+      const r = simulateMatch(seed, ['EASY', 'NORMAL', 'HARD', 'SMART'], undefined, true, true);
+      expect(r.rounds, `seed ${seed}`).toBe(5);
+      expect(r.eliminatedCount).toBe(0);
+      expect(r.winnerId).not.toBe('');
+      expect(r.winnerPoints).toBe(Math.max(...r.points));
+      // 4 players: 4+3+2+1 = 10 points handed out per round
+      expect(r.points.reduce((a, b) => a + b, 0)).toBe(50);
+    }
+  }, 120000);
 });

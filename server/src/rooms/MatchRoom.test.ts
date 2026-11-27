@@ -210,4 +210,23 @@ describe('MatchRoom match flow', () => {
     await waitFor(() => me.elementReadyAt > state.gameTime, 3000);
     expect(state.effects.some((e) => e.kind === 'BOLT')).toBe(true);
   }, 20000);
+
+  it('no-elimination mode: host-only toggle; a forfeit still ends a 2-player match with the other as winner', async () => {
+    const { host, others, state } = await createLobby(['Host', 'Guest']);
+    const guest = others[0]!;
+    const denied = guest.waitForMessage(MSG.ERROR);
+    guest.send(MSG.NO_ELIMINATION_TOGGLE, { enabled: true });
+    expect(await denied).toEqual({ code: 'NOT_HOST' });
+    host.send(MSG.NO_ELIMINATION_TOGGLE, { enabled: true });
+    await waitFor(() => state.noElimination);
+    host.send(MSG.NPC_CONFIG, { count: 0, difficulties: [] });
+    host.send(MSG.READY, { ready: true });
+    guest.send(MSG.READY, { ready: true });
+    await waitFor(() => [...state.players.values()].every((p) => p.ready));
+    host.send(MSG.START);
+    await waitFor(() => state.phase === 'ROUND_INTRO');
+    expect(state.totalRounds).toBe(5);
+    await guest.leave();
+    await waitFor(() => state.winnerId === host.sessionId, 10000);
+  }, 20000);
 });

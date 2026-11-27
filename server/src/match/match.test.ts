@@ -3,6 +3,7 @@ import { createRng, MINIGAME_IDS, type MinigameId } from '@sp/shared';
 import { pickNextGame, planRoundCount } from './RoundScheduler.ts';
 import { decideEliminations } from './EliminationPolicy.ts';
 import { canTransition, assertTransition } from './MatchStateMachine.ts';
+import { pointsLeader } from './MatchController.ts';
 
 describe('RoundScheduler', () => {
   it('plans 3 to 5 rounds', () => {
@@ -90,5 +91,14 @@ describe('MatchStateMachine', () => {
     for (const p of ['ROUND_INTRO', 'ROUND_COUNTDOWN', 'ROUND_PLAYING', 'ROUND_RESULT'] as const) {
       expect(canTransition(p, 'LOBBY')).toBe(true);
     }
+  });
+});
+
+describe('pointsLeader', () => {
+  it('picks the most points, breaking ties by the last round ranking', () => {
+    const ps = [{ id: 'a', points: 7 }, { id: 'b', points: 9 }, { id: 'c', points: 9 }] as never[];
+    expect(pointsLeader(ps, ['c', 'a', 'b'])).toBe('c');
+    expect(pointsLeader(ps, ['b', 'c', 'a'])).toBe('b');
+    expect(pointsLeader([], [])).toBe('');
   });
 });

@@ -23,6 +23,10 @@ await page.getByRole('button', { name: 'Tạo phòng' }).click();
 await page.locator('.code-value').waitFor();
 for (let i = 0; i < 3; i++) await page.locator('.npc-row').nth(i).getByRole('button', { name: 'Thông minh' }).click();
 await page.locator('.elements-toggle').waitFor();
+if (process.env.NO_ELIM) {
+  await page.locator('.no-elim-toggle').getByRole('button', { name: 'Bật' }).click();
+  await page.waitForTimeout(300);
+}
 await page.screenshot({ path: `${out}/e-0-lobby.png` });
 await page.getByRole('button', { name: 'Sẵn sàng!' }).click();
 await page.getByRole('button', { name: 'Bắt đầu' }).click();
