@@ -73,9 +73,9 @@ docker compose down
 
 | Minigame | Cách chơi |
 |---|---|
-| Đèn Xanh – Đèn Đỏ | Click/W để chạy khi đèn xanh, dừng khi đèn đỏ (nhấp chuột phải / thả phím) |
+| Đèn Xanh – Đèn Đỏ | W để chạy khi đèn xanh, thả phím khi đèn đỏ |
 | Cầu Kính | Mỗi hàng 3 tấm, 1 tấm vỡ. Click tấm kính hàng kế tiếp (A/S/D). Mọi người chơi cùng lúc |
-| Vượt Chướng Ngại | Click/WASD để chạy, Space/chuột giữa để nhảy qua hố và tường |
+| Vượt Chướng Ngại | WASD để chạy, Space để nhảy qua hố và tường |
 | Kéo Co | Click/Space khi kim vào vùng xanh |
 | Phản Xạ Nhanh | Click/Space khi màn hình chuyển xanh (BẤM!), 5 lượt |
 
@@ -108,7 +108,7 @@ Hết trận ai nhiều điểm nhất thắng, bằng điểm thì ai xếp tr�
 
 ### Chế độ Nguyên tố (bật mặc định, host tắt được trong lobby)
 
-Lúc hiện luật mỗi vòng, chọn 1 trong 9 nguyên tố. Khi chơi, bấm nút nguyên tố (góc phải dưới) rồi click xuống đất để ngắm,
+Lúc hiện luật mỗi vòng, chọn 1 trong 9 nguyên tố. Khi chơi, click chuột trái xuống chỗ muốn dùng (hoặc bấm nút nguyên tố góc phải dưới),
 hoặc nhấn **F** để dùng ngay tại con trỏ. Chiêu không giới hạn số lần, chỉ có thời gian hồi. Cố tình không cân bằng: vui là chính.
 
 | Nguyên tố | Tác dụng |
@@ -129,17 +129,17 @@ Mỗi nguyên tố đổi ngoại hình nhân vật: hình xăm phát sáng trê
 
 ## Điều khiển
 
-Chuột là chính, bàn phím luôn dùng song song.
+Bàn phím để di chuyển, chuột để dùng nguyên tố và chọn kỹ năng.
 
-| Hành động | Chuột | Bàn phím |
+| Hành động | Bàn phím | Chuột |
 |---|---|---|
-| Di chuyển | Click trái lên mặt đất (giữ + kéo để lái liên tục) | WASD / mũi tên |
-| Dừng | Nhấp chuột phải | X / thả phím |
-| Nhảy | Click chuột giữa | Space |
-| Xoay camera | Giữ chuột phải + kéo | Q / E |
-| Zoom | Con lăn | + / − |
-| Dùng nguyên tố | Nút nguyên tố → click xuống đất (chuột phải huỷ) | F (tại con trỏ) |
-| Thông tin hiệu năng | nút F3 trên HUD | F3 |
+| Di chuyển | WASD / mũi tên | — |
+| Nhảy | Space | — |
+| Xoay camera | Q / E | Giữ chuột phải + kéo |
+| Zoom | + / − | Con lăn |
+| Dùng nguyên tố | F (tại con trỏ) | Click trái xuống chỗ muốn dùng (hoặc nút nguyên tố góc phải dưới) |
+| Chọn nguyên tố / thẻ | — | Click vào ô / thẻ |
+| Thông tin hiệu năng | F3 | nút F3 trên HUD |
 
 ## Cấu trúc
 

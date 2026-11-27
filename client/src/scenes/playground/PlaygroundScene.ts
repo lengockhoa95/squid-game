@@ -88,7 +88,7 @@ class PlaygroundScene implements GameScene {
   }
 
   onGroundClick(hit: ClickHit): void {
-    this.player.setTarget(hit.x, hit.z);
+    void hit; // movement is keyboard-only (WASD); clicks are reserved for elements in matches
     this.marker.show(hit.x, hit.y, hit.z);
   }
 

@@ -19,7 +19,7 @@ export const MINIGAMES: Readonly<Record<MinigameId, MinigameInfo>> = {
     id: 'RLGL',
     title: 'Đèn Xanh – Đèn Đỏ',
     rules: [
-      'Đèn xanh: chạy về vạch đích.',
+      'Đèn xanh: chạy về vạch đích (WASD / mũi tên).',
       'Đèn đỏ: đứng yên! Còn di chuyển sẽ bị loại.',
       'Theo dõi thanh "bài hát" để đoán lúc đèn đổi màu.',
       'Về đích trước khi hết giờ để qua vòng.',
@@ -46,7 +46,7 @@ export const MINIGAMES: Readonly<Record<MinigameId, MinigameInfo>> = {
     title: 'Vượt Chướng Ngại',
     rules: [
       'Chạy tới vạch đích, né thanh quét và khối đẩy.',
-      'Nhảy qua hố và tường thấp (Space / chuột giữa).',
+      'Nhảy qua hố và tường thấp (Space).',
       'Rơi xuống sẽ quay lại checkpoint.',
       'Người về đích chậm nhất hoặc không kịp giờ sẽ bị loại.',
     ],

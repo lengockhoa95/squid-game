@@ -55,6 +55,7 @@ class MatchScene implements GameScene {
   private localStep: StepFn | null = null;
   private readonly effects: ElementEffectsView;
   private readonly auraCache = new Map<string, string>();
+  private lastCastAt = 0;
   private seqInitialized = false;
   private generation = 0;
   private accumulator = 0;
@@ -155,15 +156,13 @@ class MatchScene implements GameScene {
       return;
     }
     if (this.net.getPhase() !== 'ROUND_PLAYING' || !this.view || !this.frame) return;
-    const action = this.view.actionForClick(hit, this.frame);
-    if (action) {
-      this.net.sendAction(action);
+    // Movement games: walking is keyboard-only, a left click uses the element at that point.
+    if (this.view.step) {
+      this.castAt(hit);
       return;
     }
-    if (this.local) {
-      this.local.setTarget(hit.x, hit.z);
-      this.marker.show(hit.x, hit.y, hit.z);
-    }
+    const action = this.view.actionForClick(hit, this.frame);
+    if (action) this.net.sendAction(action);
   }
 
   onKeyPress(code: string): void {
@@ -256,6 +255,11 @@ class MatchScene implements GameScene {
     const me = this.localPlayer();
     if (!me || !me.alive || me.roundState !== 'ACTIVE' || this.net.getPhase() !== 'ROUND_PLAYING') return;
     if (!isElementId(me.element)) return;
+    // Do not spam the server: skip while cooling down / stunned, and at most a few clicks per second.
+    const now = performance.now();
+    const t = this.net.gameTimeNow();
+    if (now - this.lastCastAt < 250 || t < me.elementReadyAt - 0.05 || t < me.stunUntil) return;
+    this.lastCastAt = now;
     const pointAim = ELEMENTS[me.element].aim === 'point' && this.view?.step != null;
     if (pointAim && !hit) return;
     this.net.sendCast(pointAim && hit ? hit.x : 0, pointAim && hit ? hit.z : 0);

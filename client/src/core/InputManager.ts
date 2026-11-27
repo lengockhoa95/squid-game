@@ -128,8 +128,7 @@ export class InputManager {
       this.rightTotalDy = 0;
       this.host.setPointerCapture(e.pointerId);
     } else if (e.button === 1) {
-      e.preventDefault(); // suppress autoscroll
-      this.handlers.onJump();
+      e.preventDefault(); // suppress autoscroll (jump is Space: the mouse is for elements only)
     }
   };
 
@@ -148,8 +147,6 @@ export class InputManager {
         this.rightDragging = true;
       }
       if (this.rightDragging) this.handlers.onCameraRotate(e.movementX, e.movementY);
-    } else if (this.leftDown) {
-      this.emitGroundPoint(e); // hold + drag steers continuously
     }
   };
 

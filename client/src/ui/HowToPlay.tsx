@@ -11,17 +11,16 @@ const TABS: ReadonlyArray<[Tab, string]> = [
   ['modes', 'Minigame & chế độ'],
 ];
 
-const CONTROLS: ReadonlyArray<[action: string, mouse: string, keys: string]> = [
-  ['Di chuyển', 'Click trái xuống đất (giữ + kéo để lái liên tục)', 'WASD / mũi tên'],
-  ['Dừng lại', 'Nhấp chuột phải', 'X / thả phím'],
-  ['Nhảy', 'Click chuột giữa (nút con lăn)', 'Space'],
-  ['Xoay camera', 'Giữ chuột phải + kéo', 'Q / E'],
-  ['Zoom', 'Lăn con lăn', '+ / −'],
-  ['Cầu Kính', 'Click vào tấm kính ở hàng kế tiếp', 'A / S / D'],
-  ['Kéo Co · Phản Xạ', 'Click chuột trái đúng lúc', 'Space'],
-  ['Dùng nguyên tố', 'Click nút nguyên tố (góc phải dưới) → click xuống đất', 'F (dùng tại con trỏ)'],
-  ['Huỷ ngắm', 'Nhấp chuột phải', '—'],
-  ['Chọn nguyên tố / thẻ', 'Click vào ô / thẻ muốn chọn', '—'],
+const CONTROLS: ReadonlyArray<[action: string, keys: string, mouse: string]> = [
+  ['Di chuyển', 'WASD / mũi tên', '—'],
+  ['Nhảy', 'Space', '—'],
+  ['Xoay camera', 'Q / E', 'Giữ chuột phải + kéo'],
+  ['Zoom', '+ / −', 'Lăn con lăn'],
+  ['Dùng nguyên tố', 'F (dùng tại con trỏ)', 'Click trái xuống chỗ muốn dùng — hoặc click nút nguyên tố góc phải dưới'],
+  ['Huỷ ngắm', '—', 'Nhấp chuột phải'],
+  ['Chọn nguyên tố / thẻ kỹ năng', '—', 'Click vào ô / thẻ muốn chọn'],
+  ['Cầu Kính', 'A / S / D (trái / giữa / phải)', 'Click vào tấm kính hàng kế tiếp'],
+  ['Kéo Co · Phản Xạ', 'Space đúng lúc', 'Click trái đúng lúc'],
 ];
 
 /** "How to play" button + dialog for the lobby. Opens by itself the first time on this browser. */
@@ -90,14 +89,14 @@ export function HowToPlay() {
 function Controls() {
   return (
     <>
-      <p className="howto-lead">Chơi hoàn toàn bằng <b>chuột</b>. Bàn phím chỉ là cách phụ, dùng song song được.</p>
+      <p className="howto-lead"><b>Bàn phím để di chuyển</b>, <b>chuột để dùng nguyên tố và chọn kỹ năng</b>.</p>
       <table className="howto-table">
         <thead>
-          <tr><th>Việc</th><th>Chuột (chính)</th><th>Bàn phím (phụ)</th></tr>
+          <tr><th>Việc</th><th>Bàn phím</th><th>Chuột</th></tr>
         </thead>
         <tbody>
-          {CONTROLS.map(([a, m, k]) => (
-            <tr key={a}><td>{a}</td><td>{m}</td><td className="muted">{k}</td></tr>
+          {CONTROLS.map(([a, k, m]) => (
+            <tr key={a}><td>{a}</td><td>{k}</td><td>{m}</td></tr>
           ))}
         </tbody>
       </table>
@@ -110,7 +109,7 @@ function Elements() {
     <>
       <ol className="howto-steps">
         <li><b>Chọn:</b> lúc hiện luật mỗi vòng, click 1 nguyên tố ở hàng dưới màn hình (không chọn thì được random).</li>
-        <li><b>Dùng:</b> khi chơi, click nút nguyên tố ở <b>góc phải dưới</b>. Chiêu cần ngắm thì click tiếp xuống chỗ muốn dùng; chiêu cho bản thân thì dùng ngay.</li>
+        <li><b>Dùng:</b> khi chơi, <b>click chuột trái xuống chỗ muốn dùng</b> (chiêu cho bản thân thì click đâu cũng được). Cầu Kính / Kéo Co / Phản Xạ: click nút nguyên tố ở góc phải dưới.</li>
         <li><b>Hồi chiêu:</b> dùng không giới hạn, nút hiện số giây chờ. Nhân vật mang hình xăm theo nguyên tố đã chọn.</li>
       </ol>
       <ul className="howto-grid">

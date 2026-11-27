@@ -127,8 +127,11 @@ while (Date.now() < deadline) {
     }
     if (info.cd === 'Sẵn sàng' && info.cast) {
       casts++;
-      if (casts % 2 === 1) {
-        // mouse-first: button, then (for aimed elements) click the ground ahead
+      const how = movement ? ['click', 'button', 'F'][casts % 3] : 'button';
+      if (how === 'click') {
+        // Primary: walking is keyboard-only, a left click on the ground uses the element there.
+        await page.mouse.click(550, 260);
+      } else if (how === 'button') {
         // Short timeout: the round may end (and the button vanish) between the check and the click.
         await page.locator('.element-cast').click({ timeout: 1500 }).catch(() => {});
         if (movement && await page.locator('.element-cast.is-aiming').count()) await page.mouse.click(550, 260);
@@ -137,9 +140,9 @@ while (Date.now() < deadline) {
         await page.keyboard.press('KeyF');
       }
       await page.waitForTimeout(250);
-      const cd = await page.locator('.element-cd').textContent().catch(() => '');
+      const cd = await page.locator('.element-cd').textContent({ timeout: 500 }).catch(() => '');
       if (cd && cd !== 'Sẵn sàng') accepted++;
-      log(`  cast ${info.cast} → ${cd}`);
+      log(`  cast ${info.cast} (${how}) → ${cd}`);
       if (shots < 25) await page.screenshot({ path: `${out}/e-${++shots}-cast.png` });
     }
   } else if (wHeld) { await page.keyboard.up('KeyW'); wHeld = false; }
