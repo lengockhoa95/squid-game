@@ -12,6 +12,7 @@ export interface ServerKinematics {
   vz: number;
   yaw: number;
   grounded: boolean;
+  airJumped?: boolean;
 }
 
 /**
@@ -70,6 +71,7 @@ export class LocalPredictor {
     state.vz = server.vz;
     state.yaw = server.yaw;
     state.grounded = server.grounded;
+    state.airJumped = server.airJumped === true;
     for (let k = 0; k < this.count; k++) {
       const idx = (this.head + k) % CAPACITY;
       this.replayIntent.dirX = this.dx[idx]!;

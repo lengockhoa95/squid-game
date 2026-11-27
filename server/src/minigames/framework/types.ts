@@ -15,6 +15,8 @@ export interface MinigameContext {
   readonly rng: () => number;
   /** Measured round-trip time (ms) for latency compensation; 0 for bots. */
   rttOf(id: string): number;
+  /** Card "Mạng Phụ": spend a life to cancel a failure. True = the player is saved. */
+  tryRescue?(id: string): boolean;
 }
 
 export interface RoundOutcome {
@@ -39,6 +41,8 @@ export interface ServerMinigame {
   readonly bounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
   /** Non-movement games that support the SWAP element: exchange two players' progress. */
   swapPlayers?(a: string, b: string): boolean;
+  /** Card "Mắt Thần" (bridge): reveal the breaking tile of the first `rows` rows to this player. */
+  revealFor?(id: string, rows: number): Array<[row: number, side: number]>;
   initialize(ctx: MinigameContext): void;
   start(): void;
   handlePlayerInput(playerId: string, action: GameAction, gameTime: number): void;

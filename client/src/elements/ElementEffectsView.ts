@@ -33,7 +33,7 @@ export class ElementEffectsView {
   private readonly seen = new Set<number>();
   private readonly live = new Set<number>();
   private readonly geo: Record<'pillar' | 'disc' | 'bolt' | 'ring' | 'cone' | 'torus', THREE.BufferGeometry>;
-  private readonly mat: Record<'pillar' | 'puddle' | 'bolt' | 'wind' | 'blink' | 'swap' | 'dark' | 'fire' | 'stun', THREE.Material>;
+  private readonly mat: Record<'pillar' | 'puddle' | 'bolt' | 'wind' | 'blink' | 'swap' | 'dark' | 'fire' | 'stun' | 'rescue', THREE.Material>;
 
   constructor(materials: MaterialLibrary) {
     this.materials = materials;
@@ -58,6 +58,7 @@ export class ElementEffectsView {
       dark: basic(0x1a1030, 0.75),
       fire: basic(0xff7a2f, 0.85),
       stun: basic(0xffe14a, 0.95),
+      rescue: basic(0xff4f6d, 0.9),
     };
   }
 
@@ -160,6 +161,8 @@ export class ElementEffectsView {
         return { object: new THREE.Mesh(this.geo.ring, this.mat.wind), kind: e.kind };
       case 'DARK':
         return { object: new THREE.Mesh(this.geo.disc, this.mat.dark), kind: e.kind };
+      case 'RESCUE':
+        return { object: new THREE.Mesh(this.geo.ring, this.mat.rescue), kind: e.kind };
       case 'FIRE':
       default:
         return { object: new THREE.Group(), kind: e.kind }; // FIRE is drawn as a status mark
@@ -202,6 +205,12 @@ export class ElementEffectsView {
         c.anim.update(dt, ELEMENT_FX.cloneSpeed, true);
         break;
       }
+      case 'RESCUE': {
+        const r = 0.8 + f * 0.6;
+        o.scale.set(r, 1, r);
+        o.position.set(e.x, 0.2 + f * 2.2, e.z);
+        break;
+      }
       case 'WIND': {
         const r = 0.5 + ELEMENT_FX.windRadius * f;
         o.scale.set(r, 1, r);
@@ -229,6 +238,7 @@ export class ElementEffectsView {
 
   private playCue(kind: string): void {
     if (kind === 'BOLT') audio.play('zap', 0.16);
+    else if (kind === 'RESCUE') audio.play('pass', 0.2);
     else if (kind === 'PILLAR') audio.play('rumble', 0.2);
     else if (kind === 'WIND' || kind === 'BLINK' || kind === 'SWAP') audio.play('whoosh', 0.16);
     else audio.play('cast', 0.12);

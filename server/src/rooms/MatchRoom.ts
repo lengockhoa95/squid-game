@@ -2,7 +2,7 @@ import { Room, type Client } from '@colyseus/core';
 import {
   ERROR_CODES, IN_MATCH_PHASES, MAX_PLAYERS, MSG, PATCH_MS, PLAYGROUND_SPAWNS, RECONNECT_SECONDS, SIM_DT, SIM_HZ,
   DEFAULT_NPC_DIFFICULTIES, isDifficulty, parseCast, parseElementsToggle, parseGameAction, parseMoveBatch, parseNpcConfig,
-  parsePickElement, sanitizeNickname,
+  parsePickCard, parsePickElement, sanitizeNickname,
   type ErrorCodeName, type JoinOptions, type MinigameId, type Phase,
 } from '@sp/shared';
 import { MatchState } from '@sp/shared/schema';
@@ -28,6 +28,8 @@ const RATE_LIMITS = {
   [MSG.CAST]: { perSecond: 8, burst: 4 },
   [MSG.ELEMENTS_TOGGLE]: { perSecond: 4, burst: 4 },
   [MSG.NO_ELIMINATION_TOGGLE]: { perSecond: 4, burst: 4 },
+  [MSG.CARDS_TOGGLE]: { perSecond: 4, burst: 4 },
+  [MSG.PICK_CARD]: { perSecond: 4, burst: 4 },
 };
 const KICK_AFTER_VIOLATIONS = 300;
 const KICK_CLOSE_CODE = 4002;
@@ -74,6 +76,7 @@ export class MatchRoom extends Room {
       rttOf: (id) => this.latency.rttOf(id),
       onMatchOver: () => this.returnToLobby(),
       phaseScale: options?.phaseScale ?? 1,
+      sendTo: (id, type, message) => this.clients.find((c) => c.sessionId === id)?.send(type, message),
     }, options?.games);
 
     this.onMessage(MSG.READY, (client, msg: unknown) => this.handleReady(client, msg));
@@ -105,6 +108,18 @@ export class MatchRoom extends Room {
       if (this.state.phase !== 'LOBBY') return this.sendError(client, ERROR_CODES.BAD_PHASE);
       const toggle = parseElementsToggle(msg); // same {enabled: boolean} payload
       if (toggle) this.state.noElimination = toggle.enabled;
+    });
+    this.onMessage(MSG.CARDS_TOGGLE, (client, msg: unknown) => {
+      if (!this.allow(client, MSG.CARDS_TOGGLE)) return;
+      if (client.sessionId !== this.state.hostId) return this.sendError(client, ERROR_CODES.NOT_HOST);
+      if (this.state.phase !== 'LOBBY') return this.sendError(client, ERROR_CODES.BAD_PHASE);
+      const toggle = parseElementsToggle(msg);
+      if (toggle) this.state.cardsEnabled = toggle.enabled;
+    });
+    this.onMessage(MSG.PICK_CARD, (client, msg: unknown) => {
+      if (!this.allow(client, MSG.PICK_CARD)) return;
+      const pick = parsePickCard(msg);
+      if (pick) this.controller.pickCard(client.sessionId, pick.card);
     });
     this.onMessage(MSG.PONG, (client, msg: unknown) => {
       if (!this.allow(client, MSG.PONG)) return;
@@ -240,6 +255,9 @@ export class MatchRoom extends Room {
       p.team = -1;
       p.score = 0;
       p.element = '';
+      p.cards = '';
+      p.cardOffer = '';
+      p.lives = 0;
       const sim = this.sims.get(p.id)!;
       const spawn = PLAYGROUND_SPAWNS[p.slot]!;
       sim.reset(spawn.x, spawn.z, spawn.yaw);

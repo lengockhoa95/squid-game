@@ -18,6 +18,8 @@ export class RedLightGreenLight implements ServerMinigame {
   private lightDuration = 0;
   private readonly finishTimes = new Map<string, number>();
   private readonly caught = new Set<string>();
+  /** Saved by a life during the current red light: safe until the light turns green. */
+  private readonly rescued = new Set<string>();
 
   initialize(ctx: MinigameContext): void {
     this.ctx = ctx;
@@ -51,7 +53,11 @@ export class RedLightGreenLight implements ServerMinigame {
         this.finishTimes.set(p.id, gameTime);
         continue;
       }
-      if (this.light === 'RED' && this.isCaught(p)) {
+      if (this.light === 'RED' && !this.rescued.has(p.id) && this.isCaught(p)) {
+        if (this.ctx.tryRescue?.(p.id)) {
+          this.rescued.add(p.id);
+          continue;
+        }
         p.state.roundState = 'OUT';
         this.caught.add(p.id);
       }
@@ -104,6 +110,7 @@ export class RedLightGreenLight implements ServerMinigame {
   private setLight(light: LightColor): void {
     this.light = light;
     this.state.light = light;
+    this.rescued.clear();
     this.lightElapsed = 0;
     const [min, max] = light === 'GREEN' ? [RLGL.greenMinS, RLGL.greenMaxS] : [RLGL.redMinS, RLGL.redMaxS];
     this.lightDuration = min + this.ctx.rng() * (max - min);

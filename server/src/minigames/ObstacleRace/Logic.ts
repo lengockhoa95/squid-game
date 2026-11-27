@@ -15,6 +15,8 @@ export class ObstacleRace implements ServerMinigame {
   private readonly finishTimes = new Map<string, number>();
   private readonly best = new Map<string, number>(); // furthest z reached (lower = further)
   private readonly falls = new Map<string, number>();
+  /** Last spot each runner stood on (rescue respawn point). */
+  private readonly lastGround = new Map<string, { x: number; z: number }>();
 
   initialize(ctx: MinigameContext): void {
     this.ctx = ctx;
@@ -36,10 +38,24 @@ export class ObstacleRace implements ServerMinigame {
       if (p.state.roundState !== 'ACTIVE') continue;
       const s = p.sim.state;
       if (s.y < RACE.killY) {
+        const spot = this.lastGround.get(p.id);
+        if (spot && this.ctx.tryRescue?.(p.id)) {
+          p.sim.reset(spot.x, spot.z, Math.PI); // Mạng Phụ: back where you last stood
+          continue;
+        }
         const cp = raceCheckpoint(this.best.get(p.id) ?? RACE.startZ);
         p.sim.reset(-3 + p.state.slot * 2, cp - 0.5, Math.PI);
         this.falls.set(p.id, (this.falls.get(p.id) ?? 0) + 1);
         continue;
+      }
+      if (s.grounded && s.y > -0.05) {
+        const g = this.lastGround.get(p.id);
+        if (g) {
+          g.x = s.x;
+          g.z = s.z;
+        } else {
+          this.lastGround.set(p.id, { x: s.x, z: s.z });
+        }
       }
       if (s.z < (this.best.get(p.id) ?? RACE.startZ)) this.best.set(p.id, s.z);
       if (s.z <= RACE.finishZ) {

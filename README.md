@@ -3,7 +3,7 @@
 Game web 3D multiplayer (tối đa 4 người, người thật + NPC) gồm nhiều minigame loại trực tiếp.
 Three.js + React + Vite (client), Node.js + Colyseus (server), TypeScript toàn bộ.
 
-> Trạng thái: Phase 0–8 xong — chơi được đầy đủ: phòng, lobby, NPC 4 cấp độ, 5 minigame, loại trực tiếp, spectator, người thắng, chế độ Nguyên tố, chế độ Không bị loại. Xem [PROGRESS.md](PROGRESS.md).
+> Trạng thái: Phase 0–8 xong — chơi được đầy đủ: phòng, lobby, NPC 4 cấp độ, 5 minigame, loại trực tiếp, spectator, người thắng, chế độ Nguyên tố, chế độ Không bị loại, va chạm người chơi, thẻ kỹ năng. Xem [PROGRESS.md](PROGRESS.md).
 > Hướng dẫn test 4 người: [TESTING.md](TESTING.md).
 
 ## Yêu cầu
@@ -74,10 +74,32 @@ docker compose down
 | Minigame | Cách chơi |
 |---|---|
 | Đèn Xanh – Đèn Đỏ | Click/W để chạy khi đèn xanh, dừng khi đèn đỏ (nhấp chuột phải / thả phím) |
-| Cầu Kính | Click tấm kính hàng kế tiếp (A/D). Mọi người chơi cùng lúc |
+| Cầu Kính | Mỗi hàng 3 tấm, 1 tấm vỡ. Click tấm kính hàng kế tiếp (A/S/D). Mọi người chơi cùng lúc |
 | Vượt Chướng Ngại | Click/WASD để chạy, Space/chuột giữa để nhảy qua hố và tường |
 | Kéo Co | Click/Space khi kim vào vùng xanh |
-| Phản Xạ Nhanh | Click/Space khi màn hình chuyển xanh (BẤM!) |
+| Phản Xạ Nhanh | Click/Space khi màn hình chuyển xanh (BẤM!), 5 lượt |
+
+Trong màn chờ có nút **Hướng dẫn chơi** (tự mở ở lần đầu): điều khiển bằng chuột, nguyên tố, thẻ kỹ năng, minigame.
+
+### Va chạm
+
+Người chơi húc được nhau. Chạy vào người khác sẽ đẩy họ đi, nên bị húc lúc đèn đỏ là bị loại.
+
+### Thẻ kỹ năng (bật mặc định, host tắt được)
+
+Đầu trận mỗi người nhận 1 thẻ. Sau mỗi vòng, ở màn kết quả, **click chọn 1 trong 3 thẻ** (người xếp cuối được 4).
+Thẻ tự có tác dụng, không cần bấm gì. Chọn trùng thẻ thì lên cấp; **cấp 3 thức tỉnh**: có hiệu ứng đặc biệt, hào quang dưới chân và cả phòng được thông báo.
+
+| Thẻ | Cấp 1 → 2 | Thức tỉnh (cấp 3) |
+|---|---|---|
+| Chân Thỏ | Nhảy cao +15% → +30% | Nhảy đôi |
+| Giày Gió | Chạy +8% → +15% | +25%, không bị vũng lầy |
+| Da Trâu | Khó bị đẩy, giảm lực gió | Gần như bất động |
+| Cú Húc | Húc mạnh ×1.6 → ×2.2 | Húc khi đang chạy làm đối thủ bay lên |
+| Mạng Phụ | 1 → 2 mạng mỗi vòng (thoát bị bắt / rơi kính / rơi vực) | 3 mạng, được cứu thì chạy x2 |
+| Nạp Nhanh | Hồi chiêu nguyên tố −20% → −35% | −50%, dùng được ngay từ đầu vòng |
+| Phản Xạ | Bị choáng ngắn hơn 40% → 70% | Lôi / Hoán đổi / Bóng tối dội ngược người dùng |
+| Mắt Thần | Cầu Kính: biết ô vỡ ở hàng 1 → 3 hàng đầu | Biết ô vỡ ở mọi hàng |
 
 ### Chế độ Không bị loại (tắt mặc định, host bật trong lobby)
 

@@ -10,6 +10,7 @@ import type { MaterialLibrary } from '../core/MaterialLibrary.ts';
 type Shape = 'rock' | 'drop' | 'bolt' | 'ring' | 'flame' | 'cube' | 'orb';
 
 interface LookGeometries {
+  aura: THREE.BufferGeometry;
   emblem: THREE.BufferGeometry;
   band: THREE.BufferGeometry;
   shapes: Record<Shape, THREE.BufferGeometry>;
@@ -36,6 +37,7 @@ function acquire(): LookGeometries {
     const drop = new THREE.SphereGeometry(0.1, 8, 6);
     drop.scale(1, 1.4, 1);
     shared = {
+      aura: new THREE.TorusGeometry(0.62, 0.06, 4, 24).rotateX(Math.PI / 2),
       emblem: new THREE.OctahedronGeometry(0.14, 0).scale(1, 1, 0.3),
       band: new THREE.CylinderGeometry(0.16, 0.16, 0.08, 8, 1, true),
       shapes: {
@@ -56,6 +58,7 @@ function release(): void {
   users = Math.max(0, users - 1);
   if (users === 0 && shared) {
     shared.emblem.dispose();
+    shared.aura.dispose();
     shared.band.dispose();
     for (const g of Object.values(shared.shapes)) g.dispose();
     shared = null;
@@ -78,6 +81,8 @@ export class ElementLook {
   private readonly orbit = new THREE.Group();
   private current: ElementId | null = null;
   private time = 0;
+  private aura: THREE.Mesh | null = null;
+  private auraColor = -1;
 
   constructor(materials: MaterialLibrary, targets: LookTargets) {
     this.materials = materials;
@@ -123,9 +128,25 @@ export class ElementLook {
     }
   }
 
+  /** Awakened-card halo under the feet (-1 = none). */
+  setAura(color: number, root: THREE.Object3D): void {
+    if (color === this.auraColor) return;
+    this.auraColor = color;
+    this.aura?.removeFromParent();
+    this.aura = null;
+    if (color < 0) return;
+    this.aura = new THREE.Mesh(this.geo.aura, this.materials.basic(color));
+    this.aura.position.y = 0.05;
+    root.add(this.aura);
+  }
+
   update(dt: number): void {
-    if (!this.current) return;
     this.time += dt;
+    if (this.aura) {
+      this.aura.rotation.y += dt * 1.5;
+      this.aura.scale.setScalar(1 + Math.sin(this.time * 5) * 0.08);
+    }
+    if (!this.current) return;
     this.orbit.rotation.y += dt * 2.2;
     this.orbit.position.y = 1.45 + Math.sin(this.time * 3) * 0.05;
     const spin = this.current === 'FIRE' ? 0 : dt * 4;
@@ -134,6 +155,7 @@ export class ElementLook {
 
   dispose(): void {
     this.clear();
+    this.aura?.removeFromParent();
     this.orbit.removeFromParent();
     release();
   }

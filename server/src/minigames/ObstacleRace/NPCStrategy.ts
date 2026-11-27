@@ -29,7 +29,14 @@ export class RaceStrategy implements NpcStrategy {
     const sloppy = bot.difficulty === 'EASY' ? (bot.rng() - 0.5) * 1.0 : bot.difficulty === 'NORMAL' ? (bot.rng() - 0.5) * 0.6 : 0;
     for (const jz of this.jumpZs) {
       const trigger = jz + sloppy;
-      if (s.grounded && s.z <= trigger && s.z > trigger - 0.5) bot.intent.jump = true;
+      if (s.grounded && s.z <= trigger && s.z > trigger - JUMP_LEAD) bot.intent.jump = true;
+    }
+    // Stuck (blocked by a wall, a pillar or another player) while trying to run: hop.
+    const trying = Math.hypot(bot.intent.dirX, bot.intent.dirZ) > 0.3;
+    m.stuck = trying && s.grounded && Math.hypot(s.vx, s.vz) < 1 ? ((m.stuck as number | undefined) ?? 0) + dt : 0;
+    if ((m.stuck as number) > 0.4) {
+      bot.intent.jump = true;
+      m.stuck = 0;
     }
 
     if (careful) {

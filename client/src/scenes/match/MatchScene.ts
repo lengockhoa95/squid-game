@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  ELEMENTS, INPUT_BATCH, SLOT_LOOKS, effectStep, isElementId, type MinigameId, type MoveBatch, type QualityPreset, type StepFn,
+  CARDS, ELEMENTS, INPUT_BATCH, parseCards, SLOT_LOOKS, effectStep, isElementId, type MinigameId, type MoveBatch, type QualityPreset, type StepFn,
 } from '@sp/shared';
 import type { CameraPreset, ClickHit, FrameInput, GameScene, SceneContext } from '../../core/GameScene.ts';
 import { ResourceTracker } from '../../core/ResourceTracker.ts';
@@ -54,6 +54,7 @@ class MatchScene implements GameScene {
   /** Step used for the local prediction: the game's step wrapped with element effects. */
   private localStep: StepFn | null = null;
   private readonly effects: ElementEffectsView;
+  private readonly auraCache = new Map<string, string>();
   private seqInitialized = false;
   private generation = 0;
   private accumulator = 0;
@@ -223,6 +224,33 @@ class MatchScene implements GameScene {
     return me;
   }
 
+  /** Colour of the first awakened (level 3) card, '' when none. Cached per cards string. */
+  private awakenColor(cards: string): string {
+    let c = this.auraCache.get(cards);
+    if (c === undefined) {
+      const levels = parseCards(cards);
+      const id = (Object.keys(levels) as Array<keyof typeof levels>).find((k) => levels[k] === 3);
+      c = id ? CARDS[id].color : '';
+      this.auraCache.set(cards, c);
+    }
+    return c;
+  }
+
+  /** Other active players as static obstacles for the local prediction (the server resolves real pushes). */
+  private syncBodies(): void {
+    const bodies = this.effects.field.bodies;
+    let n = 0;
+    this.net.forEachPlayer((p) => {
+      if (p.id === this.net.localId || !p.alive || p.roundState !== 'ACTIVE' || !this.participants.has(p.id)) return;
+      const b = bodies[n] ?? (bodies[n] = { x: 0, y: 0, z: 0 });
+      b.x = p.x;
+      b.y = p.y;
+      b.z = p.z;
+      n++;
+    });
+    bodies.length = n;
+  }
+
   /** Use the local player's element. Point elements in movement games need a ground point. */
   private castAt(hit: ClickHit | null): void {
     const me = this.localPlayer();
@@ -271,6 +299,7 @@ class MatchScene implements GameScene {
     const phase = this.net.getPhase();
     if (state.currentGame && state.currentGame !== this.viewGame) void this.loadView(state.currentGame as MinigameId);
     this.effects.syncField(state);
+    this.syncBodies();
     if (phase === 'ROUND_INTRO' && this.lastPhase !== 'ROUND_INTRO') {
       this.participants.clear();
       state.players.forEach((p) => {
@@ -289,6 +318,7 @@ class MatchScene implements GameScene {
         p.roundState === 'OUT' ? 'fallen' : p.roundState === 'FINISHED' || (phase === 'MATCH_END' && p.id === winnerId) ? 'cheer' : 'normal';
       actor.anim.setPose(pose);
       actor.model.setElement(p.element);
+      actor.model.setAura(this.awakenColor(p.cards));
       if (p.id === this.net.localId) this.syncLocal(p, actor, now);
       else actor.interp.push(now, p.x, p.y, p.z, p.yaw, Math.hypot(p.vx, p.vz), p.grounded);
     });

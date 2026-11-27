@@ -40,6 +40,8 @@ export class GlassBridge implements ServerMinigame {
   private readonly cooldown = new Map<string, number>();
   private readonly finishTimes = new Map<string, number>();
   private readonly fellAt = new Map<string, number>();
+  /** Mắt Thần hints: rows whose breaking tile each player knows. */
+  private readonly hints = new Map<string, Set<number>>();
 
   initialize(ctx: MinigameContext): void {
     this.ctx = ctx;
@@ -103,6 +105,22 @@ export class GlassBridge implements ServerMinigame {
       jumping: (id) => this.jumps.has(id),
       someoneJumpingTo: (row) => [...this.jumps.values()].some((j) => j.row === row),
     };
+  }
+
+  revealFor(id: string, rows: number): Array<[number, number]> {
+    const known = new Set<number>();
+    const out: Array<[number, number]> = [];
+    for (let row = 0; row < Math.min(rows, this.rows); row++) {
+      known.add(row);
+      out.push([row, this.brokenSide[row]!]);
+    }
+    this.hints.set(id, known);
+    return out;
+  }
+
+  /** Breaking tile of `row` if this player holds a Mắt Thần hint for it (used by bots). */
+  hintFor(id: string, row: number): number | null {
+    return this.hints.get(id)?.has(row) ? this.brokenSide[row]! : null;
   }
 
   /** SWAP element: two standing players exchange places and progress. */
@@ -180,6 +198,14 @@ export class GlassBridge implements ServerMinigame {
       this.state.tiles[idx] = TILE_SAFE;
       this.progress.set(p.id, jump.row + 1);
       p.state.score = jump.row + 1;
+    } else if (this.ctx.tryRescue?.(p.id)) {
+      // Mạng Phụ: the glass still breaks (everyone learns the row) but you land back where you were.
+      this.state.tiles[idx] = TILE_BROKEN;
+      for (let side = 0; side < BRIDGE.tilesPerRow; side++) {
+        if (side !== jump.side) this.state.tiles[tileIndex(jump.row, side)] = TILE_SAFE;
+      }
+      this.place(p, jump.fromX, jump.fromZ, 0);
+      this.cooldown.set(p.id, gameTime + 0.6);
     } else {
       this.state.tiles[idx] = TILE_BROKEN;
       // The other tiles of this row are now known to be safe.

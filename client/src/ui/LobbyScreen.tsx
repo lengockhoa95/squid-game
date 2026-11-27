@@ -6,6 +6,7 @@ import { useStore } from '../store/UIStore.ts';
 import { Avatar } from './Avatar.tsx';
 import { NpcSettings, DIFFICULTY_LABEL } from './NpcSettings.tsx';
 import { ElementsToggle } from '../elements/ElementsToggle.tsx';
+import { HowToPlay } from './HowToPlay.tsx';
 
 function PlayerCard({ p, isHost, isMe }: { p: LobbyPlayer; isHost: boolean; isMe: boolean }) {
   return (
@@ -57,7 +58,10 @@ export function LobbyScreen() {
   return (
     <main className="home">
       <div className="home-card lobby-card">
-        <h2>{vi.lobbyTitle}</h2>
+        <div className="lobby-head">
+          <h2>{vi.lobbyTitle}</h2>
+          <HowToPlay />
+        </div>
         <div className="code-box">
           <span className="code-label">{vi.roomCode}</span>
           <strong className="code-value">{roomCode}</strong>

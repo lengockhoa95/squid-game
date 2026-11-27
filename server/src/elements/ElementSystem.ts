@@ -1,8 +1,8 @@
 import {
-  ELEMENTS, ELEMENT_FX, createElementField, effectStep, elementsFor,
-  type EffectKind, type ElementField, type ElementId, type MinigameId, type StepFn,
+  ELEMENTS, ELEMENT_FX, cardMods, createElementField, effectStep, elementsFor,
+  type CardMods, type EffectKind, type ElementField, type ElementId, type MinigameId, type StepFn,
 } from '@sp/shared';
-import { ElementEffect, type MatchState } from '@sp/shared/schema';
+import { ElementEffect, type MatchState, type PlayerState } from '@sp/shared/schema';
 import type { GamePlayer, ServerMinigame } from '../minigames/framework/types.ts';
 
 /** First cast allowed this long after the round starts playing. */
@@ -33,10 +33,17 @@ export class ElementSystem {
   private allowed: readonly ElementId[] = [];
   private clones: Clone[] = [];
   private nextId = 1;
+  private readonly modsOf: (p: PlayerState) => CardMods;
 
-  constructor(state: MatchState, rng: () => number) {
+  constructor(state: MatchState, rng: () => number, modsOf: (p: PlayerState) => CardMods = () => cardMods({})) {
     this.state = state;
     this.rng = rng;
+    this.modsOf = modsOf;
+  }
+
+  /** A visual-only effect (e.g. a rescue sparkle). */
+  flash(kind: EffectKind, owner: GamePlayer, x: number, z: number, t: number): void {
+    this.addEffect(kind, owner, x, z, t, ELEMENT_FX.flashSeconds);
   }
 
   get enabled(): boolean {
@@ -61,7 +68,7 @@ export class ElementSystem {
     for (const p of players) {
       const s = p.state;
       s.element = this.allowed.length > 0 ? this.allowed[Math.floor(this.rng() * this.allowed.length)]! : '';
-      s.elementReadyAt = FIRST_CAST_DELAY;
+      s.elementReadyAt = this.modsOf(s).instantFirstCast ? 0 : FIRST_CAST_DELAY;
       s.stunUntil = 0;
       s.hasteUntil = 0;
       s.blindUntil = 0;
@@ -91,7 +98,7 @@ export class ElementSystem {
     if (t < caster.state.elementReadyAt || t < caster.state.stunUntil) return 'rejected';
     const ok = this.movement ? this.castMovement(caster, element, x, z, t) : this.castAction(caster, element, t);
     if (!ok) return 'rejected';
-    caster.state.elementReadyAt = t + ELEMENTS[element].cooldown;
+    caster.state.elementReadyAt = t + ELEMENTS[element].cooldown * this.modsOf(caster.state).cooldownMul;
     return 'ok';
   }
 
@@ -157,8 +164,9 @@ export class ElementSystem {
         this.addEffect('PUDDLE', caster, x, z, t, ELEMENT_FX.puddleSeconds);
         return true;
       case 'THUNDER': {
-        const target = this.nearestOther(caster, x, z, ELEMENT_FX.thunderHitRadius);
-        if (target) target.state.stunUntil = Math.max(target.state.stunUntil, t + ELEMENT_FX.stunSeconds);
+        let target = this.nearestOther(caster, x, z, ELEMENT_FX.thunderHitRadius);
+        if (target && this.modsOf(target.state).reflect) target = caster; // Phản Xạ: bounced back
+        if (target) this.stun(target, t, ELEMENT_FX.stunSeconds);
         const at = target ? target.sim.state : { x, z };
         this.addEffect('BOLT', caster, at.x, at.z, t, ELEMENT_FX.flashSeconds);
         return true;
@@ -172,9 +180,10 @@ export class ElementSystem {
           if (d > ELEMENT_FX.windRadius) continue;
           const nx = d > 1e-3 ? dx / d : Math.sin(me.yaw);
           const nz = d > 1e-3 ? dz / d : Math.cos(me.yaw);
-          s.vx = nx * ELEMENT_FX.windSpeed;
-          s.vz = nz * ELEMENT_FX.windSpeed;
-          s.vy = ELEMENT_FX.windLift;
+          const taken = this.modsOf(p.state).windTaken;
+          s.vx = nx * ELEMENT_FX.windSpeed * taken;
+          s.vz = nz * ELEMENT_FX.windSpeed * taken;
+          s.vy = ELEMENT_FX.windLift * taken;
           s.grounded = false;
         }
         this.addEffect('WIND', caster, me.x, me.z, t, ELEMENT_FX.flashSeconds);
@@ -186,6 +195,11 @@ export class ElementSystem {
       case 'SWAP': {
         const target = this.nearestOther(caster, x, z, ELEMENT_FX.swapHitRadius);
         if (!target) return false; // nothing to swap with: keep the cooldown
+        if (this.modsOf(target.state).reflect) {
+          this.stun(caster, t, ELEMENT_FX.stunSeconds); // Phản Xạ: the swap backfires
+          this.addEffect('BOLT', caster, me.x, me.z, t, ELEMENT_FX.flashSeconds);
+          return true;
+        }
         const o = target.sim.state;
         const e = this.addEffect('SWAP', caster, me.x, me.z, t, ELEMENT_FX.flashSeconds);
         e.x2 = o.x;
@@ -216,7 +230,9 @@ export class ElementSystem {
       case 'DARK':
         for (const p of this.activeOthers(caster)) {
           const s = p.sim.state;
-          if (Math.hypot(s.x - x, s.z - z) <= ELEMENT_FX.darkRadius) p.state.blindUntil = t + ELEMENT_FX.darkSeconds;
+          if (Math.hypot(s.x - x, s.z - z) > ELEMENT_FX.darkRadius) continue;
+          const victim = this.modsOf(p.state).reflect ? caster : p;
+          victim.state.blindUntil = t + ELEMENT_FX.darkSeconds;
         }
         this.addEffect('DARK', caster, x, z, t, ELEMENT_FX.flashSeconds);
         return true;
@@ -230,18 +246,24 @@ export class ElementSystem {
     if (opponents.length === 0) return false;
     switch (element) {
       case 'THUNDER': {
-        const target = opponents[Math.floor(this.rng() * opponents.length)]!;
-        target.state.stunUntil = Math.max(target.state.stunUntil, t + ELEMENT_FX.actionStunSeconds);
+        let target = opponents[Math.floor(this.rng() * opponents.length)]!;
+        if (this.modsOf(target.state).reflect) target = caster;
+        this.stun(target, t, ELEMENT_FX.actionStunSeconds);
         this.addEffect('BOLT', caster, target.state.x, target.state.z, t, ELEMENT_FX.flashSeconds);
         return true;
       }
       case 'DARK':
-        for (const p of opponents) p.state.blindUntil = t + ELEMENT_FX.actionDarkSeconds;
+        for (const p of opponents) (this.modsOf(p.state).reflect ? caster : p).state.blindUntil = t + ELEMENT_FX.actionDarkSeconds;
         this.addEffect('DARK', caster, caster.state.x, caster.state.z, t, ELEMENT_FX.flashSeconds);
         return true;
       case 'SWAP': {
         const leader = [...opponents].sort((a, b) => b.state.score - a.state.score)[0]!;
         if (leader.state.score <= caster.state.score) return false; // nobody ahead
+        if (this.modsOf(leader.state).reflect) {
+          this.stun(caster, t, ELEMENT_FX.actionStunSeconds);
+          this.addEffect('BOLT', caster, caster.state.x, caster.state.z, t, ELEMENT_FX.flashSeconds);
+          return true;
+        }
         const fromX = caster.state.x, fromZ = caster.state.z;
         if (!this.game?.swapPlayers?.(caster.id, leader.id)) return false;
         const e = this.addEffect('SWAP', caster, fromX, fromZ, t, ELEMENT_FX.flashSeconds);
@@ -252,6 +274,11 @@ export class ElementSystem {
       default:
         return false;
     }
+  }
+
+  /** Stun shortened by the victim's Phản Xạ card. */
+  private stun(p: GamePlayer, t: number, seconds: number): void {
+    p.state.stunUntil = Math.max(p.state.stunUntil, t + seconds * this.modsOf(p.state).stunMul);
   }
 
   private activeOthers(caster: GamePlayer): GamePlayer[] {

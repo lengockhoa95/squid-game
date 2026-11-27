@@ -9,9 +9,9 @@ const WORLD: SimWorld = { bounds: { minX: -50, maxX: 50, minZ: -50, maxZ: 50 }, 
 const base = staticWorldStep(WORLD);
 const DT = 1 / 60;
 
-function run(status: { stunUntil: number; hasteUntil: number }, field = createElementField(), seconds = 1, id = 'me') {
+function run(status: { stunUntil: number; hasteUntil: number; cards?: string }, field = createElementField(), seconds = 1, id = 'me') {
   const s = createCharacterState(0, 0);
-  const step = effectStep(base, field, status, id);
+  const step = effectStep(base, field, { cards: '', ...status }, id);
   const intent = { dirX: 0, dirZ: -1, jump: false };
   for (let t = 0; t < seconds; t += DT) step(s, intent, DT, t);
   return s;

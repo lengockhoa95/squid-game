@@ -39,7 +39,8 @@ export class BridgeStrategy implements NpcStrategy {
       io.act({ kind: 'JUMP_TILE', side: 0 });
       return;
     }
-    const known = this.knownSafe(view.tiles, row);
+    const hinted = this.game.hintFor(bot.id, row);
+    const known = this.knownSafe(view.tiles, row) ?? (hinted === null ? null : (((hinted + 1) % 3) as BridgeSide));
     if (known !== null && !bot.chance(bot.profile.errorRate * (bot.difficulty === 'EASY' ? 2 : 0.5))) {
       io.act({ kind: 'JUMP_TILE', side: known });
       return;

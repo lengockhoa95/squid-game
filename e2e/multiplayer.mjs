@@ -17,6 +17,7 @@ const browser = await chromium.launch({
 const errors = [];
 async function player(name) {
   const ctx = await browser.newContext({ viewport: { width: 900, height: 600 } });
+  await ctx.addInitScript(() => localStorage.setItem('sp.howToSeen', '1')); // skip the first-visit guide
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${name} console: ${m.text()}`); });

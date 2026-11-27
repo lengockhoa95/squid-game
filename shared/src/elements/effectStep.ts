@@ -1,4 +1,6 @@
 import { MOVEMENT } from '../config/movement.ts';
+import { cardMods, parseCards, type CardMods } from '../cards/cards.ts';
+import { pushOutOfBodies } from '../sim/bodies.ts';
 import type { CharacterState, MoveIntent } from '../sim/kinematics.ts';
 import type { StepFn } from '../sim/step.ts';
 import { ELEMENT_FX } from './elements.ts';
@@ -7,16 +9,20 @@ import { ELEMENT_FX } from './elements.ts';
 export interface ElementField {
   pillars: Array<{ x: number; z: number; until: number }>;
   puddles: Array<{ x: number; z: number; until: number; owner: string }>;
+  /** Client prediction only: other characters as static obstacles (the server collides pairs itself). */
+  bodies: Array<{ x: number; y: number; z: number }>;
 }
 
 /** Timed statuses on one character (game-time seconds). PlayerState satisfies this. */
 export interface ElementStatus {
   stunUntil: number;
   hasteUntil: number;
+  /** Card levels, synced as "BUNNY:2,SPEED:1" (movement cards apply in the step). */
+  cards: string;
 }
 
 export function createElementField(): ElementField {
-  return { pillars: [], puddles: [] };
+  return { pillars: [], puddles: [], bodies: [] };
 }
 
 /**
@@ -25,13 +31,19 @@ export function createElementField(): ElementField {
  */
 export function effectStep(base: StepFn, field: ElementField, status: ElementStatus, selfId: string): StepFn {
   const tmp: MoveIntent = { dirX: 0, dirZ: 0, jump: false };
+  let cardsKey = '';
+  let mods: CardMods = cardMods({});
   return (s, intent, dt, t) => {
+    if (status.cards !== cardsKey) {
+      cardsKey = status.cards;
+      mods = cardMods(parseCards(cardsKey));
+    }
     let mul = 1;
     let jump = intent.jump;
     if (t < status.stunUntil) {
       mul = 0;
       jump = false;
-    } else if (inPuddle(s, field, selfId, t)) {
+    } else if (!mods.slowImmune && inPuddle(s, field, selfId, t)) {
       mul = ELEMENT_FX.puddleSlow;
     }
     tmp.dirX = intent.dirX * mul;
@@ -39,8 +51,23 @@ export function effectStep(base: StepFn, field: ElementField, status: ElementSta
     tmp.jump = jump;
     const steps = t < status.hasteUntil && mul > 0 ? 2 : 1;
     for (let k = 0; k < steps; k++) {
+      const wasGrounded = s.grounded;
       base(s, tmp, dt, t);
+      if (tmp.jump) {
+        if (wasGrounded && !s.grounded && s.vy > 0) {
+          s.vy *= mods.jumpMul; // higher normal jump
+        } else if (!wasGrounded && mods.doubleJump && !s.airJumped) {
+          s.vy = MOVEMENT.jumpVelocity * mods.jumpMul; // double jump
+          s.airJumped = true;
+        }
+      }
+      if (mods.speedMul !== 1 && mul > 0) {
+        s.x += s.vx * dt * (mods.speedMul - 1);
+        s.z += s.vz * dt * (mods.speedMul - 1);
+      }
       resolvePillars(s, field, t);
+      if (field.bodies.length > 0) pushOutOfBodies(s, field.bodies);
+      if (s.grounded) s.airJumped = false;
       tmp.jump = false;
     }
   };

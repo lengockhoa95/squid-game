@@ -16,6 +16,9 @@ export interface LobbyPlayer {
   team: number;
   element: string;
   points: number;
+  cards: string;
+  cardOffer: string;
+  lives: number;
 }
 
 export interface ResultRow {
@@ -47,6 +50,9 @@ export interface SessionState {
   winnerId: string;
   elementsEnabled: boolean;
   noElimination: boolean;
+  cardsEnabled: boolean;
+  /** Short room-wide announcement (e.g. a card awakening), cleared after a few seconds. */
+  announce: string | null;
   results: readonly ResultRow[];
   /** Sorted by slot. Only replaced when listed fields change (never on movement patches). */
   players: readonly LobbyPlayer[];
@@ -69,6 +75,8 @@ export const sessionStore = createStore<SessionState>({
   winnerId: '',
   elementsEnabled: true,
   noElimination: false,
+  cardsEnabled: true,
+  announce: null,
   results: [],
   players: [],
 });

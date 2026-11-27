@@ -15,6 +15,7 @@ import {
 } from './match/MatchOverlays.tsx';
 import { useMatchSounds } from './match/useMatchSounds.ts';
 import { ElementBar, ElementPicker } from '../elements/ElementHud.tsx';
+import { AnnounceBanner, CardBar, CardDraft } from '../cards/CardUi.tsx';
 import { RlglHud } from '../minigames/RedLightGreenLight/Hud.tsx';
 import { BridgeHud } from '../minigames/GlassBridge/Hud.tsx';
 import { RaceHud } from '../minigames/ObstacleRace/Hud.tsx';
@@ -43,7 +44,7 @@ function PhaseLayer({ net }: { net: MatchNetAdapter }) {
       return <><Hud net={net} /><ElementBar net={net} /></>;
     }
     case 'ROUND_RESULT':
-      return <ResultsCard />;
+      return <><ResultsCard /><CardDraft net={net} /></>;
     case 'MATCH_END':
       return <WinnerCard />;
     default:
@@ -79,6 +80,8 @@ export function MatchScreen() {
       <PlayerList />
       <StatusBanner />
       <PhaseLayer net={adapter} />
+      <CardBar />
+      <AnnounceBanner />
       <DebugOverlay />
       {movement && playing && <ControlsHint />}
     </div>

@@ -123,6 +123,13 @@ export class PlayerModel {
     this.look.set(element);
   }
 
+  /** Awakened-card halo (CSS hex color like '#ffd23f', or '' for none). */
+  setAura(css: string): void {
+    if (!css && !this.look) return;
+    this.look ??= new ElementLook(this.materials, { torso: this.torso, armL: this.armL, armR: this.armR });
+    this.look.setAura(css ? Number.parseInt(css.slice(1), 16) : -1, this.poseGroup);
+  }
+
   /** Animate cosmetic extras (element charm). */
   updateExtras(dt: number): void {
     this.look?.update(dt);

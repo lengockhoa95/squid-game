@@ -94,6 +94,26 @@ Thiết kế: [docs/superpowers/specs/2026-11-26-elements-design.md](docs/superp
 - [x] Ngoại hình theo nguyên tố: hình xăm ngực + vòng tay + vật thể bay quanh đầu; bản sao Phân thân mang cùng ngoại hình
 - [x] Test: 142 unit/integration (mô phỏng trận không bị loại, chọn người thắng khi bằng điểm, toggle qua phòng thật); E2E `NO_ELIM=1 node e2e/elements.mjs`
 
+## Phase 10 — Map lớn hơn, va chạm, thẻ kỹ năng, hướng dẫn ✅
+
+Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs/superpowers/specs/2026-11-27-collision-cards-design.md).
+
+- [x] Map lớn hơn:
+  - Đèn Xanh – Đèn Đỏ: đường 80m, rộng hơn, 90s.
+  - Cầu Kính: 3 tấm mỗi hàng (1 vỡ), số người + 3 hàng, 80s.
+  - Vượt Chướng Ngại: thêm nửa chặng sau (hố, 2 tường, 3 khối đẩy, 2 thanh quét, 3 checkpoint), 150s.
+  - Kéo Co 45s; Phản Xạ Nhanh 5 lượt.
+- [x] Va chạm người chơi: server tách theo khối lượng và truyền lực húc; client prediction coi người khác là vật cản.
+- [x] 8 thẻ kỹ năng, 3 cấp, thức tỉnh ở cấp 3 (hào quang + thông báo cả phòng).
+  - Chọn thẻ sau mỗi vòng; người xếp cuối được 4 lựa chọn; NPC tự chọn.
+  - Host bật/tắt trong lobby.
+- [x] Mắt Thần gửi gợi ý riêng (không nằm trong state chung); NPC có Mắt Thần cũng dùng.
+- [x] Hướng dẫn chơi trong màn chờ (4 tab, chuột là chính), tự mở lần đầu.
+- [x] Sửa:
+  - NPC đua bị kẹt trước tường: tự nhảy khi đứng yên.
+  - Animation `rise`/`pop` ghi đè transform căn giữa làm overlay giật.
+- [x] Test: 158 unit/integration; E2E chọn thẻ + hướng dẫn trong `e2e/elements.mjs`.
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).
@@ -101,5 +121,7 @@ Thiết kế: [docs/superpowers/specs/2026-11-26-elements-design.md](docs/superp
 - Chỉ hỗ trợ chuột + bàn phím (chưa có điều khiển cảm ứng).
 - Camera chưa tránh tường; khi FPS < 10 nhân vật của mình đi chậm hơn.
 - Room code duy nhất trong 1 tiến trình server (đủ cho triển khai 1 server).
+- Va chạm ở client dự đoán theo vị trí người khác ở snapshot gần nhất, nên khi chen nhau nhân vật có thể giật nhẹ.
+- Gợi ý Mắt Thần mất nếu tải lại trang giữa vòng Cầu Kính.
 - Chế độ Nguyên tố cố tình không cân bằng; hiệu ứng tức thời (gió, hoán đổi, dịch chuyển) làm nhân vật của mình giật nhẹ một lần do server sửa vị trí.
 - Ở chế độ dev, lần E2E đầu tiên ngay sau khi Vite khởi động có thể lỗi do Vite tự tải lại trang khi tối ưu dependency.

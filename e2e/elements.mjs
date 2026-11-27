@@ -21,6 +21,14 @@ await page.getByRole('button', { name: 'Thấp' }).click();
 await page.getByPlaceholder('Nhập tên').fill('Khoa');
 await page.getByRole('button', { name: 'Tạo phòng' }).click();
 await page.locator('.code-value').waitFor();
+// First visit: the how-to-play guide opens by itself in the lobby. Check every tab, then close it.
+await page.locator('.howto').waitFor({ timeout: 5000 });
+for (const [i, tab] of ['Điều khiển', 'Nguyên tố', 'Thẻ kỹ năng', 'Minigame & chế độ'].entries()) {
+  await page.locator('.howto-tabs').getByRole('tab', { name: tab }).click();
+  await page.screenshot({ path: `${out}/e-guide-${i}.png` });
+}
+await page.getByRole('button', { name: 'Đóng' }).click();
+await page.locator('.howto').waitFor({ state: 'detached' });
 for (let i = 0; i < 3; i++) await page.locator('.npc-row').nth(i).getByRole('button', { name: 'Thông minh' }).click();
 await page.locator('.elements-toggle').waitFor();
 if (process.env.NO_ELIM) {
@@ -40,6 +48,7 @@ let shots = 0;
 let wHeld = false;
 let seenStun = false;
 let seenDark = false;
+const draftedIn = new Set();
 const pickedIn = new Set();
 const deadline = Date.now() + 9 * 60 * 1000;
 while (Date.now() < deadline) {
@@ -78,6 +87,24 @@ while (Date.now() < deadline) {
     pickedIn.add(info.title);
     round++;
   }
+  if (info.phase === 'result' && !draftedIn.has(lastKey)) {
+    const cards = page.locator('.skill-card');
+    if (await cards.count()) {
+      draftedIn.add(lastKey);
+      const names = await page.locator('.skill-card strong').allInnerTexts();
+      await page.screenshot({ path: `${out}/e-draft-${draftedIn.size}.png` });
+      await cards.first().click({ timeout: 1500 }).catch(() => {});
+      await page.waitForTimeout(400);
+      const gone = (await page.locator('.skill-card').count()) === 0;
+      const bar = await page.locator('.card-chip').count();
+      log(`  draft: ${names.join(', ')} → picked ${names[0]} (offer closed: ${gone}, cards owned: ${bar})`);
+      if (!gone) errors.push('card pick did not close the offer');
+    }
+  }
+  if (info.phase === 'lobby' && round > 0) {
+    errors.push('back in the lobby without seeing the winner screen');
+    break;
+  }
   if (info.phase === 'end') {
     log('WINNER:', info.winner);
     await page.screenshot({ path: `${out}/e-${++shots}-end.png` });
@@ -102,7 +129,8 @@ while (Date.now() < deadline) {
       casts++;
       if (casts % 2 === 1) {
         // mouse-first: button, then (for aimed elements) click the ground ahead
-        await page.locator('.element-cast').click();
+        // Short timeout: the round may end (and the button vanish) between the check and the click.
+        await page.locator('.element-cast').click({ timeout: 1500 }).catch(() => {});
         if (movement && await page.locator('.element-cast.is-aiming').count()) await page.mouse.click(550, 260);
       } else {
         await page.mouse.move(560, 280);

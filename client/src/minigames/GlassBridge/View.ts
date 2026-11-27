@@ -7,6 +7,7 @@ import type { ClickHit, SceneContext } from '../../core/GameScene.ts';
 import type { ResourceTracker } from '../../core/ResourceTracker.ts';
 import type { MinigameView, ViewFrame } from '../framework/MinigameView.ts';
 import { StageLights, placeBox, setSky } from '../framework/stage.ts';
+import { bridgeHints } from '../../network/bridgeHints.ts';
 
 const DEG = Math.PI / 180;
 const PER_ROW = BRIDGE.tilesPerRow;
@@ -14,6 +15,7 @@ const TILE_CAPACITY = BRIDGE.maxRows * PER_ROW;
 const SHARDS = 48;
 const UNKNOWN_COLOR = 0xaee9ff;
 const SAFE_COLOR = 0x7dffb2;
+const HINT_COLOR = 0xff5a5a;
 
 /** Platforms over a deep pit, glass tiles in one instanced mesh, pooled shard particles when a tile breaks. */
 class BridgeView implements MinigameView {
@@ -26,6 +28,7 @@ class BridgeView implements MinigameView {
   private readonly finishLine: THREE.Mesh;
   private readonly beams: THREE.Mesh[] = [];
   private rows = 0;
+  private hintRound = -1;
   private readonly shards: THREE.InstancedMesh;
   private readonly shardPos = new Float32Array(SHARDS * 3);
   private readonly shardVel = new Float32Array(SHARDS * 3);
@@ -94,7 +97,7 @@ class BridgeView implements MinigameView {
     if (bridge && bridge.rows !== this.rows) this.layout(bridge.rows);
     const tiles = bridge?.tiles;
     if (tiles) {
-      for (let i = 0; i < this.rows * 2; i++) {
+      for (let i = 0; i < this.rows * PER_ROW; i++) {
         const v = tiles[i] ?? 0;
         if (v === this.known[i]) continue;
         this.known[i] = v;
@@ -104,6 +107,15 @@ class BridgeView implements MinigameView {
         } else if (v === TILE_SAFE) {
           this.setTile(i, true, SAFE_COLOR);
         }
+      }
+    }
+    // Mắt Thần: tint the tiles this player knows will break (private hint for this round).
+    const hints = bridgeHints.get();
+    if (hints.round === frame.state.roundIndex && this.hintRound !== hints.round) {
+      this.hintRound = hints.round;
+      for (const [row, side] of hints.broken) {
+        const i = row * PER_ROW + side;
+        if (row < this.rows && this.known[i] === 0) this.setTile(i, true, HINT_COLOR);
       }
     }
     this.updateShards(dt);
@@ -140,6 +152,7 @@ class BridgeView implements MinigameView {
   private layout(rows: number): void {
     this.rows = rows;
     this.known.fill(0);
+    this.hintRound = -1;
     for (let i = 0; i < TILE_CAPACITY; i++) this.setTile(i, i < rows * PER_ROW, UNKNOWN_COLOR);
     const lastZ = bridgeFinishZ(rows);
     placeBox(this.finish, -5, 5, lastZ - 6, lastZ + 1.4, -1.5, 0);

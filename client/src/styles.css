@@ -142,9 +142,11 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
   .controls-hint { display: none; }
 }
 
+/* Animations use the individual translate/scale properties so they compose with each element's own
+   centring transform (translate(-50%, …)) instead of overriding it mid-animation. */
 @keyframes rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; translate: 0 8px; }
+  to { opacity: 1; translate: 0 0; }
 }
 
 /* Forms */
@@ -290,8 +292,8 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
   max-width: calc(100% - 32px);
 }
 @keyframes pop {
-  from { transform: scale(1.6); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from { scale: 1.6; opacity: 0; }
+  to { scale: 1; opacity: 1; }
 }
 @media (max-width: 640px) {
   .hud-players { top: auto; bottom: 56px; }
@@ -531,3 +533,149 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
 .standings .rank { width: 26px; color: var(--muted); font-weight: 800; }
 .standings-name { flex: 1; text-align: left; }
 .elements-toggle .segmented-sm, .no-elim-toggle .segmented-sm { flex: 0 0 140px; min-width: 0; }
+.cards-toggle .segmented-sm { flex: 0 0 140px; min-width: 0; }
+
+/* Skill cards */
+.card-draft {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  animation: rise 0.3s ease-out;
+}
+.card-bonus { color: #ffd23f; font-weight: 700; }
+.card-options { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.skill-card {
+  position: relative;
+  width: 150px;
+  min-height: 176px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 10px 12px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--card) 22%, var(--bg-2)), var(--bg));
+  border: 2px solid color-mix(in srgb, var(--card) 70%, transparent);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.skill-card:hover { transform: translateY(-6px) rotate(-1deg); box-shadow: 0 12px 30px color-mix(in srgb, var(--card) 40%, transparent); }
+.skill-card small { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.3; }
+.skill-card.is-awaken { animation: shimmer 1.4s ease-in-out infinite alternate; }
+.card-tag {
+  position: absolute;
+  top: -10px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #10131f;
+  background: var(--card);
+}
+.card-glyph {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 16px;
+  color: #10131f;
+  background: var(--card);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--card) 55%, transparent);
+}
+.card-pips { display: inline-flex; gap: 4px; }
+.card-pips i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.15); }
+.card-pips i.on { background: var(--card, var(--neon)); box-shadow: 0 0 6px var(--card, var(--neon)); }
+.card-bar {
+  position: absolute;
+  left: 12px;
+  top: 60px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: min(420px, calc(100% - 220px));
+  pointer-events: auto;
+}
+.card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  border-radius: 10px;
+  background: rgba(13, 15, 26, 0.78);
+  border: 1px solid color-mix(in srgb, var(--card) 60%, transparent);
+}
+.card-chip b {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: #10131f;
+  background: var(--card);
+}
+.card-chip.is-awakened { box-shadow: 0 0 14px color-mix(in srgb, var(--card) 70%, transparent); }
+.card-lives { padding: 4px 8px; border-radius: 10px; background: rgba(13, 15, 26, 0.78); color: #ff4f6d; font-size: 15px; letter-spacing: 2px; }
+.announce {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 22px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, rgba(255, 210, 63, 0.95), rgba(255, 79, 154, 0.95));
+  color: #1a0d12;
+  font-weight: 900;
+  font-size: 20px;
+  text-align: center;
+  max-width: calc(100% - 24px);
+  pointer-events: none;
+  animation: pop 0.5s ease-out;
+}
+@keyframes shimmer { from { box-shadow: 0 0 10px color-mix(in srgb, var(--card) 40%, transparent); } to { box-shadow: 0 0 34px color-mix(in srgb, var(--card) 90%, transparent); } }
+@media (max-width: 640px) {
+  .skill-card { width: 120px; min-height: 150px; }
+  .card-bar { top: 104px; max-width: calc(100% - 24px); }
+}
+/* While drafting a card, the results card moves up and scrolls so both fit. */
+.game-screen:has(.card-draft) .results-card { top: 104px; transform: translateX(-50%); max-height: calc(100% - 104px - 250px); padding: 14px 18px; }
+.game-screen:has(.card-draft) .results-card .card-title { font-size: 20px; margin: 0 0 8px; }
+
+/* How to play */
+.lobby-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.lobby-head h2 { margin: 0; }
+.howto-open { padding: 8px 14px; font-size: 14px; }
+.howto-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(5, 6, 12, 0.72); animation: rise 0.2s ease-out; }
+.howto { width: min(760px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border-radius: 20px; background: var(--bg-2); border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); }
+.howto-head { display: flex; justify-content: space-between; align-items: center; }
+.howto-head h2 { margin: 0; }
+.howto-tabs { flex-wrap: wrap; }
+.howto-tabs button { flex: 1 1 auto; }
+.howto-body { overflow-y: auto; padding-right: 4px; font-size: 14px; line-height: 1.45; }
+.howto-lead { margin: 0 0 10px; }
+.howto-table { width: 100%; border-collapse: collapse; }
+.howto-table th, .howto-table td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.howto-table th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.howto-table td:first-child { font-weight: 700; white-space: nowrap; }
+.howto-steps { margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.howto-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.howto-grid li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 12px; background: var(--bg); border: 1px solid color-mix(in srgb, var(--el) 40%, transparent); }
+.howto-grid p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.howto-grid .howto-awaken { color: var(--el); font-weight: 700; }
+.howto-list { margin: 0 0 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.howto-note { margin: 10px 0 0; font-size: 13px; }
+@media (max-width: 640px) {
+  .howto-table td:first-child { white-space: normal; }
+}

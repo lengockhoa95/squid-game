@@ -1,12 +1,14 @@
 import { Client, CloseCode, type Room } from '@colyseus/sdk';
 import {
   MSG, ROOM_NAME, isDifficulty, vi,
-  type Difficulty, type ElementId, type ErrorMessage, type GameAction, type MinigameId, type MoveBatch, type NpcConfigMessage, type Phase,
+  CARDS, parseCards,
+  type CardId, type Difficulty, type ElementId, type ErrorMessage, type GameAction, type MinigameId, type MoveBatch, type NpcConfigMessage, type Phase,
 } from '@sp/shared';
 import { MatchState } from '@sp/shared/schema';
 import { getServerUrl } from './serverUrl.ts';
 import { sessionStore, type LobbyPlayer, type ResultRow } from './sessionStore.ts';
 import { joinErrorText, serverErrorText } from './errors.ts';
+import { bridgeHints } from './bridgeHints.ts';
 import type { MatchNetAdapter, NetPlayer } from './types.ts';
 
 const TOKEN_KEY = 'sp.reconnectToken';
@@ -108,6 +110,10 @@ class NetworkManager {
     this.room?.send(MSG.NO_ELIMINATION_TOGGLE, { enabled });
   }
 
+  setCardsEnabled(enabled: boolean): void {
+    this.room?.send(MSG.CARDS_TOGGLE, { enabled });
+  }
+
   /** Adapter for the networked scene; null when not in a room. */
   getAdapter(): MatchNetAdapter | null {
     if (!this.room) return null;
@@ -125,6 +131,7 @@ class NetworkManager {
       sendAction: (action: GameAction) => this.room?.send(MSG.ACTION, action),
       sendCast: (x: number, z: number) => this.room?.send(MSG.CAST, { x, z }),
       pickElement: (element: ElementId) => this.room?.send(MSG.PICK_ELEMENT, { element }),
+      pickCard: (card: CardId) => this.room?.send(MSG.PICK_CARD, { card }),
       gameTimeNow: () => {
         const phase = this.room?.state.phase;
         if (phase !== 'ROUND_PLAYING') return this.lastGameTime;
@@ -168,6 +175,10 @@ class NetworkManager {
     room.onMessage(MSG.ERROR, (msg: ErrorMessage) => this.showToast(serverErrorText(msg.code)));
     // Echo the server's latency probe immediately (the server measures RTT itself).
     room.onMessage(MSG.PING, (msg: unknown) => room.send(MSG.PONG, msg));
+    room.onMessage(MSG.BRIDGE_HINT, (msg: { rows?: unknown }) => {
+      const rows = Array.isArray(msg?.rows) ? (msg.rows as Array<[number, number]>) : [];
+      bridgeHints.set({ round: room.state.roundIndex, broken: new Map(rows.map(([r, side]) => [r, side])) });
+    });
     room.onDrop(() => sessionStore.set({ status: 'reconnecting' }));
     room.onReconnect(() => {
       saveToken(room.reconnectionToken);
@@ -224,6 +235,7 @@ class NetworkManager {
       winnerId: state.winnerId,
       elementsEnabled: state.elementsEnabled,
       noElimination: state.noElimination,
+      cardsEnabled: state.cardsEnabled,
     });
 
     let resultsSig = '';
@@ -239,7 +251,7 @@ class NetworkManager {
 
     let signature = '';
     state.players.forEach((p) => {
-      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.difficulty}|${p.ready}|${p.connected}|${p.alive}|${p.roundState}|${p.team}|${p.element}|${p.points};`;
+      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.difficulty}|${p.ready}|${p.connected}|${p.alive}|${p.roundState}|${p.team}|${p.element}|${p.points}|${p.cards}|${p.cardOffer}|${p.lives};`;
     });
     if (signature === this.lobbySignature) return;
     this.lobbySignature = signature;
@@ -248,10 +260,33 @@ class NetworkManager {
       players.push({
         id: p.id, nickname: p.nickname, slot: p.slot, isBot: p.isBot, difficulty: p.difficulty, ready: p.ready,
         connected: p.connected, alive: p.alive, roundState: p.roundState, team: p.team, element: p.element, points: p.points,
+        cards: p.cards, cardOffer: p.cardOffer, lives: p.lives,
       });
+      this.detectAwakening(p.id, p.nickname, p.cards);
     });
     players.sort((a, b) => a.slot - b.slot);
     sessionStore.set({ players });
+  }
+
+  private readonly awakened = new Map<string, Set<string>>();
+  private announceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Announce when someone's card reaches level 3 (compared with what we saw before). */
+  private detectAwakening(id: string, nickname: string, cards: string): void {
+    const levels = parseCards(cards);
+    const seen = this.awakened.get(id) ?? new Set<string>();
+    const isFirstSight = !this.awakened.has(id);
+    this.awakened.set(id, seen);
+    for (const [card, level] of Object.entries(levels)) {
+      if (level !== 3 || seen.has(card)) continue;
+      seen.add(card);
+      if (isFirstSight) continue; // joined/reconnected mid-match: no stale announcements
+      const info = CARDS[card as CardId];
+      sessionStore.set({ announce: `${nickname} ${vi.awakened} ${info.name.toUpperCase()} — ${info.awaken}!` });
+      if (this.announceTimer) clearTimeout(this.announceTimer);
+      this.announceTimer = setTimeout(() => sessionStore.set({ announce: null }), 3500);
+    }
+    if (!cards) seen.clear();
   }
 
   private showToast(text: string): void {

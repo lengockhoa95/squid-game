@@ -1,4 +1,7 @@
-import { MINIGAMES, type ElementId, type GameAction, type MinigameId, type MoveBatch, type Phase, type StepFn } from '@sp/shared';
+import {
+  MINIGAMES, MSG, collideBodies,
+  type CardId, type ElementId, type GameAction, type MinigameId, type MoveBatch, type Phase, type StepFn,
+} from '@sp/shared';
 import { RoundResultEntry, type MatchState, type PlayerState } from '@sp/shared/schema';
 import type { PlayerSim } from '../players/PlayerSim.ts';
 import { syncPlayerFromSim } from '../players/sync.ts';
@@ -10,6 +13,7 @@ import { pickNextGame, planRoundCount } from './RoundScheduler.ts';
 import { decideEliminations } from './EliminationPolicy.ts';
 import { assertTransition } from './MatchStateMachine.ts';
 import { ElementSystem, type CastResult } from '../elements/ElementSystem.ts';
+import { CardSystem } from '../cards/CardSystem.ts';
 
 export const NO_ELIMINATION_ROUNDS = 5;
 
@@ -17,6 +21,8 @@ export const PHASE_SECONDS = {
   ROUND_INTRO: 5,
   ROUND_COUNTDOWN: 3,
   ROUND_RESULT: 6,
+  /** Longer result screen when players draft a card. */
+  ROUND_RESULT_DRAFT: 10,
   MATCH_END: 10,
 } as const;
 
@@ -30,6 +36,8 @@ export interface MatchDeps {
   onMatchOver(): void;
   /** Multiplier for non-gameplay phase durations (1 in production). */
   phaseScale?: number;
+  /** Private server → client message (e.g. Mắt Thần hints). Bots have no client. */
+  sendTo?(id: string, type: string, message: unknown): void;
 }
 
 /**
@@ -45,11 +53,14 @@ export class MatchController {
   private readonly available: MinigameId[];
   private readonly steps = new Map<string, StepFn>();
   readonly elements: ElementSystem;
+  readonly cards: CardSystem;
+  private readonly launchReady = new Map<string, number>();
 
   constructor(deps: MatchDeps, available: MinigameId[] = availableMinigames()) {
     this.d = deps;
     this.available = available;
-    this.elements = new ElementSystem(deps.state, deps.rng);
+    this.cards = new CardSystem(deps.state, deps.rng);
+    this.elements = new ElementSystem(deps.state, deps.rng, (p) => this.cards.mods(p));
   }
 
   get phase(): Phase {
@@ -73,6 +84,7 @@ export class MatchController {
       p.roundState = 'ACTIVE';
       p.points = 0;
     }
+    this.cards.beginMatch(s.players.values());
     this.nextRound();
   }
 
@@ -122,6 +134,10 @@ export class MatchController {
     return this.elements.pick(id, element);
   }
 
+  pickCard(id: string, card: CardId): boolean {
+    return this.cards.pick(this.d.state.players.get(id), card);
+  }
+
   castElement(id: string, x: number, z: number): CastResult {
     return this.elements.cast(id, x, z, this.d.state.gameTime);
   }
@@ -140,6 +156,7 @@ export class MatchController {
   /** Stop the match immediately (e.g. the room returns to the lobby). */
   abort(): void {
     this.elements.clear();
+    this.cards.reset(this.d.state.players.values());
     this.steps.clear();
     this.game?.dispose();
     this.game = null;
@@ -175,8 +192,10 @@ export class MatchController {
       players: this.participants,
       rng: this.d.rng,
       rttOf: (pid) => this.d.rttOf(pid),
+      tryRescue: (pid) => this.rescue(pid),
     });
     if (this.game.step) for (const p of this.participants) syncPlayerFromSim(p.state, p.sim);
+    this.cards.beginRound(this.participants.map((p) => p.state));
     this.elements.beginRound(this.participants, this.game);
     this.steps.clear();
     const base = this.game.step;
@@ -189,6 +208,16 @@ export class MatchController {
     if (!this.game) return;
     this.d.state.gameTime = 0;
     this.game.start();
+    this.launchReady.clear();
+    // Mắt Thần: private hints for whoever holds the card.
+    if (this.game.revealFor) {
+      for (const p of this.participants) {
+        const rows = this.cards.mods(p.state).eyeRows;
+        if (rows <= 0) continue;
+        const hints = this.game.revealFor(p.id, rows);
+        if (!p.state.isBot) this.d.sendTo?.(p.id, MSG.BRIDGE_HINT, { rows: hints });
+      }
+    }
     this.setPhase('ROUND_PLAYING', MINIGAMES[this.game.id].timeLimit);
   }
 
@@ -212,6 +241,7 @@ export class MatchController {
         if (p.state.alive && p.state.roundState === 'ACTIVE') p.sim.tick(this.steps.get(p.id) ?? game.step, s.gameTime);
       }
     }
+    if (game.step) this.collidePlayers(s.gameTime);
     this.elements.update(dt, s.gameTime);
     game.update(dt, s.gameTime);
     if (game.step) for (const p of this.participants) syncPlayerFromSim(p.state, p.sim);
@@ -279,7 +309,49 @@ export class MatchController {
       s.winnerId = survivors[0]!.id;
     }
     this.participants = [];
+    const more = survivors.length > 1 && s.roundIndex < s.totalRounds;
     this.setPhase('ROUND_RESULT', this.scaled(PHASE_SECONDS.ROUND_RESULT));
+    if (more && this.cards.offer(survivors, ranked)) s.timer = this.scaled(PHASE_SECONDS.ROUND_RESULT_DRAFT);
+  }
+
+  /** Card "Mạng Phụ": spend a life and show it. */
+  private rescue(id: string): boolean {
+    const p = this.participant(id);
+    if (!p || !this.cards.tryRescue(p.state, this.d.state.gameTime)) return false;
+    this.elements.flash('RESCUE', p, p.state.x, p.state.z, this.d.state.gameTime);
+    return true;
+  }
+
+  /** Player-vs-player contact for movement games (cards change mass / push / launch). */
+  private collidePlayers(t: number): void {
+    const act = this.participants.filter((p) => p.state.alive && p.state.roundState === 'ACTIVE');
+    for (let i = 0; i < act.length; i++) {
+      for (let j = i + 1; j < act.length; j++) {
+        const a = act[i]!;
+        const b = act[j]!;
+        const ma = this.cards.mods(a.state);
+        const mb = this.cards.mods(b.state);
+        const closing = collideBodies(a.sim.state, b.sim.state, ma, mb);
+        if (closing <= 0) continue;
+        this.tryLaunch(a, b, ma.launch, t);
+        this.tryLaunch(b, a, mb.launch, t);
+      }
+    }
+  }
+
+  /** Cú Húc level 3: bumping someone while running sends them flying. */
+  private tryLaunch(from: GamePlayer, to: GamePlayer, launch: boolean, t: number): void {
+    const s = from.sim.state;
+    if (!launch || Math.hypot(s.vx, s.vz) < 3 || t < (this.launchReady.get(from.id) ?? 0)) return;
+    const o = to.sim.state;
+    const d = Math.hypot(o.x - s.x, o.z - s.z) || 1;
+    const taken = this.cards.mods(to.state).windTaken;
+    o.vx = ((o.x - s.x) / d) * 12 * taken;
+    o.vz = ((o.z - s.z) / d) * 12 * taken;
+    o.vy = 6 * taken;
+    o.grounded = false;
+    this.launchReady.set(from.id, t + 1.5);
+    this.elements.flash('WIND', from, o.x, o.z, t);
   }
 
   private alivePlayers(): PlayerState[] {

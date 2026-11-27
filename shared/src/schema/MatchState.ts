@@ -37,6 +37,12 @@ export const PlayerState = schema(
     blindUntil: t.float32(),
     /** No-elimination mode: match points (rank points summed over rounds). */
     points: t.uint16(),
+    /** Skill cards: owned levels ("BUNNY:2,LIFE:1"), current draft offer ("A,B,C"), lives left this round. */
+    cards: t.string(),
+    cardOffer: t.string(),
+    lives: t.uint8(),
+    /** Double jump used (mirrors CharacterState.airJumped for reconciliation). */
+    airJumped: t.boolean(),
   },
   'PlayerState',
 );
@@ -115,6 +121,8 @@ export const MatchState = schema(
     elementsEnabled: t.boolean().default(true),
     /** When true nobody is eliminated: all rounds are played and the most points wins. */
     noElimination: t.boolean().default(false),
+    /** Skill card draft between rounds. */
+    cardsEnabled: t.boolean().default(true),
     effects: t.array(ElementEffect),
     rlgl: t.ref(RlglState).optional(),
     bridge: t.ref(BridgeState).optional(),

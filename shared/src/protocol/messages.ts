@@ -18,6 +18,11 @@ export const MSG = {
   ELEMENTS_TOGGLE: 'elementsToggle',
   /** Host toggles "no elimination" mode: everyone plays every round and scores points. */
   NO_ELIMINATION_TOGGLE: 'noEliminationToggle',
+  CARDS_TOGGLE: 'cardsToggle',
+  /** Choose one card of your offer during the round result. */
+  PICK_CARD: 'pickCard',
+  /** Server → one client: Mắt Thần bridge hints {rows: [[row, brokenSide], ...]}. */
+  BRIDGE_HINT: 'bridgeHint',
 } as const;
 
 export type Phase = 'LOBBY' | 'ROUND_INTRO' | 'ROUND_COUNTDOWN' | 'ROUND_PLAYING' | 'ROUND_RESULT' | 'MATCH_END';

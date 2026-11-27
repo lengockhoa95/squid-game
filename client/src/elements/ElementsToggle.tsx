@@ -16,6 +16,7 @@ function OnOff({ value, editable, onChange, label }: { value: boolean; editable:
 export function ElementsToggle({ editable }: { editable: boolean }) {
   const elements = useStore(sessionStore, (s) => s.elementsEnabled);
   const noElim = useStore(sessionStore, (s) => s.noElimination);
+  const cards = useStore(sessionStore, (s) => s.cardsEnabled);
   return (
     <>
       <section className="npc-settings elements-toggle">
@@ -31,6 +32,13 @@ export function ElementsToggle({ editable }: { editable: boolean }) {
           <OnOff value={noElim} editable={editable} onChange={(v) => network.setNoElimination(v)} label={vi.noElimMode} />
         </div>
         <p className="muted">{noElim ? vi.noElimModeDesc : vi.classicModeDesc}</p>
+      </section>
+      <section className="npc-settings cards-toggle">
+        <div className="npc-head">
+          <h2>{vi.cardsMode}</h2>
+          <OnOff value={cards} editable={editable} onChange={(v) => network.setCardsEnabled(v)} label={vi.cardsMode} />
+        </div>
+        <p className="muted">{vi.cardsModeDesc}</p>
       </section>
     </>
   );

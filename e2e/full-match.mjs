@@ -13,6 +13,8 @@ const browser = await chromium.launch({
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
 });
 const page = await browser.newPage({ viewport: { width: 1100, height: 680 } });
+// The how-to-play dialog auto-opens on a first visit; this scenario does not need it.
+await page.addInitScript(() => localStorage.setItem('sp.howToSeen', '1'));
 const errors = [];
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
