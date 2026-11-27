@@ -6,6 +6,8 @@ import { useStore } from '../store/UIStore.ts';
 import { useAnimationFrame } from '../ui/match/useAnimationFrame.ts';
 import { audio } from '../audio/AudioManager.ts';
 import { elementUi } from './elementUi.ts';
+import { touchStore } from '../store/touch.ts';
+import { CAST_AT_CROSSHAIR_EVENT } from '../core/GameEngine.ts';
 
 function useMyElement(): ElementId | null {
   const el = useStore(sessionStore, (s) => s.players.find((p) => p.id === s.myId)?.element ?? '');
@@ -108,7 +110,9 @@ export function ElementBar({ net }: { net: MatchNetAdapter }) {
             className={`element-cast ${aiming ? 'is-aiming' : ''}`}
             style={{ '--el': info.color } as CSSProperties}
             onClick={() => {
-              if (movement && info.aim === 'point') elementUi.set({ aiming: !elementUi.get().aiming });
+              // Touch: there is no cursor — use the element at the crosshair right away.
+              if (touchStore.get().enabled) window.dispatchEvent(new Event(CAST_AT_CROSSHAIR_EVENT));
+              else if (movement && info.aim === 'point') elementUi.set({ aiming: !elementUi.get().aiming });
               else net.sendCast(0, 0);
             }}
           >

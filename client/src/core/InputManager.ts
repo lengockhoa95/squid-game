@@ -134,6 +134,7 @@ export class InputManager {
   }
 
   private readonly onPointerDown = (e: PointerEvent): void => {
+    if (e.pointerType === 'touch') return; // touch is handled by the on-screen controls
     const onView = e.target === this.host || e.target instanceof HTMLCanvasElement;
     if (!this.enabled || !onView) return;
     if (this.locked) {

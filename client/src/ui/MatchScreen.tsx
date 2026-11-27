@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { settingsStore } from '../store/settings.ts';
+import { touchStore } from '../store/touch.ts';
 import { MINIGAMES, vi, type MinigameId } from '@sp/shared';
 import { matchSceneLoader } from '../core/GameEngine.ts';
 import { network } from '../network/NetworkManager.ts';
@@ -59,7 +60,9 @@ function PhaseLayer({ net }: { net: MatchNetAdapter }) {
 
 /** "Click to capture the mouse" hint while mouse look is available but not active. */
 function MouseLookHint({ movement }: { movement: boolean }) {
-  const enabled = useStore(settingsStore, (s) => s.mouseLook);
+  const mouseLook = useStore(settingsStore, (s) => s.mouseLook);
+  const touch = useStore(touchStore, (s) => s.enabled);
+  const enabled = mouseLook && !touch;
   const playing = useStore(sessionStore, (s) => s.phase === 'ROUND_PLAYING');
   const active = useStore(sessionStore, (s) => {
     const me = s.players.find((p) => p.id === s.myId);
@@ -81,6 +84,7 @@ export function MatchScreen() {
   const amHost = useStore(sessionStore, (s) => s.myId !== '' && s.myId === s.hostId);
   const game = useStore(sessionStore, (s) => s.currentGame);
   const playing = useStore(sessionStore, (s) => s.phase === 'ROUND_PLAYING');
+  const touch = useStore(touchStore, (s) => s.enabled);
   useMatchSounds();
   // The adapter and scene loader are bound to the current session; created once per mounted match screen.
   const adapter = useMemo(() => network.getAdapter(), []);
@@ -89,7 +93,7 @@ export function MatchScreen() {
   const movement = game ? MINIGAMES[game].movement : false;
 
   return (
-    <div className="game-screen">
+    <div className={`game-screen ${touch ? 'is-touch' : ''}`}>
       <GameCanvas loader={loader} />
       <div className="hud-top">
         <button type="button" className="btn btn-ghost" onClick={() => void network.leave()}>← {vi.leaveRoom}</button>
@@ -106,7 +110,8 @@ export function MatchScreen() {
       <CardBar />
       <AnnounceBanner />
       <DebugOverlay />
-      {movement && playing && <ControlsHint />}
+      {movement && playing && !touch && <ControlsHint />}
+      {movement && playing && touch && <div className="touch-hint">{vi.touchHint}</div>}
       <MouseLookHint movement={movement} />
     </div>
   );

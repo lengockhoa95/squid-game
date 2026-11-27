@@ -140,11 +140,20 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
 - [x] Chọn nhân vật trong màn chờ; NPC tự lấy nhân vật chưa ai chọn; Minotaur là zombie Kenney có sừng
 - [x] Test: 166 unit/integration; E2E trận đầy đủ + multiplayer qua với model mới
 
+## Phase 13 — Điều khiển cảm ứng ✅
+
+- [x] Kiểu game bắn súng trên iPad, tự bật trên màn cảm ứng:
+  - Nửa trái: cần điều khiển nổi (analog).
+  - Nửa phải: vuốt xoay camera, chạm để dùng nguyên tố.
+  - Nút: Nhảy và nguyên tố (dùng tại tâm ngắm).
+- [x] Đa chạm (vừa đi vừa xoay camera); tâm ngắm luôn hiện; gợi ý cảm ứng thay cho gợi ý bàn phím.
+- [x] Máy tính có màn cảm ứng: dùng chuột thì tự quay về điều khiển chuột.
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).
 - Trận 4 người thường 2–3 vòng: trận dừng khi còn 1 người; 4–5 vòng chỉ khi có vòng không ai bị loại.
-- Chỉ hỗ trợ chuột + bàn phím (chưa có điều khiển cảm ứng — chưa chơi được bằng tay trên iPad/điện thoại).
+- Điều khiển cảm ứng (iPad/điện thoại) mới thử trên Chrome giả lập iPad, chưa thử trên máy thật; game chưa được deploy lên link công khai.
 - Camera chưa tránh tường; khi FPS < 10 nhân vật của mình đi chậm hơn.
 - Room code duy nhất trong 1 tiến trình server (đủ cho triển khai 1 server).
 - Va chạm ở client dự đoán theo vị trí người khác ở snapshot gần nhất, nên khi chen nhau nhân vật có thể giật nhẹ.

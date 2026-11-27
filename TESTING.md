@@ -58,6 +58,16 @@ Người chơi khác mở `http://<IP-máy-chủ>:5173` — client tự kết n�
 > WSL2: Windows không tự mở cổng của WSL ra mạng LAN. Cách đơn giản: chạy bằng Docker Desktop,
 > hoặc bật "mirrored networking" cho WSL (`networkingMode=mirrored` trong `.wslconfig`).
 
+### iPad / điện thoại
+
+Mở cùng link LAN ở trên bằng Safari. Màn cảm ứng tự bật điều khiển kiểu game bắn súng:
+
+- **Nửa trái:** đặt ngón cái xuống chỗ nào thì cần điều khiển hiện ở đó; kéo để đi (kéo nhẹ thì đi chậm).
+- **Nửa phải:** vuốt để xoay camera; chạm nhẹ để dùng nguyên tố tại chỗ chạm.
+- **Nút:** Nhảy, và nút nguyên tố (dùng tại tâm ngắm).
+
+Đã thử trên Chrome giả lập iPad Pro 11 với sự kiện chạm thật (cần điều khiển, vuốt 2 ngón cùng lúc, các nút). Chưa thử trên iPad thật.
+
 ## 4. Mô phỏng mạng chậm
 
 Đặt biến môi trường `COLYSEUS_LATENCY=150` (ms, khứ hồi) khi chạy server để thử prediction:

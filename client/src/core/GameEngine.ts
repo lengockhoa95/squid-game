@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { QUALITY_PRESETS, type FpsCap, type QualityLevel } from '@sp/shared';
 import { RenderManager, type RenderStats } from './RenderManager.ts';
 import { CameraManager } from './CameraManager.ts';
-import { InputManager } from './InputManager.ts';
+import { CROSSHAIR_NDC_Y, InputManager } from './InputManager.ts';
 import { MaterialLibrary } from './MaterialLibrary.ts';
 import { SceneManager, type SceneLoader } from './SceneManager.ts';
 import { keyboardToWorldDir } from './inputMath.ts';
@@ -20,6 +20,10 @@ export interface EngineOptions {
 }
 
 const STATS_INTERVAL_S = 0.25;
+/** Touch look is a bit faster than mouse drag (thumbs travel less). */
+const TOUCH_LOOK_GAIN = 1.4;
+/** Window event the HUD's element button fires in touch mode: cast at the crosshair. */
+export const CAST_AT_CROSSHAIR_EVENT = 'sp:cast-crosshair';
 const UP_NORMAL_MIN = 0.5;
 
 /** Character models (Kenney glTF); failures fall back to the procedural characters. */
@@ -62,9 +66,16 @@ export class GameEngine {
   private readonly hits: THREE.Intersection[] = [];
   private statsTimer = 0;
   private disposed = false;
+  /** Touch joystick (−1..1, y = forward); used when no movement key is held. */
+  private readonly stick = { x: 0, y: 0 };
+  private readonly onCastEvent = (): void => this.castAtCrosshair();
+
+  private readonly host: HTMLElement;
 
   constructor(host: HTMLElement, opts: EngineOptions) {
     this.opts = opts;
+    this.host = host;
+    window.addEventListener(CAST_AT_CROSSHAIR_EVENT, this.onCastEvent);
     this.render = new RenderManager(host, opts.quality, opts.fpsCap);
     this.camera = new CameraManager(this.render.aspect);
     this.render.onQualityChange((p) => this.scenes.active?.applyQuality(p));
@@ -105,6 +116,37 @@ export class GameEngine {
     this.opts.mouseLook = enabled;
   }
 
+  // --- Touch controls (twin-stick, like mobile shooters) -------------------------------------
+
+  /** Left stick: x = right, y = forward, each −1..1 (0, 0 = released). */
+  setMoveStick(x: number, y: number): void {
+    this.stick.x = x;
+    this.stick.y = y;
+  }
+
+  /** Right side drag: turn the camera (pixels). */
+  lookDrag(dx: number, dy: number): void {
+    this.camera.rotateByMouse(dx * TOUCH_LOOK_GAIN, dy * TOUCH_LOOK_GAIN);
+  }
+
+  jump(): void {
+    this.scenes.active?.onJump();
+  }
+
+  /** Tap on the 3D view at client coordinates: same as a mouse click there. */
+  tapAt(clientX: number, clientY: number): void {
+    const rect = this.host.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    this.handleGroundPoint(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+  }
+
+  /** Use the element at the crosshair (touch cast button). */
+  castAtCrosshair(): void {
+    const scene = this.scenes.active;
+    if (!scene?.onCastAt) return;
+    this.raycastGround(0, CROSSHAIR_NDC_Y, (hit) => scene.onCastAt?.(hit), () => scene.onCastAt?.(null));
+  }
+
   static defaultFpsCap(level: QualityLevel): FpsCap {
     return QUALITY_PRESETS[level].fpsCap;
   }
@@ -112,6 +154,7 @@ export class GameEngine {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    window.removeEventListener(CAST_AT_CROSSHAIR_EVENT, this.onCastEvent);
     this.input.dispose();
     this.scenes.dispose();
     this.materials.disposeAll();
@@ -123,9 +166,16 @@ export class GameEngine {
     if (!scene) return;
 
     this.input.getKeyAxes(this.axes);
+    let magnitude = 1;
+    if (this.axes.fwd === 0 && this.axes.right === 0) {
+      // Touch joystick: analog (push a little = walk slowly).
+      this.axes.fwd = this.stick.y;
+      this.axes.right = this.stick.x;
+      magnitude = Math.min(1, Math.hypot(this.stick.x, this.stick.y));
+    }
     keyboardToWorldDir(this.axes.fwd, this.axes.right, this.camera.viewYaw, this.dir);
-    this.frameInput.keyDirX = this.dir.x;
-    this.frameInput.keyDirZ = this.dir.z;
+    this.frameInput.keyDirX = this.dir.x * magnitude;
+    this.frameInput.keyDirZ = this.dir.z * magnitude;
     this.camera.rotateByKeys(this.input.getKeyRotate(), dt);
 
     this.input.setPointerLockAllowed(this.opts.mouseLook && scene.wantsPointerLock?.() === true);
