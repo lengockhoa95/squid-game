@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RLGL, SIM_DT, createRng, parseCards, type MinigameId } from '@sp/shared';
+import { BRIDGE, RLGL, SIM_DT, bridgeRowZ, createRng, parseCards, type MinigameId } from '@sp/shared';
 import { MatchState } from '@sp/shared/schema';
 import { PlayerSim } from '../players/PlayerSim.ts';
 import { addPlayer } from '../players/factory.ts';
@@ -124,10 +124,12 @@ describe('card hooks', () => {
     const broken = hints[0]![1] as 0 | 1 | 2;
     expect(game.hintFor('p0', 0)).toBe(broken);
     expect(game.hintFor('p1', 0)).toBeNull();
-    game.handlePlayerInput('p0', { kind: 'JUMP_TILE', side: broken }, 0);
-    run(game, players, 0, 1);
-    expect(players[0]!.state.roundState).toBe('ACTIVE');
-    expect(players[0]!.state.score).toBe(0);
+    run(game, players, 0, 0.2); // standing on the start platform (remembered as safe footing)
+    players[0]!.sim.reset(BRIDGE.tileX[broken], bridgeRowZ(0), Math.PI); // lands on the breaking tile
+    run(game, players, 0.2, 2);
+    expect(players[0]!.state.roundState).toBe('ACTIVE'); // saved by the extra life
+    expect(players[0]!.sim.state.z).toBeGreaterThan(BRIDGE.startZ - 2); // back on the platform
+    expect(players[0]!.state.lives).toBe(0);
     expect(match.bridge!.tiles[broken]).toBe(1); // TILE_BROKEN, revealed to all
   });
 

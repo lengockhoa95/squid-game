@@ -89,15 +89,13 @@ while (Date.now() < deadline) {
     if (t.includes('Đèn')) {
       if (info.green && !wHeld) { await page.keyboard.down('KeyW'); wHeld = true; }
       if (!info.green && wHeld) { await page.keyboard.up('KeyW'); wHeld = false; }
-    } else if (t.includes('Chướng') || t.includes('Sàn')) {
+    } else if (t.includes('Chướng') || t.includes('Sàn') || t.includes('Cầu') || t.includes('Tháp') || t.includes('Mê') || t.includes('Parkour')) {
       if (!wHeld) { await page.keyboard.down('KeyW'); wHeld = true; }
       if (Math.random() < 0.25) await page.keyboard.press('Space');
     } else if (t.includes('Kéo')) {
       await page.keyboard.press('Space');
     } else if (t.includes('Phản')) {
       if (info.go) { await page.waitForTimeout(220); await page.keyboard.press('Space'); }
-    } else if (t.includes('Cầu')) {
-      if (Math.random() < 0.15) await page.keyboard.press(Math.random() < 0.5 ? 'KeyA' : 'KeyD');
     }
   } else if (wHeld) { await page.keyboard.up('KeyW'); wHeld = false; }
   await page.waitForTimeout(60);

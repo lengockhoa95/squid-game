@@ -79,7 +79,7 @@ export const vi = {
   lightGreen: 'ĐÈN XANH — CHẠY!',
   lightRed: 'ĐÈN ĐỎ — ĐỨNG YÊN!',
   song: 'Bài hát',
-  bridgeHint: 'Click tấm kính ở hàng kế tiếp (A / S / D)',
+  bridgeHint: 'WASD để đi · Space để nhảy sang hàng kế · tấm xanh là an toàn',
   bridgeRow: 'Hàng',
   raceHint: 'WASD để chạy · Space để nhảy · click chuột để dùng nguyên tố',
   tugHint: 'Click hoặc Space khi kim vào vùng xanh',

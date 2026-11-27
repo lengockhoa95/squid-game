@@ -114,10 +114,10 @@ while (Date.now() < deadline) {
   if (info.dark && !seenDark) { seenDark = true; log('  >> screen darkened'); await page.screenshot({ path: `${out}/e-dark.png` }); }
   if (info.phase === 'playing' && !info.spectating) {
     const t = info.title;
-    const movement = t.includes('Đèn') || t.includes('Chướng') || t.includes('Sàn') || t.includes('Tháp') || t.includes('Mê') || t.includes('Parkour');
+    const movement = !t.includes('Kéo') && !t.includes('Phản'); // every current minigame is a movement game
     if (movement) {
       if ((!t.includes('Đèn') || info.green) && !wHeld) { await page.keyboard.down('KeyW'); wHeld = true; }
-      if ((t.includes('Tháp') || t.includes('Parkour')) && Math.random() < 0.25) await page.keyboard.press('Space');
+      if ((t.includes('Tháp') || t.includes('Parkour') || t.includes('Cầu')) && Math.random() < 0.25) await page.keyboard.press('Space');
       if (t.includes('Sàn')) {
         // Keep moving on the collapsing floor: steer left/right now and then, hop a lot.
         if (Math.random() < 0.3) await page.keyboard.press('Space');
@@ -128,8 +128,6 @@ while (Date.now() < deadline) {
       await page.keyboard.press('Space');
     } else if (t.includes('Phản')) {
       if (await page.locator('.reaction-big.stage-go').count()) { await page.waitForTimeout(200); await page.keyboard.press('Space'); }
-    } else if (t.includes('Cầu') && Math.random() < 0.1) {
-      await page.keyboard.press(Math.random() < 0.5 ? 'KeyA' : 'KeyD');
     }
     if (info.cd === 'Sẵn sàng' && info.cast) {
       casts++;

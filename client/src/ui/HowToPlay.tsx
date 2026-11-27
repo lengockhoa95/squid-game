@@ -19,7 +19,6 @@ const CONTROLS: ReadonlyArray<[action: string, keys: string, mouse: string]> = [
   ['Dùng nguyên tố', 'F', 'Click trái: dùng tại tâm ngắm (rê chuột lên/xuống để ngắm xa/gần)'],
   ['Huỷ ngắm', '—', 'Nhấp chuột phải'],
   ['Chọn nguyên tố / thẻ kỹ năng', '—', 'Click vào ô / thẻ muốn chọn'],
-  ['Cầu Kính', 'A / S / D (trái / giữa / phải)', 'Click vào tấm kính hàng kế tiếp'],
   ['Kéo Co · Phản Xạ', 'Space đúng lúc', 'Click trái đúng lúc'],
 ];
 
@@ -109,7 +108,7 @@ function Elements() {
     <>
       <ol className="howto-steps">
         <li><b>Chọn:</b> lúc hiện luật mỗi vòng, click 1 nguyên tố ở hàng dưới màn hình (không chọn thì được random).</li>
-        <li><b>Dùng:</b> khi chơi, <b>click chuột trái</b> — chiêu bay tới chỗ tâm ngắm chỉ (rê chuột để ngắm). Chiêu cho bản thân thì click lúc nào cũng được. Cầu Kính: click nút nguyên tố ở góc phải dưới.</li>
+        <li><b>Dùng:</b> khi chơi, <b>click chuột trái</b> — chiêu bay tới chỗ tâm ngắm chỉ (rê chuột để ngắm). Chiêu cho bản thân thì click lúc nào cũng được.</li>
         <li><b>Hồi chiêu:</b> dùng không giới hạn, nút hiện số giây chờ. Nhân vật mang hình xăm theo nguyên tố đã chọn.</li>
       </ol>
       <ul className="howto-grid">
@@ -126,7 +125,7 @@ function Elements() {
           );
         })}
       </ul>
-      <p className="muted howto-note">Cầu Kính chỉ có Lôi / Hoán đổi / Bóng tối; Kéo Co và Phản Xạ Nhanh chỉ có Lôi / Bóng tối — các trò này chiêu tự chọn mục tiêu, chỉ cần click nút.</p>
+      <p className="muted howto-note">Mọi minigame đều dùng được cả 9 nguyên tố (trừ những cái host đã bỏ trong màn chờ).</p>
     </>
   );
 }

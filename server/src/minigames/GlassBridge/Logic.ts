@@ -1,45 +1,33 @@
 import {
-  BRIDGE, TILE_BROKEN, TILE_SAFE, TILE_UNKNOWN, bridgeFinishZ, bridgeRowZ, bridgeRowsFor, bridgeSlotOffset, tileIndex,
-  type GameAction,
+  BRIDGE, BRIDGE_PLATFORM_HALF, TILE_BROKEN, TILE_SAFE, TILE_UNKNOWN,
+  breakBridgeTile, bridgeFinishZ, bridgeRowsFor, bridgeSpawn, bridgeStep, bridgeTileUnder, createBridgeWorld, tileIndex,
+  type BridgeWorld, type GameAction, type StepFn,
 } from '@sp/shared';
 import { BridgeState } from '@sp/shared/schema';
-import { rankPlayers, type GamePlayer, type MinigameContext, type RoundOutcome, type ServerMinigame } from '../framework/types.ts';
-
-interface Jump {
-  fromX: number;
-  fromZ: number;
-  toX: number;
-  toZ: number;
-  elapsed: number;
-  row: number; // target row; rows = finish platform
-  side: number;
-}
-
-interface Fall {
-  elapsed: number;
-}
-
-const FALL_SECONDS = 1.2;
+import { rankPlayers, type MinigameContext, type RoundOutcome, type ServerMinigame } from '../framework/types.ts';
 
 /**
- * Glass Bridge (simultaneous): every player jumps forward row by row. Each row has one safe tile;
- * the safe pattern exists only on the server. Broken and proven-safe tiles are revealed to everyone.
- * Player positions are set by the server (no walking). PlayerState.score = rows cleared.
+ * Glass Bridge (free movement): walk and jump from row to row. Each row has three tiles, one of
+ * which breaks under the first player who lands on it. The breaking pattern exists only on the
+ * server; tiles proven safe or broken are revealed to everyone. Falling off the bridge is out,
+ * reaching the far platform passes. PlayerState.score = rows cleared.
  */
 export class GlassBridge implements ServerMinigame {
   readonly id = 'GLASS_BRIDGE' as const;
-  readonly step = null;
+  private bw: BridgeWorld = createBridgeWorld(1);
+  /** Delegates to the current world (built in initialize once the row count is known). */
+  readonly step: StepFn = (s, intent, dt, t) => this.stepFn(s, intent, dt, t);
+  private stepFn: StepFn = bridgeStep(this.bw);
+  bounds = this.bw.world.bounds;
   private ctx!: MinigameContext;
   private state!: BridgeState;
   /** Index of the tile that breaks in each row. */
   private brokenSide: number[] = [];
-  private rows: number = BRIDGE.maxRows;
-  private readonly progress = new Map<string, number>(); // rows cleared (0 = on start platform)
-  private readonly jumps = new Map<string, Jump>();
-  private readonly falls = new Map<string, Fall>();
-  private readonly cooldown = new Map<string, number>();
+  private rows = 0;
+  private readonly progress = new Map<string, number>();
   private readonly finishTimes = new Map<string, number>();
   private readonly fellAt = new Map<string, number>();
+  private readonly lastSafe = new Map<string, { x: number; z: number }>();
   /** Mắt Thần hints: rows whose breaking tile each player knows. */
   private readonly hints = new Map<string, Set<number>>();
 
@@ -51,60 +39,56 @@ export class GlassBridge implements ServerMinigame {
     for (let i = 0; i < this.rows * BRIDGE.tilesPerRow; i++) this.state.tiles.push(TILE_UNKNOWN);
     ctx.match.bridge = this.state;
     this.brokenSide = Array.from({ length: this.rows }, () => Math.floor(ctx.rng() * BRIDGE.tilesPerRow));
+    this.bw = createBridgeWorld(this.rows);
+    this.stepFn = bridgeStep(this.bw);
+    this.bounds = this.bw.world.bounds;
     for (const p of ctx.players) {
       this.progress.set(p.id, 0);
-      const o = bridgeSlotOffset(p.state.slot);
-      this.place(p, o.dx * 3, BRIDGE.startZ + o.dz * 2, 0);
+      const s = bridgeSpawn(p.state.slot);
+      p.sim.reset(s.x, s.z, s.yaw);
       p.state.score = 0;
     }
   }
 
   start(): void {}
 
-  handlePlayerInput(playerId: string, action: GameAction, gameTime: number): void {
-    if (action.kind !== 'JUMP_TILE') return;
-    const p = this.ctx.players.find((pl) => pl.id === playerId);
-    if (!p || p.state.roundState !== 'ACTIVE' || this.jumps.has(playerId)) return;
-    if (gameTime < (this.cooldown.get(playerId) ?? 0)) return;
-    const row = this.progress.get(playerId) ?? 0;
-    const o = bridgeSlotOffset(p.state.slot);
-    if (row >= this.rows) {
-      this.startJump(p, 0, bridgeFinishZ(this.rows) - 1.5 + o.dz, this.rows, 0);
-      return;
-    }
-    if (this.state.tiles[tileIndex(row, action.side)] === TILE_BROKEN) return; // cannot pick a broken tile
-    this.startJump(p, BRIDGE.tileX[action.side] + o.dx, bridgeRowZ(row) + o.dz, row, action.side);
+  handlePlayerInput(_playerId: string, _action: GameAction): void {
+    // Movement only.
   }
 
-  update(dt: number, gameTime: number): void {
+  update(_dt: number, gameTime: number): void {
+    const finishLine = bridgeFinishZ(this.rows) + 0.4;
     for (const p of this.ctx.players) {
-      const jump = this.jumps.get(p.id);
-      if (jump) this.advanceJump(p, jump, dt, gameTime);
-      const fall = this.falls.get(p.id);
-      if (fall) {
-        fall.elapsed += dt;
-        const f = Math.min(1, fall.elapsed / FALL_SECONDS);
-        p.state.y = BRIDGE.fallDepth * f * f;
-        p.state.vy = -20 * f;
-        p.state.grounded = false;
+      if (p.state.roundState !== 'ACTIVE') continue;
+      const s = p.sim.state;
+      if (s.grounded && s.z <= finishLine) {
+        p.state.roundState = 'FINISHED';
+        this.finishTimes.set(p.id, gameTime);
+        this.progress.set(p.id, this.rows);
+        p.state.score = this.rows;
+        continue;
+      }
+      const tile = bridgeTileUnder(this.bw, s);
+      const broke = tile >= 0 && this.land(p.id, tile);
+      // Remember solid footing as the Mạng Phụ landing spot: an intact tile or a platform —
+      // never the spot of a tile that just broke (the player may not have started falling yet).
+      const onPlatform = Math.abs(s.x) <= BRIDGE_PLATFORM_HALF && (s.z >= BRIDGE.startZ - 1.6 || s.z <= bridgeFinishZ(this.rows) + 1.4);
+      if (!broke && s.grounded && Math.abs(s.y) < 0.05 && (tile >= 0 || onPlatform)) this.lastSafe.set(p.id, { x: s.x, z: s.z });
+      if (s.y < -6) {
+        const spot = this.lastSafe.get(p.id);
+        if (spot && this.ctx.tryRescue?.(p.id)) {
+          p.sim.reset(spot.x, spot.z, s.yaw);
+          continue;
+        }
+        p.state.roundState = 'OUT';
+        this.fellAt.set(p.id, this.progress.get(p.id) ?? 0);
       }
     }
   }
 
   /** Public info for bots: tile states and each player's progress (what everyone can see). */
-  view(): {
-    tiles: readonly number[];
-    progress: ReadonlyMap<string, number>;
-    jumping: (id: string) => boolean;
-    /** True if someone is mid-air towards `row` (everyone can see them jumping). */
-    someoneJumpingTo: (row: number) => boolean;
-  } {
-    return {
-      tiles: this.state.tiles,
-      progress: this.progress,
-      jumping: (id) => this.jumps.has(id),
-      someoneJumpingTo: (row) => [...this.jumps.values()].some((j) => j.row === row),
-    };
+  view(): { tiles: readonly number[]; progress: ReadonlyMap<string, number>; world: BridgeWorld } {
+    return { tiles: this.state.tiles, progress: this.progress, world: this.bw };
   }
 
   revealFor(id: string, rows: number): Array<[number, number]> {
@@ -123,31 +107,12 @@ export class GlassBridge implements ServerMinigame {
     return this.hints.get(id)?.has(row) ? this.brokenSide[row]! : null;
   }
 
-  /** SWAP element: two standing players exchange places and progress. */
-  swapPlayers(a: string, b: string): boolean {
-    const pa = this.ctx.players.find((p) => p.id === a);
-    const pb = this.ctx.players.find((p) => p.id === b);
-    if (!pa || !pb || a === b) return false;
-    for (const p of [pa, pb]) {
-      if (p.state.roundState !== 'ACTIVE' || this.jumps.has(p.id) || this.falls.has(p.id)) return false;
-    }
-    const ax = pa.state.x, az = pa.state.z, ay = pa.state.y;
-    this.place(pa, pb.state.x, pb.state.z, pb.state.y);
-    this.place(pb, ax, az, ay);
-    const progA = this.progress.get(a) ?? 0;
-    this.progress.set(a, this.progress.get(b) ?? 0);
-    this.progress.set(b, progA);
-    pa.state.score = this.progress.get(a)!;
-    pb.state.score = progA;
-    return true;
-  }
-
   getState(): BridgeState {
     return this.state;
   }
 
   isFinished(): boolean {
-    return this.ctx.players.every((p) => p.state.roundState !== 'ACTIVE' && !this.jumps.has(p.id));
+    return this.ctx.players.every((p) => p.state.roundState !== 'ACTIVE');
   }
 
   finish(): RoundOutcome {
@@ -167,61 +132,24 @@ export class GlassBridge implements ServerMinigame {
     this.ctx.match.bridge = undefined;
   }
 
-  private startJump(p: GamePlayer, toX: number, toZ: number, row: number, side: number): void {
-    this.jumps.set(p.id, { fromX: p.state.x, fromZ: p.state.z, toX, toZ, elapsed: 0, row, side });
-    p.state.yaw = Math.atan2(toX - p.state.x, toZ - p.state.z);
-  }
-
-  private advanceJump(p: GamePlayer, jump: Jump, dt: number, gameTime: number): void {
-    jump.elapsed += dt;
-    const f = Math.min(1, jump.elapsed / BRIDGE.jumpTime);
-    const x = jump.fromX + (jump.toX - jump.fromX) * f;
-    const z = jump.fromZ + (jump.toZ - jump.fromZ) * f;
-    this.place(p, x, z, 4 * 1.1 * f * (1 - f));
-    p.state.vz = (jump.toZ - jump.fromZ) / BRIDGE.jumpTime;
-    p.state.grounded = false;
-    if (f < 1) return;
-
-    this.jumps.delete(p.id);
-    p.state.vz = 0;
-    p.state.grounded = true;
-    this.cooldown.set(p.id, gameTime + BRIDGE.cooldown);
-    if (jump.row >= this.rows) {
-      p.state.roundState = 'FINISHED';
-      this.finishTimes.set(p.id, gameTime);
-      this.progress.set(p.id, this.rows + 1);
-      p.state.score = this.rows + 1;
-      return;
-    }
-    const idx = tileIndex(jump.row, jump.side);
-    if (this.brokenSide[jump.row] !== jump.side) {
-      this.state.tiles[idx] = TILE_SAFE;
-      this.progress.set(p.id, jump.row + 1);
-      p.state.score = jump.row + 1;
-    } else if (this.ctx.tryRescue?.(p.id)) {
-      // Mạng Phụ: the glass still breaks (everyone learns the row) but you land back where you were.
-      this.state.tiles[idx] = TILE_BROKEN;
-      for (let side = 0; side < BRIDGE.tilesPerRow; side++) {
-        if (side !== jump.side) this.state.tiles[tileIndex(jump.row, side)] = TILE_SAFE;
+  /** Someone stands on a tile: reveal it as safe, or break it (and its row becomes known). True = it broke. */
+  private land(id: string, tile: number): boolean {
+    const row = Math.floor(tile / BRIDGE.tilesPerRow);
+    const side = tile % BRIDGE.tilesPerRow;
+    if (this.brokenSide[row] === side) {
+      this.state.tiles[tile] = TILE_BROKEN;
+      breakBridgeTile(this.bw, tile);
+      for (let k = 0; k < BRIDGE.tilesPerRow; k++) {
+        if (k !== side) this.state.tiles[tileIndex(row, k)] = TILE_SAFE;
       }
-      this.place(p, jump.fromX, jump.fromZ, 0);
-      this.cooldown.set(p.id, gameTime + 0.6);
-    } else {
-      this.state.tiles[idx] = TILE_BROKEN;
-      // The other tiles of this row are now known to be safe.
-      for (let side = 0; side < BRIDGE.tilesPerRow; side++) {
-        if (side !== jump.side) this.state.tiles[tileIndex(jump.row, side)] = TILE_SAFE;
-      }
-      p.state.roundState = 'OUT';
-      this.fellAt.set(p.id, jump.row);
-      this.falls.set(p.id, { elapsed: 0 });
+      return true; // physics takes over: the player falls
     }
-  }
-
-  private place(p: GamePlayer, x: number, z: number, y: number): void {
-    p.state.x = x;
-    p.state.z = z;
-    p.state.y = y;
-    p.state.vx = 0;
+    if (this.state.tiles[tile] !== TILE_SAFE) this.state.tiles[tile] = TILE_SAFE;
+    if (row + 1 > (this.progress.get(id) ?? 0)) {
+      this.progress.set(id, row + 1);
+      const p = this.ctx.players.find((pl) => pl.id === id);
+      if (p) p.state.score = row + 1;
+    }
+    return false;
   }
 }

@@ -36,15 +36,15 @@ describe('ElementSystem', () => {
     expect(players[0]!.state.element).toBe('FIRE');
   });
 
-  it('non-movement games only offer their element list', () => {
+  it('the glass bridge is a movement game: every element is allowed', () => {
     const { ctx, players, match } = makeContext(2);
     const bridge = new GlassBridge();
     bridge.initialize(ctx);
     const sys = new ElementSystem(match, ctx.rng);
     sys.beginRound(players, bridge);
     match.phase = 'ROUND_INTRO';
-    expect(sys.allowedElements()).toEqual(['THUNDER', 'SWAP', 'DARK']);
-    expect(sys.pick('p0', 'EARTH')).toBe(false);
+    expect(sys.allowedElements()).toHaveLength(9);
+    expect(sys.pick('p0', 'EARTH')).toBe(true);
   });
 
   it('gives nobody an element when the mode is off', () => {
@@ -151,27 +151,6 @@ describe('ElementSystem', () => {
     expect(clones()).toHaveLength(0);
   });
 
-  it('bridge SWAP trades progress with the leader', () => {
-    const { ctx, players, match } = makeContext(2);
-    const bridge = new GlassBridge();
-    bridge.initialize(ctx);
-    const sys = new ElementSystem(match, ctx.rng);
-    sys.beginRound(players, bridge);
-    match.phase = 'ROUND_PLAYING';
-    bridge.start();
-    // p1 clears row 0 on the safe tile
-    const broken = (bridge as unknown as { brokenSide: number[] }).brokenSide[0]!;
-    const safe = ((broken + 1) % 3) as 0 | 1 | 2;
-    bridge.handlePlayerInput('p1', { kind: 'JUMP_TILE', side: safe }, 0);
-    run(bridge, players, 0, 2);
-    expect(players[1]!.state.score).toBe(1);
-    players[0]!.state.element = 'SWAP';
-    players[0]!.state.elementReadyAt = 0;
-    expect(sys.cast('p0', 0, 0, 3)).toBe('ok');
-    expect(players[0]!.state.score).toBe(1);
-    expect(players[1]!.state.score).toBe(0);
-  });
-
   it('movement hold helper still works with wrapped steps (sanity)', () => {
     const { players, sys } = setup(new RedLightGreenLight(), 1);
     const p = players[0]!;
@@ -185,7 +164,7 @@ describe('ElementSystem', () => {
 });
 
 describe('MatchController + elements', () => {
-  it('locks actions while stunned and routes picks/casts', async () => {
+  it('routes picks/casts; lightning freezes the target', async () => {
     const { MatchState } = await import('@sp/shared/schema');
     const { createRng } = await import('@sp/shared');
     const { PlayerSim } = await import('../players/PlayerSim.ts');
@@ -194,24 +173,28 @@ describe('MatchController + elements', () => {
     const { MatchController } = await import('../match/MatchController.ts');
     const state = new MatchState();
     state.phase = 'LOBBY';
+    state.cardsEnabled = false;
     const sims = new Map<string, InstanceType<typeof PlayerSim>>();
     for (let i = 0; i < 2; i++) addPlayer(state, sims, { id: `h${i}`, nickname: `H${i}`, slot: i, joinOrder: i, isBot: false });
     const c = new MatchController(
       { state, sims, npcs: new NPCManager(1), rng: createRng(4), rttOf: () => 0, onMatchOver: () => {}, phaseScale: 0.01 },
-      ['GLASS_BRIDGE'],
+      ['RLGL'],
     );
     c.begin();
     expect(c.pickElement('h0', 'THUNDER')).toBe(true);
-    expect(c.pickElement('h0', 'FIRE')).toBe(false); // not allowed on the bridge
+    expect(c.pickElement('h0', 'NOPE' as never)).toBe(false);
     while (state.phase !== 'ROUND_PLAYING') c.update(1 / 60);
     for (let i = 0; i < 90; i++) c.update(1 / 60); // past the first-cast delay
-    expect(c.castElement('h0', 0, 0)).toBe('ok');
     const h1 = state.players.get('h1')!;
+    expect(c.castElement('h0', h1.x, h1.z)).toBe('ok');
     expect(h1.stunUntil).toBeGreaterThan(state.gameTime);
-    const z = h1.z;
-    c.handleAction('h1', { kind: 'JUMP_TILE', side: 0 });
-    for (let i = 0; i < 30; i++) c.update(1 / 60);
-    expect(h1.z).toBe(z); // the jump was ignored
+    const sim = sims.get('h1')!;
+    const z = sim.state.z;
+    for (let k = 0; k < 10; k++) {
+      sim.enqueue({ s: sim.nextSeq, i: [0, -1, 0, 0, -1, 0, 0, -1, 0] });
+      for (let j = 0; j < 3; j++) c.update(1 / 60);
+    }
+    expect(Math.abs(sim.state.z - z)).toBeLessThan(0.05); // stunned: inputs do nothing
   });
 });
 

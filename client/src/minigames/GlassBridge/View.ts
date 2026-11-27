@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import {
   BRIDGE, TILE_BROKEN, TILE_SAFE, bridgeFinishZ, bridgeRowZ, bridgeRowsFor,
-  type BridgeSide, type GameAction, type QualityPreset,
+  breakBridgeTile, bridgeStep, createBridgeWorld,
+  type BridgeSide, type BridgeWorld, type QualityPreset, type StepFn,
 } from '@sp/shared';
-import type { ClickHit, SceneContext } from '../../core/GameScene.ts';
+import type { SceneContext } from '../../core/GameScene.ts';
 import type { ResourceTracker } from '../../core/ResourceTracker.ts';
 import type { MinigameView, ViewFrame } from '../framework/MinigameView.ts';
 import { StageLights, placeBox, setSky } from '../framework/stage.ts';
@@ -19,7 +20,10 @@ const HINT_COLOR = 0xff5a5a;
 
 /** Platforms over a deep pit, glass tiles in one instanced mesh, pooled shard particles when a tile breaks. */
 class BridgeView implements MinigameView {
-  readonly step = null;
+  /** Local collision world for prediction; rebuilt when the row count is known, tiles drop as they break. */
+  private bw: BridgeWorld = createBridgeWorld(1);
+  private stepFn: StepFn = bridgeStep(this.bw);
+  readonly step: StepFn = (st, intent, dt, t) => this.stepFn(st, intent, dt, t);
   readonly clickTargets: THREE.Object3D[] = [];
   readonly cameraPreset = { yaw: 0, pitch: 34 * DEG, distance: 9 };
   private readonly lights: StageLights;
@@ -103,6 +107,7 @@ class BridgeView implements MinigameView {
         this.known[i] = v;
         if (v === TILE_BROKEN) {
           this.setTile(i, false, UNKNOWN_COLOR);
+          breakBridgeTile(this.bw, i);
           this.burst(i);
         } else if (v === TILE_SAFE) {
           this.setTile(i, true, SAFE_COLOR);
@@ -122,21 +127,11 @@ class BridgeView implements MinigameView {
     this.lights.follow(frame.focus);
   }
 
-  actionForClick(hit: ClickHit, frame: ViewFrame): GameAction | null {
-    const me = frame.state.players.get(frame.localId);
-    if (!me) return null;
-    const nextRow = Math.round(me.score); // score = rows cleared; the next row index
-    if (hit.object === this.finish) return nextRow >= this.rows ? { kind: 'JUMP_TILE', side: 0 } : null;
-    if (hit.object !== this.tiles || hit.instanceId === undefined) return null;
-    const row = Math.floor(hit.instanceId / PER_ROW);
-    const side = (hit.instanceId % PER_ROW) as BridgeSide;
-    return row === nextRow ? { kind: 'JUMP_TILE', side } : null;
+  actionForClick(): null {
+    return null; // free movement: clicks are for elements
   }
 
-  actionForKey(code: string): GameAction | null {
-    if (code === 'KeyA' || code === 'ArrowLeft') return { kind: 'JUMP_TILE', side: 0 };
-    if (code === 'KeyS' || code === 'KeyW' || code === 'ArrowDown' || code === 'ArrowUp') return { kind: 'JUMP_TILE', side: 1 };
-    if (code === 'KeyD' || code === 'ArrowRight') return { kind: 'JUMP_TILE', side: 2 };
+  actionForKey(): null {
     return null;
   }
 
@@ -151,6 +146,8 @@ class BridgeView implements MinigameView {
   /** Place tiles, beams and the finish platform for `rows` rows. */
   private layout(rows: number): void {
     this.rows = rows;
+    this.bw = createBridgeWorld(rows);
+    this.stepFn = bridgeStep(this.bw);
     this.known.fill(0);
     this.hintRound = -1;
     for (let i = 0; i < TILE_CAPACITY; i++) this.setTile(i, i < rows * PER_ROW, UNKNOWN_COLOR);

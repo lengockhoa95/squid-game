@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RACE, RLGL, TILE_BROKEN, TILE_SAFE, tileIndex } from '@sp/shared';
+import { BRIDGE, RACE, RLGL, TILE_BROKEN, TILE_SAFE, bridgeFinishZ, bridgeRowZ, tileIndex } from '@sp/shared';
 import { RedLightGreenLight } from '../RedLightGreenLight/Logic.ts';
 import { GlassBridge } from '../GlassBridge/Logic.ts';
 import { ObstacleRace } from '../ObstacleRace/Logic.ts';
@@ -51,39 +51,41 @@ describe('Red Light Green Light', () => {
 });
 
 describe('Glass Bridge', () => {
-  it('3 tiles per row: the breaking one drops you and reveals the rest; broken tiles cannot be picked', () => {
+  /** Stand a player on a tile (as if they just landed there). */
+  function standOn(p: { sim: { reset(x: number, z: number, yaw: number): void } }, row: number, side: number) {
+    p.sim.reset(BRIDGE.tileX[side as 0 | 1 | 2], bridgeRowZ(row), Math.PI);
+  }
+
+  it('3 tiles per row: landing on the breaking one drops you and reveals the rest', () => {
     const { ctx, players, match } = makeContext(2, 7);
     const game = new GlassBridge();
     game.initialize(ctx);
     expect(match.bridge!.rows).toBe(5); // 2 players → max(5, 2 + 3)
     expect(match.bridge!.tiles.length).toBe(5 * 3);
-    const broken = (game as unknown as { brokenSide: number[] }).brokenSide[0] as 0 | 1 | 2;
+    const broken = (game as unknown as { brokenSide: number[] }).brokenSide[0]!;
 
-    game.handlePlayerInput('p0', { kind: 'JUMP_TILE', side: broken }, 0);
-    run(game, players, 0, 1);
+    standOn(players[0]!, 0, broken);
+    run(game, players, 0, 2);
     expect(players[0]!.state.roundState).toBe('OUT');
     for (let side = 0; side < 3; side++) {
       expect(match.bridge!.tiles[tileIndex(0, side)]).toBe(side === broken ? TILE_BROKEN : TILE_SAFE);
     }
-    game.handlePlayerInput('p1', { kind: 'JUMP_TILE', side: broken }, 1.1); // broken: rejected
-    run(game, players, 1.1, 1);
-    expect(players[1]!.state.score).toBe(0);
-    const safe = ((broken + 1) % 3) as 0 | 1 | 2;
-    game.handlePlayerInput('p1', { kind: 'JUMP_TILE', side: safe }, 2.2);
-    run(game, players, 2.2, 1);
+    standOn(players[1]!, 0, (broken + 1) % 3);
+    run(game, players, 2, 0.5);
     expect(players[1]!.state.score).toBe(1);
     expect(players[1]!.state.roundState).toBe('ACTIVE');
   });
 
-  it('ignores actions from players who are out, mid-jump, or spamming', () => {
-    const { ctx, players } = makeContext(1, 3);
+  it('players walk on the start platform and finish on the far platform', () => {
+    const { ctx, players, match } = makeContext(2, 3);
     const game = new GlassBridge();
     game.initialize(ctx);
-    game.handlePlayerInput('p0', { kind: 'JUMP_TILE', side: 1 }, 0);
-    game.handlePlayerInput('p0', { kind: 'JUMP_TILE', side: 0 }, 0.05); // mid-jump: ignored
-    run(game, players, 0, 2);
-    expect(players[0]!.state.score).toBeLessThanOrEqual(1);
-    game.handlePlayerInput('nobody', { kind: 'JUMP_TILE', side: 0 }, 2.1); // unknown id: ignored
+    run(game, players, 0, 1);
+    expect(players[0]!.state.roundState).toBe('ACTIVE'); // standing on the start platform
+    players[1]!.sim.reset(0, bridgeFinishZ(match.bridge!.rows) - 2, Math.PI);
+    run(game, players, 1, 0.2);
+    expect(players[1]!.state.roundState).toBe('FINISHED');
+    expect(game.finish().passed.has('p1')).toBe(true);
   });
 });
 

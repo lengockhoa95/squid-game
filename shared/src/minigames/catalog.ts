@@ -32,13 +32,13 @@ export const MINIGAMES: Readonly<Record<MinigameId, MinigameInfo>> = {
     id: 'GLASS_BRIDGE',
     title: 'Cầu Kính',
     rules: [
-      'Mỗi hàng có 3 tấm kính: 2 an toàn, 1 sẽ vỡ.',
-      'Click tấm kính ở hàng kế tiếp (hoặc A / S / D) để nhảy.',
+      'Mỗi hàng có 3 tấm kính: 2 an toàn, 1 sẽ vỡ khi có người đáp xuống.',
+      'Di chuyển WASD, nhảy (Space) sang hàng kế tiếp — giữa các hàng có khe hở.',
       'Tất cả chơi cùng lúc — chờ người khác thử thì an toàn hơn, nhưng coi chừng hết giờ.',
       'Rơi xuống hoặc không qua cầu kịp giờ sẽ bị loại.',
     ],
     timeLimit: 80,
-    movement: false,
+    movement: true,
     needsEvenPlayers: false,
   },
   OBSTACLE_RACE: {

@@ -74,7 +74,7 @@ docker compose down
 | Minigame | Cách chơi |
 |---|---|
 | Đèn Xanh – Đèn Đỏ | W để chạy khi đèn xanh, thả phím khi đèn đỏ (đường 80m) |
-| Cầu Kính | Mỗi hàng 3 tấm, 1 tấm vỡ. Click tấm kính hàng kế tiếp (A/S/D). Mọi người chơi cùng lúc |
+| Cầu Kính | Mỗi hàng 3 tấm, 1 tấm vỡ khi có người đáp xuống. Đi WASD, nhảy Space sang hàng kế. Mọi người chơi cùng lúc, húc nhau được |
 | Vượt Chướng Ngại | WASD để chạy, Space để nhảy qua hố và tường, né khối đẩy và thanh quét |
 | Sàn Sụp | 3 tầng gạch; ô vừa đứng lên sẽ sụp. Rơi khỏi tầng cuối là thua |
 | Tháp Leo | Nhảy bục xoắn ốc lên đỉnh tháp trước khi dung nham dâng tới |
@@ -127,8 +127,7 @@ hoặc nhấn **F** để dùng ngay tại con trỏ. Chiêu không giới hạn
 | Không gian | Dịch chuyển tức thời tới con trỏ (≤5m) |
 | Bóng tối | Che tối màn hình người gần con trỏ |
 
-Cầu Kính chỉ có Lôi / Hoán đổi / Bóng tối (Hoán đổi = đổi tiến độ với người dẫn đầu). Kéo Co và Phản Xạ Nhanh chỉ có Lôi
-(khoá thao tác của 1 đối thủ) và Bóng tối (che màn hình mọi đối thủ). NPC cũng dùng nguyên tố.
+Mọi minigame đều dùng được cả 9 nguyên tố, trừ những nguyên tố host đã bỏ trong màn chờ. NPC cũng dùng nguyên tố.
 Mỗi nguyên tố đổi ngoại hình nhân vật: hình xăm phát sáng trên ngực, vòng xăm ở hai tay và vật thể nhỏ bay quanh đầu (đá, giọt nước, tia sét…).
 
 ## Điều khiển

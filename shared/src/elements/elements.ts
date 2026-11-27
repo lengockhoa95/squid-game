@@ -71,7 +71,6 @@ export const ELEMENT_FX = {
 } as const;
 
 const ACTION_GAME_ELEMENTS: Partial<Record<MinigameId, readonly ElementId[]>> = {
-  GLASS_BRIDGE: ['THUNDER', 'SWAP', 'DARK'],
 };
 
 /** Elements usable in a minigame. Movement games allow all of them. */
