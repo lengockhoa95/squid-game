@@ -41,6 +41,8 @@ export const PlayerState = schema(
     cards: t.string(),
     cardOffer: t.string(),
     lives: t.uint8(),
+    /** Game-specific speed multiplier (zombies run faster), 1 = normal. */
+    moveMul: t.float32().default(1),
     /** Picked Kenney character id ('' = slot default). */
     character: t.string(),
     /** Double jump used (mirrors CharacterState.airJumped for reconciliation). */
@@ -106,6 +108,14 @@ export const MazeState = schema(
 );
 export type MazeState = InstanceType<typeof MazeState>;
 
+/** Cửa Thần: revealed door states (0 unknown, 1 fake, 2 real), index = row * perRow + door. */
+export const DoorsState = schema({ tiles: t.array('uint8') }, 'DoorsState');
+export type DoorsState = InstanceType<typeof DoorsState>;
+
+/** Sơn Lãnh Thổ: owner of each floor cell (0 = nobody, else slot + 1). */
+export const PaintState = schema({ cells: t.array('uint8') }, 'PaintState');
+export type PaintState = InstanceType<typeof PaintState>;
+
 export const MatchState = schema(
   {
     phase: t.string(),
@@ -137,6 +147,8 @@ export const MatchState = schema(
     bridge: t.ref(BridgeState).optional(),
     collapse: t.ref(CollapseState).optional(),
     maze: t.ref(MazeState).optional(),
+    doors: t.ref(DoorsState).optional(),
+    paint: t.ref(PaintState).optional(),
   },
   'MatchState',
 );

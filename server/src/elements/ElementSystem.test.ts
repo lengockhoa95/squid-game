@@ -212,12 +212,12 @@ describe('host-disabled pools', () => {
 
   it('matches only schedule games the host left on', async () => {
     const { simulateMatch } = await import('../match/simulateMatch.ts');
-    const { MatchState } = await import('@sp/shared/schema');
-    void MatchState;
+    const { MINIGAME_IDS } = await import('@sp/shared');
+    const off = ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE'];
+    const allowed = MINIGAME_IDS.filter((g) => !off.includes(g));
     for (let seed = 1; seed <= 4; seed++) {
-      const r = simulateMatch(seed, ['NORMAL', 'NORMAL', 'HARD'], undefined, true, true, ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE']);
-      expect(new Set(r.games)).toEqual(new Set(['TOWER_CLIMB', 'MAZE', 'PARKOUR'].filter((g) => r.games.includes(g as never))));
-      for (const g of r.games) expect(['TOWER_CLIMB', 'MAZE', 'PARKOUR']).toContain(g);
+      const r = simulateMatch(seed, ['NORMAL', 'NORMAL', 'HARD'], undefined, true, true, off);
+      for (const g of r.games) expect(allowed).toContain(g);
     }
   }, 60000);
 });

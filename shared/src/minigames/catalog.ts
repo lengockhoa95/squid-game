@@ -1,6 +1,6 @@
-export type MinigameId = 'RLGL' | 'GLASS_BRIDGE' | 'OBSTACLE_RACE' | 'FLOOR_COLLAPSE' | 'TOWER_CLIMB' | 'MAZE' | 'PARKOUR';
+export type MinigameId = 'RLGL' | 'GLASS_BRIDGE' | 'OBSTACLE_RACE' | 'FLOOR_COLLAPSE' | 'TOWER_CLIMB' | 'MAZE' | 'PARKOUR' | 'ICE_RACE' | 'LUCKY_DOORS' | 'PAINT' | 'ZOMBIE' | 'ROPE_CLIMB';
 
-export const MINIGAME_IDS: readonly MinigameId[] = ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE', 'TOWER_CLIMB', 'MAZE', 'PARKOUR'];
+export const MINIGAME_IDS: readonly MinigameId[] = ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE', 'TOWER_CLIMB', 'MAZE', 'PARKOUR', 'ICE_RACE', 'LUCKY_DOORS', 'PAINT', 'ZOMBIE', 'ROPE_CLIMB'];
 
 export interface MinigameInfo {
   id: MinigameId;
@@ -103,6 +103,71 @@ export const MINIGAMES: Readonly<Record<MinigameId, MinigameInfo>> = {
       'Về đích chậm nhất hoặc không kịp giờ sẽ bị loại.',
     ],
     timeLimit: 150,
+    movement: true,
+    needsEvenPlayers: false,
+  },
+  ICE_RACE: {
+    id: 'ICE_RACE',
+    title: 'Đua Băng Trơn',
+    rules: [
+      'Đường đua toàn băng: tăng tốc chậm, phanh không ăn, vào cua rất dễ trượt ra ngoài.',
+      'Bắt đầu rẽ sớm trước khúc cua. Cột đá trên đường sẽ làm bạn nảy ra.',
+      'Trượt ra ngoài sẽ quay lại điểm gần nhất.',
+      'Về đích chậm nhất hoặc không kịp giờ sẽ bị loại.',
+    ],
+    timeLimit: 120,
+    movement: true,
+    needsEvenPlayers: false,
+  },
+  LUCKY_DOORS: {
+    id: 'LUCKY_DOORS',
+    title: 'Cửa Thần May Mắn',
+    rules: [
+      'Chạy qua 8 hàng cửa. Mỗi hàng có 4 cửa giống hệt nhau: 2 cửa thật, 2 cửa giả.',
+      'Đâm vào cửa giả sẽ bị bật ngược và choáng — cửa đó lộ ra cho mọi người.',
+      'Cửa có người đi qua sẽ sáng xanh: theo sau người khác thì an toàn hơn.',
+      'Về đích chậm nhất hoặc không kịp giờ sẽ bị loại.',
+    ],
+    timeLimit: 90,
+    movement: true,
+    needsEvenPlayers: false,
+  },
+  PAINT: {
+    id: 'PAINT',
+    title: 'Sơn Lãnh Thổ',
+    rules: [
+      'Đi tới đâu, sàn đổi sang màu của bạn tới đó.',
+      'Giẫm lên ô của người khác là cướp ô đó.',
+      'Hết giờ, ai có ít ô nhất sẽ bị loại.',
+      'Nhảy không tô được — chạy liên tục mới phủ nhiều!',
+    ],
+    timeLimit: 60,
+    movement: true,
+    needsEvenPlayers: false,
+  },
+  ZOMBIE: {
+    id: 'ZOMBIE',
+    title: 'Zombie Lây Lan',
+    rules: [
+      'Sau 2 giây, một người ngẫu nhiên biến thành zombie.',
+      'Zombie chạy nhanh hơn một chút — bị zombie chạm là bạn cũng thành zombie.',
+      'Nấp sau thùng, nhảy qua vật cản, dùng nguyên tố để cắt đuôi.',
+      'Hết giờ còn là người thì qua vòng; zombie bị loại.',
+    ],
+    timeLimit: 60,
+    movement: true,
+    needsEvenPlayers: false,
+  },
+  ROPE_CLIMB: {
+    id: 'ROPE_CLIMB',
+    title: 'Leo Dây Nhện',
+    rules: [
+      'Leo qua 5 cây cầu ván lắc lư để lên bệ cao nhất.',
+      'Ván lắc qua lại theo nhịp — canh ván ở giữa rồi bước.',
+      'Có gió giật ngang từng đợt: ghì phím ngược chiều gió!',
+      'Rơi sẽ quay lại bệ gần nhất. Về chậm nhất hoặc không kịp giờ bị loại.',
+    ],
+    timeLimit: 120,
     movement: true,
     needsEvenPlayers: false,
   },

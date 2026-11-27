@@ -149,6 +149,16 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
 - [x] Đa chạm (vừa đi vừa xoay camera); tâm ngắm luôn hiện; gợi ý cảm ứng thay cho gợi ý bàn phím.
 - [x] Máy tính có màn cảm ứng: dùng chuột thì tự quay về điều khiển chuột.
 
+## Phase 14 — 5 game mới ✅
+
+- [x] **Đua Băng Trơn:** đường uốn khúc, thông số trượt riêng; bot nhìn trước theo độ khó.
+- [x] **Cửa Thần May Mắn:** cửa giả chỉ server biết; client chỉ va chạm với cửa đã lộ.
+- [x] **Sơn Lãnh Thổ:** sàn 24×24 ô, bảng đếm ô trực tiếp.
+- [x] **Zombie Lây Lan:** hệ số tốc độ `moveMul` dùng chung cho dự đoán; đổi thân thành zombie Kenney khi bị lây.
+- [x] **Leo Dây Nhện:** ván lắc theo sóng, gió giật; tính giống nhau trên server và client.
+- [x] Mỗi game có NPC riêng và đã cân bằng bằng `server/scripts/round-check.ts`.
+- [x] Test: 172 unit/integration; E2E chơi thử cả 5 game trên Chrome.
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).

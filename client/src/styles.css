@@ -845,3 +845,9 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
   animation: hint-fade 6s ease-out forwards;
 }
 @keyframes hint-fade { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+.paint-board { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.paint-chip { padding: 4px 10px; border-radius: 10px; background: rgba(13, 15, 26, 0.78); border-left: 6px solid var(--c); font-weight: 700; font-variant-numeric: tabular-nums; }
+.paint-chip.is-me { box-shadow: 0 0 0 2px var(--c); }
+.zombie-role { padding: 8px 18px; border-radius: 999px; font-weight: 900; font-size: 18px; background: rgba(61, 245, 200, 0.85); color: #04221b; }
+.zombie-role.is-zombie { background: rgba(110, 200, 80, 0.92); color: #102008; animation: pulse 0.6s ease-in-out infinite alternate; }
+.game-hud-top { bottom: auto; top: 104px; }

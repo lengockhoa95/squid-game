@@ -3,7 +3,7 @@ import { BRIDGE, RACE, RLGL, TILE_BROKEN, TILE_SAFE, bridgeFinishZ, bridgeRowZ, 
 import { RedLightGreenLight } from '../RedLightGreenLight/Logic.ts';
 import { GlassBridge } from '../GlassBridge/Logic.ts';
 import { ObstacleRace } from '../ObstacleRace/Logic.ts';
-import { makeContext, run } from './helpers.ts';
+import { hold, makeContext, run } from './helpers.ts';
 
 describe('Red Light Green Light', () => {
   it('catches a player who keeps moving after the grace period of a red light', () => {
@@ -264,5 +264,120 @@ describe('Parkour', () => {
     players[1]!.sim.reset(0, PARKOUR.finishZ - 0.5, Math.PI);
     run(game, players, 1, 0.1);
     expect(players[1]!.state.roundState).toBe('FINISHED');
+  });
+});
+
+describe('Ice Race', () => {
+  it('ice has little grip: you keep sliding after letting go', async () => {
+    const { createCharacterState, createIceWorld, iceStep, ICE_MOVEMENT, MOVEMENT } = await import('@sp/shared');
+    expect(ICE_MOVEMENT.decel).toBeLessThan(MOVEMENT.decel / 10);
+    const step = iceStep(createIceWorld());
+    const s = createCharacterState(0, 30);
+    s.vz = -8;
+    for (let i = 0; i < 60; i++) step(s, { dirX: 0, dirZ: 0, jump: false }, 1 / 60, 0);
+    expect(Math.abs(s.vz)).toBeGreaterThan(5); // still sliding a second later
+  });
+
+  it('progress follows the track; falling respawns on the track', async () => {
+    const { IceRace } = await import('../IceRace/Logic.ts');
+    const { ICE, iceProgress } = await import('@sp/shared');
+    expect(iceProgress(0, 34)).toBeCloseTo(0, 5);
+    expect(iceProgress(24, 2)).toBeCloseTo(32 + 24, 5);
+    const { ctx, players } = makeContext(1);
+    const game = new IceRace();
+    game.initialize(ctx);
+    players[0]!.sim.state.y = ICE.killY - 1;
+    run(game, players, 0, 1 / 60);
+    expect(players[0]!.sim.state.y).toBe(0);
+  });
+});
+
+describe('Lucky Doors', () => {
+  it('fake doors bounce you back and get revealed; real doors let you through', async () => {
+    const { LuckyDoors } = await import('../LuckyDoors/Logic.ts');
+    const { DOORS, DOOR_FAKE, DOOR_REAL, doorRowZ, doorX } = await import('@sp/shared');
+    const { ctx, players, match } = makeContext(2);
+    const game = new LuckyDoors();
+    game.initialize(ctx);
+    const real = (game as unknown as { real: boolean[][] }).real[0]!;
+    expect(real.filter(Boolean)).toHaveLength(DOORS.realPerRow);
+    const fakeK = real.indexOf(false);
+    const realK = real.indexOf(true);
+    const [a, b] = players as [typeof players[0], typeof players[0]];
+    a.sim.reset(doorX(fakeK), doorRowZ(0) + 1, Math.PI);
+    b.sim.reset(doorX(realK), doorRowZ(0) + 1, Math.PI);
+    hold(a, 0, -1, 1);
+    hold(b, 0, -1, 1);
+    run(game, players, 0, 1);
+    expect(match.doors!.tiles[fakeK]).toBe(DOOR_FAKE);
+    expect(a.sim.state.z).toBeGreaterThan(doorRowZ(0)); // still in front of the wall
+    expect(match.doors!.tiles[realK]).toBe(DOOR_REAL);
+    expect(b.state.score).toBe(1);
+  });
+});
+
+describe('Paint', () => {
+  it('walking paints cells; stepping on a rival cell steals it; fewest cells fails', async () => {
+    const { Paint } = await import('../Paint/Logic.ts');
+    const { paintCellAt } = await import('@sp/shared');
+    const { ctx, players, match } = makeContext(2);
+    const game = new Paint();
+    game.initialize(ctx);
+    for (let i = 0; i < 90; i++) {
+      hold(players[0]!, 1, 0, 1 / 60); // one input per tick, like a client
+      run(game, players, i / 60, 1 / 60);
+    }
+    expect(players[0]!.state.score).toBeGreaterThan(4);
+    const cell = paintCellAt(players[0]!.sim.state.x, players[0]!.sim.state.z);
+    expect(match.paint!.cells[cell]).toBe(players[0]!.state.slot + 1);
+    players[1]!.sim.reset(players[0]!.sim.state.x, players[0]!.sim.state.z, 0);
+    run(game, players, 1.5, 0.1);
+    expect(match.paint!.cells[cell]).toBe(players[1]!.state.slot + 1);
+    const outcome = game.finish();
+    expect(outcome.passed.size).toBe(1);
+    expect(outcome.passed.has(outcome.ranking[0]!)).toBe(true);
+  });
+});
+
+describe('Zombie', () => {
+  it('patient zero appears, touching infects, survivors pass', async () => {
+    const { ZombieInfection } = await import('../Zombie/Logic.ts');
+    const { TEAM_ZOMBIE, ZOMBIE } = await import('@sp/shared');
+    const { ctx, players } = makeContext(3);
+    const game = new ZombieInfection();
+    game.initialize(ctx);
+    run(game, players, 0, ZOMBIE.outbreakAt + 0.1);
+    const zombies = players.filter((p) => p.state.team === TEAM_ZOMBIE);
+    expect(zombies).toHaveLength(1);
+    expect(zombies[0]!.state.moveMul).toBeCloseTo(ZOMBIE.speedMul, 5);
+    const z = zombies[0]!;
+    const victim = players.find((p) => p !== z)!;
+    victim.sim.reset(z.sim.state.x + 0.5, z.sim.state.z, 0);
+    run(game, players, ZOMBIE.outbreakAt + ZOMBIE.infectCooldown + 0.2, 0.1);
+    expect(victim.state.team).toBe(TEAM_ZOMBIE);
+    const outcome = game.finish();
+    const survivor = players.find((p) => p.state.team !== TEAM_ZOMBIE)!;
+    expect([...outcome.passed]).toEqual([survivor.id]);
+  });
+});
+
+describe('Rope Climb', () => {
+  it('planks sway with time, gusts push sideways, falls respawn on the highest station reached', async () => {
+    const { RopeClimb } = await import('../RopeClimb/Logic.ts');
+    const { ROPE, plankOffset, windAt, stationCenter } = await import('@sp/shared');
+    expect(plankOffset(0, 3, 0)).not.toBeCloseTo(plankOffset(0, 3, 1), 2);
+    const gusts = Array.from({ length: 120 }, (_, i) => windAt(i / 10)).filter((w) => Math.abs(w) > 0.5);
+    expect(gusts.length).toBeGreaterThan(0);
+    const { ctx, players } = makeContext(2);
+    const game = new RopeClimb();
+    game.initialize(ctx);
+    const c = stationCenter(2);
+    players[0]!.sim.reset(c.x, c.z, Math.PI);
+    players[0]!.sim.state.y = c.y;
+    run(game, players, 0, 0.1);
+    expect(players[0]!.state.score).toBe(2);
+    players[0]!.sim.state.y = ROPE.killY - 1;
+    run(game, players, 0.1, 1 / 60);
+    expect(players[0]!.sim.state.z).toBeCloseTo(c.z, 1);
   });
 });

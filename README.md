@@ -43,7 +43,7 @@ Mở http://localhost:5173 → nhập tên → **Tạo phòng** (hoặc **Sân t
 | `PORT` | server | `2567` | Cổng Colyseus |
 | `VITE_SERVER_URL` | client (lúc build) | `http(s)://<host đang mở trang>:2567` | Địa chỉ server khi deploy khác máy/cổng |
 | `COLYSEUS_LATENCY` | server | – | Giả lập độ trễ (ms) để thử prediction |
-| `SP_GAMES` | server | – (tất cả) | Chỉ chơi các minigame này khi test, ví dụ `SP_GAMES=MAZE,PARKOUR` (RLGL, GLASS_BRIDGE, OBSTACLE_RACE, FLOOR_COLLAPSE, TOWER_CLIMB, MAZE, PARKOUR) |
+| `SP_GAMES` | server | – (tất cả) | Chỉ chơi các minigame này khi test, ví dụ `SP_GAMES=MAZE,PARKOUR` (RLGL, GLASS_BRIDGE, OBSTACLE_RACE, FLOOR_COLLAPSE, TOWER_CLIMB, MAZE, PARKOUR, ICE_RACE, LUCKY_DOORS, PAINT, ZOMBIE, ROPE_CLIMB) |
 
 ## Chạy bằng Docker
 
@@ -80,6 +80,11 @@ docker compose down
 | Tháp Leo | Nhảy bục xoắn ốc lên đỉnh tháp trước khi dung nham dâng tới |
 | Mê Cung | Tìm cổng ra, Minotaur được thả sau 5 giây và đuổi theo, ngày càng nhanh |
 | Parkour | Đá nhảy, rào, cầu thăng bằng, bệ bật, búa trượt, băng chuyền, thanh quét, bục di động |
+| Đua Băng Trơn | Đường đua uốn khúc trên băng: tăng tốc chậm, phanh không ăn, cua dễ trượt ra ngoài |
+| Cửa Thần May Mắn | 8 hàng cửa, mỗi hàng 2 thật 2 giả; đâm cửa giả bị bật ngược, cửa lộ ra cho người sau |
+| Sơn Lãnh Thổ | Đi tới đâu sàn đổi màu mình tới đó, cướp ô người khác; ít ô nhất bị loại |
+| Zombie Lây Lan | 1 người hoá zombie, chạm ai lây người đó (đổi luôn thành nhân vật zombie); hết giờ còn là người thì qua |
+| Leo Dây Nhện | Cầu ván lắc lư nối các bệ cao dần, gió giật ngang từng đợt |
 
 Mỗi người chọn nhân vật trong màn chờ (20 nhân vật [Kenney Mini Characters](https://kenney.nl/assets/mini-characters-1), CC0 — cảm ơn Kenney); NPC tự lấy nhân vật chưa ai chọn. Tên người chơi hiện trên đầu nhân vật.
 

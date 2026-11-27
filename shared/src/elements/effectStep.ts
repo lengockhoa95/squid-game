@@ -20,6 +20,8 @@ export interface ElementStatus {
   hasteUntil: number;
   /** Card levels, synced as "BUNNY:2,SPEED:1" (movement cards apply in the step). */
   cards: string;
+  /** Game-specific speed multiplier (e.g. zombies), 1 = normal. */
+  moveMul?: number;
 }
 
 export function createElementField(): ElementField {
@@ -62,9 +64,10 @@ export function effectStep(base: StepFn, field: ElementField, status: ElementSta
           s.airJumped = true;
         }
       }
-      if (mods.speedMul !== 1 && mul > 0) {
-        s.x += s.vx * dt * (mods.speedMul - 1);
-        s.z += s.vz * dt * (mods.speedMul - 1);
+      const speedMul = mods.speedMul * (status.moveMul || 1);
+      if (speedMul !== 1 && mul > 0) {
+        s.x += s.vx * dt * (speedMul - 1);
+        s.z += s.vz * dt * (speedMul - 1);
       }
       resolvePillars(s, field, t);
       if (field.bodies.length > 0) pushOutOfBodies(s, field.bodies);

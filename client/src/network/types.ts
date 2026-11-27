@@ -33,6 +33,7 @@ export interface NetPlayer {
   readonly lives: number;
   readonly airJumped: boolean;
   readonly character: string;
+  readonly moveMul: number;
 }
 
 /** What networked scenes/HUDs need from the session — keeps them SDK-agnostic. */

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  CARDS, ELEMENTS, INPUT_BATCH, parseCards, SLOT_LOOKS, effectStep, isElementId, type MinigameId, type MoveBatch, type QualityPreset, type StepFn,
+  CARDS, ELEMENTS, INPUT_BATCH, TEAM_ZOMBIE, characterFor, parseCards, SLOT_LOOKS, effectStep, isElementId, type MinigameId, type MoveBatch, type QualityPreset, type StepFn,
 } from '@sp/shared';
 import type { CameraPreset, ClickHit, FrameInput, GameScene, SceneContext } from '../../core/GameScene.ts';
 import { ResourceTracker } from '../../core/ResourceTracker.ts';
@@ -9,6 +9,7 @@ import { createCharacterBody } from '../../player/characters.ts';
 import { FIXED_DT, PlayerController } from '../../player/PlayerController.ts';
 import { ClickMarker } from '../../player/ClickMarker.ts';
 import { NameTag } from '../../player/NameTag.ts';
+import { audio } from '../../audio/AudioManager.ts';
 import { LocalPredictor } from '../../player/LocalPredictor.ts';
 import { RemoteInterpolator, createSample } from '../../player/RemoteInterpolator.ts';
 import type { MatchNetAdapter, NetPlayer } from '../../network/types.ts';
@@ -26,6 +27,8 @@ interface Actor {
   generation: number;
   /** Nickname above the head (none for the local player). */
   tag: NameTag | null;
+  /** Character model currently shown. */
+  character: string;
 }
 
 /**
@@ -347,11 +350,37 @@ class MatchScene implements GameScene {
     }
   }
 
+  /** Which character to show: zombies in "Zombie Lây Lan" turn into the zombie, otherwise the player's pick. */
+  private shownCharacter(p: NetPlayer): string {
+    const state = this.net.getState();
+    if (state?.currentGame === 'ZOMBIE' && p.team === TEAM_ZOMBIE && this.net.getPhase() !== 'LOBBY') return 'character-zombie';
+    return characterFor(p.character, p.slot);
+  }
+
   private ensureActor(p: NetPlayer, gen: number): Actor {
     let a = this.actors.get(p.id);
+    const character = this.shownCharacter(p);
+    if (a && a.character !== character) {
+      // Swap the body (e.g. infected): keep position, tag and interpolation history.
+      const old = a.model;
+      const model = createCharacterBody(this.ctx.materials, p.slot, character);
+      model.group.position.copy(old.group.position);
+      model.group.rotation.y = old.group.rotation.y;
+      model.group.visible = old.group.visible;
+      this.root.add(model.group);
+      if (a.tag) a.tag.attach(model.group, model.tagHeight);
+      old.dispose();
+      a.model = model;
+      a.character = character;
+      if (p.id === this.net.localId && this.local) {
+        this.local = null; // rebuilt around the new body on this snapshot
+        this.predictor.clear();
+      }
+      if (character === 'character-zombie') audio.play('out', 0.12);
+    }
     if (!a) {
       const look = SLOT_LOOKS[p.slot] ?? SLOT_LOOKS[0]!;
-      const model = createCharacterBody(this.ctx.materials, p.slot, p.character);
+      const model = createCharacterBody(this.ctx.materials, p.slot, character);
       model.group.position.set(p.x, p.y, p.z);
       this.root.add(model.group);
       let tag: NameTag | null = null;
@@ -359,7 +388,7 @@ class MatchScene implements GameScene {
         tag = new NameTag(p.nickname, look.color);
         tag.attach(model.group, model.tagHeight);
       }
-      a = { model, interp: new RemoteInterpolator(), generation: gen, tag };
+      a = { model, interp: new RemoteInterpolator(), generation: gen, tag, character };
       this.actors.set(p.id, a);
     }
     a.generation = gen;

@@ -43,4 +43,9 @@ export const VIEW_LOADERS: Readonly<Record<MinigameId, () => Promise<ViewFactory
   TOWER_CLIMB: () => import('../TowerClimb/View.ts').then((m) => m.createView),
   MAZE: () => import('../Maze/View.ts').then((m) => m.createView),
   PARKOUR: () => import('../Parkour/View.ts').then((m) => m.createView),
+  ICE_RACE: () => import('../IceRace/View.ts').then((m) => m.createView),
+  LUCKY_DOORS: () => import('../LuckyDoors/View.ts').then((m) => m.createView),
+  PAINT: () => import('../Paint/View.ts').then((m) => m.createView),
+  ZOMBIE: () => import('../Zombie/View.ts').then((m) => m.createView),
+  ROPE_CLIMB: () => import('../RopeClimb/View.ts').then((m) => m.createView),
 };

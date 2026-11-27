@@ -16,6 +16,16 @@ import { MazeRun } from '../Maze/Logic.ts';
 import { MazeStrategy } from '../Maze/NPCStrategy.ts';
 import { Parkour } from '../Parkour/Logic.ts';
 import { ParkourStrategy } from '../Parkour/NPCStrategy.ts';
+import { IceRace } from '../IceRace/Logic.ts';
+import { IceStrategy } from '../IceRace/NPCStrategy.ts';
+import { LuckyDoors } from '../LuckyDoors/Logic.ts';
+import { DoorsStrategy } from '../LuckyDoors/NPCStrategy.ts';
+import { Paint } from '../Paint/Logic.ts';
+import { PaintStrategy } from '../Paint/NPCStrategy.ts';
+import { ZombieInfection } from '../Zombie/Logic.ts';
+import { ZombieStrategy } from '../Zombie/NPCStrategy.ts';
+import { RopeClimb } from '../RopeClimb/Logic.ts';
+import { RopeStrategy } from '../RopeClimb/NPCStrategy.ts';
 
 export interface MinigameBundle {
   game: ServerMinigame;
@@ -35,6 +45,20 @@ export const MINIGAME_FACTORIES: Partial<Record<MinigameId, MinigameFactory>> = 
     return { game, strategy: new BridgeStrategy(game, match) };
   },
   OBSTACLE_RACE: () => ({ game: new ObstacleRace(), strategy: new RaceStrategy() }),
+  ICE_RACE: () => ({ game: new IceRace(), strategy: new IceStrategy() }),
+  ROPE_CLIMB: () => ({ game: new RopeClimb(), strategy: new RopeStrategy() }),
+  ZOMBIE: () => {
+    const game = new ZombieInfection();
+    return { game, strategy: new ZombieStrategy(game) };
+  },
+  PAINT: () => {
+    const game = new Paint();
+    return { game, strategy: new PaintStrategy(game) };
+  },
+  LUCKY_DOORS: () => {
+    const game = new LuckyDoors();
+    return { game, strategy: new DoorsStrategy(game) };
+  },
   PARKOUR: () => {
     const game = new Parkour();
     return { game, strategy: new ParkourStrategy(game) };
