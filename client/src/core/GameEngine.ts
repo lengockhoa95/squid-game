@@ -12,6 +12,8 @@ import type { MatchNetAdapter } from '../network/types.ts';
 export interface EngineOptions {
   quality: QualityLevel;
   fpsCap: FpsCap;
+  /** Shooter-style camera: click captures the mouse, moving it turns the camera. */
+  mouseLook: boolean;
   /** Called ~4 times per second, never every frame. */
   onStats(stats: Readonly<RenderStats>, entities: number): void;
   onToggleDebug(): void;
@@ -89,6 +91,10 @@ export class GameEngine {
     this.render.setFpsCap(cap);
   }
 
+  setMouseLook(enabled: boolean): void {
+    this.opts.mouseLook = enabled;
+  }
+
   static defaultFpsCap(level: QualityLevel): FpsCap {
     return QUALITY_PRESETS[level].fpsCap;
   }
@@ -112,6 +118,7 @@ export class GameEngine {
     this.frameInput.keyDirZ = this.dir.z;
     this.camera.rotateByKeys(this.input.getKeyRotate(), dt);
 
+    this.input.setPointerLockAllowed(this.opts.mouseLook && scene.wantsPointerLock?.() === true);
     scene.update(dt, this.frameInput);
     const preset = scene.takeCameraPreset?.();
     if (preset) this.camera.applyPreset(preset);

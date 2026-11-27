@@ -710,3 +710,36 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
   background: rgba(255, 255, 255, 0.12);
 }
 .pool-chip.is-on .pool-check { background: var(--el, var(--neon)); }
+
+/* Mouse look (pointer lock) */
+.game-host.is-locked { cursor: none; }
+.game-host.is-locked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 35%; /* matches CROSSHAIR_NDC_Y = 0.3 */
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background:
+    linear-gradient(#fff, #fff) center / 2px 8px no-repeat,
+    linear-gradient(#fff, #fff) center / 8px 2px no-repeat;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.mouselook-hint {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(13, 15, 26, 0.75);
+  color: var(--text);
+  font-size: 14px;
+  pointer-events: none;
+  text-align: center;
+  max-width: calc(100% - 24px);
+}

@@ -126,6 +126,12 @@ class MatchScene implements GameScene {
     }
   }
 
+  wantsPointerLock(): boolean {
+    if (this.net.getPhase() !== 'ROUND_PLAYING' || !this.view?.step) return false;
+    const me = this.localPlayer();
+    return !!me && me.alive && me.roundState === 'ACTIVE';
+  }
+
   getCameraTarget(): Readonly<THREE.Vector3> {
     return this.cameraTarget;
   }

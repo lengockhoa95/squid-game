@@ -16,6 +16,9 @@ const FORWARD_KEYS = ['KeyW', 'ArrowUp'];
 const BACK_KEYS = ['KeyS', 'ArrowDown'];
 const LEFT_KEYS = ['KeyA', 'ArrowLeft'];
 const RIGHT_KEYS = ['KeyD', 'ArrowRight'];
+/** Crosshair height in NDC while the mouse is captured (over-the-shoulder: above the character). */
+export const CROSSHAIR_NDC_Y = 0.3;
+
 const GAME_KEYS = new Set([
   ...FORWARD_KEYS, ...BACK_KEYS, ...LEFT_KEYS, ...RIGHT_KEYS,
   'Space', 'KeyQ', 'KeyE', 'KeyX', 'KeyF', 'F3', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract',
@@ -43,8 +46,10 @@ export class InputManager {
   private rightTotalDy = 0;
   private rightDragging = false;
   private enabled = true;
-  /** Last pointer position over the view in NDC (for "cast at cursor"). */
+  /** Last pointer position over the view in NDC (for "cast at cursor"); the screen centre while locked. */
   readonly pointer = { x: 0, y: 0, valid: false };
+  /** Shooter-style mouse look: the engine allows it only while the scene wants it (e.g. playing). */
+  private pointerLockAllowed = false;
 
   constructor(host: HTMLElement, handlers: InputHandlers) {
     this.host = host;
@@ -58,6 +63,18 @@ export class InputManager {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', this.onBlur);
+    document.addEventListener('pointerlockchange', this.onLockChange);
+  }
+
+  /** True while the mouse is captured for camera control. */
+  get locked(): boolean {
+    return document.pointerLockElement === this.host;
+  }
+
+  /** Allow / forbid mouse look; forbidding releases a held lock (so menus can be clicked). */
+  setPointerLockAllowed(allowed: boolean): void {
+    this.pointerLockAllowed = allowed;
+    if (!allowed && this.locked) document.exitPointerLock();
   }
 
   setEnabled(enabled: boolean): void {
@@ -91,6 +108,8 @@ export class InputManager {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
+    document.removeEventListener('pointerlockchange', this.onLockChange);
+    if (this.locked) document.exitPointerLock();
     this.reset();
   }
 
@@ -117,6 +136,21 @@ export class InputManager {
   private readonly onPointerDown = (e: PointerEvent): void => {
     const onView = e.target === this.host || e.target instanceof HTMLCanvasElement;
     if (!this.enabled || !onView) return;
+    if (this.locked) {
+      // Mouse look: left click acts at the crosshair (screen centre), right click cancels aiming.
+      if (e.button === 0) this.handlers.onGroundPoint(0, CROSSHAIR_NDC_Y);
+      else if (e.button === 2) this.handlers.onStop();
+      return;
+    }
+    if (e.button === 0 && this.pointerLockAllowed) {
+      // First click captures the mouse (it does not cast).
+      try {
+        void Promise.resolve(this.host.requestPointerLock()).catch(() => undefined);
+      } catch {
+        // pointer lock unsupported: keep the classic controls
+      }
+      return;
+    }
     if (e.button === 0) {
       this.leftDown = true;
       this.host.setPointerCapture(e.pointerId);
@@ -133,6 +167,10 @@ export class InputManager {
   };
 
   private readonly onPointerMove = (e: PointerEvent): void => {
+    if (this.locked) {
+      if (this.enabled) this.handlers.onCameraRotate(e.movementX, e.movementY);
+      return;
+    }
     const rect = this.host.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
       this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -198,5 +236,15 @@ export class InputManager {
 
   private readonly onBlur = (): void => {
     this.reset();
+  };
+
+  private readonly onLockChange = (): void => {
+    const locked = this.locked;
+    this.host.classList.toggle('is-locked', locked);
+    if (locked) {
+      this.pointer.x = 0;
+      this.pointer.y = CROSSHAIR_NDC_Y;
+      this.pointer.valid = true;
+    }
   };
 }

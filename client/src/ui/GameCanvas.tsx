@@ -17,6 +17,7 @@ export function GameCanvas({ loader }: { loader: SceneLoader }) {
     const engine = new GameEngine(host, {
       quality: initial.quality,
       fpsCap: initial.fpsCap,
+      mouseLook: initial.mouseLook,
       onStats: (stats, entities) => debugStore.set({ stats: { ...stats }, entities }),
       onToggleDebug: () => debugStore.set({ visible: !debugStore.get().visible }),
     });
@@ -24,6 +25,7 @@ export function GameCanvas({ loader }: { loader: SceneLoader }) {
       const s = settingsStore.get();
       engine.setQuality(s.quality);
       engine.setFpsCap(s.fpsCap);
+      engine.setMouseLook(s.mouseLook);
     });
     let cancelled = false;
     void engine.loadScene(loader).then((ok) => {

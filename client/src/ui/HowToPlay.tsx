@@ -14,9 +14,9 @@ const TABS: ReadonlyArray<[Tab, string]> = [
 const CONTROLS: ReadonlyArray<[action: string, keys: string, mouse: string]> = [
   ['Di chuyển', 'WASD / mũi tên', '—'],
   ['Nhảy', 'Space', '—'],
-  ['Xoay camera', 'Q / E', 'Giữ chuột phải + kéo'],
+  ['Xoay camera', 'Q / E', 'Click vào màn hình để khoá chuột rồi rê chuột (như game bắn súng) · Esc để thả'],
   ['Zoom', '+ / −', 'Lăn con lăn'],
-  ['Dùng nguyên tố', 'F (dùng tại con trỏ)', 'Click trái xuống chỗ muốn dùng — hoặc click nút nguyên tố góc phải dưới'],
+  ['Dùng nguyên tố', 'F', 'Click trái: dùng tại tâm ngắm (rê chuột lên/xuống để ngắm xa/gần)'],
   ['Huỷ ngắm', '—', 'Nhấp chuột phải'],
   ['Chọn nguyên tố / thẻ kỹ năng', '—', 'Click vào ô / thẻ muốn chọn'],
   ['Cầu Kính', 'A / S / D (trái / giữa / phải)', 'Click vào tấm kính hàng kế tiếp'],
@@ -89,7 +89,7 @@ export function HowToPlay() {
 function Controls() {
   return (
     <>
-      <p className="howto-lead"><b>Bàn phím để di chuyển</b>, <b>chuột để dùng nguyên tố và chọn kỹ năng</b>.</p>
+      <p className="howto-lead"><b>Bàn phím để di chuyển</b>, <b>chuột để xoay camera, dùng nguyên tố và chọn kỹ năng</b>. Không thích khoá chuột? Vào Cài đặt → "Xoay camera bằng chuột" → Giữ chuột phải.</p>
       <table className="howto-table">
         <thead>
           <tr><th>Việc</th><th>Bàn phím</th><th>Chuột</th></tr>
@@ -109,7 +109,7 @@ function Elements() {
     <>
       <ol className="howto-steps">
         <li><b>Chọn:</b> lúc hiện luật mỗi vòng, click 1 nguyên tố ở hàng dưới màn hình (không chọn thì được random).</li>
-        <li><b>Dùng:</b> khi chơi, <b>click chuột trái xuống chỗ muốn dùng</b> (chiêu cho bản thân thì click đâu cũng được). Cầu Kính / Kéo Co / Phản Xạ: click nút nguyên tố ở góc phải dưới.</li>
+        <li><b>Dùng:</b> khi chơi, <b>click chuột trái</b> — chiêu bay tới chỗ tâm ngắm chỉ (rê chuột để ngắm). Chiêu cho bản thân thì click lúc nào cũng được. Cầu Kính: click nút nguyên tố ở góc phải dưới.</li>
         <li><b>Hồi chiêu:</b> dùng không giới hạn, nút hiện số giây chờ. Nhân vật mang hình xăm theo nguyên tố đã chọn.</li>
       </ol>
       <ul className="howto-grid">

@@ -6,19 +6,21 @@ export interface Settings {
   quality: QualityLevel;
   fpsCap: FpsCap;
   sound: boolean;
+  /** Shooter-style mouse look (pointer lock) in movement games. */
+  mouseLook: boolean;
 }
 
 const KEY = 'sp.settings.v1';
 
 function load(): Settings {
-  const fallback: Settings = { quality: 'MEDIUM', fpsCap: QUALITY_PRESETS.MEDIUM.fpsCap, sound: true };
+  const fallback: Settings = { quality: 'MEDIUM', fpsCap: QUALITY_PRESETS.MEDIUM.fpsCap, sound: true, mouseLook: true };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<Settings>;
     const quality = QUALITY_LEVELS.includes(parsed.quality as QualityLevel) ? (parsed.quality as QualityLevel) : fallback.quality;
     const fpsCap: FpsCap = parsed.fpsCap === 30 ? 30 : parsed.fpsCap === 60 ? 60 : QUALITY_PRESETS[quality].fpsCap;
-    return { quality, fpsCap, sound: parsed.sound !== false };
+    return { quality, fpsCap, sound: parsed.sound !== false, mouseLook: parsed.mouseLook !== false };
   } catch {
     return fallback;
   }

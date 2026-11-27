@@ -44,6 +44,8 @@ export interface GameScene {
   takeCameraPreset?(): CameraPreset | null;
   onStop(): void;
   onJump(): void;
+  /** True while shooter-style mouse look makes sense (e.g. walking around in a round). */
+  wantsPointerLock?(): boolean;
   /** Cast key pressed: `hit` is the ground point under the cursor (null if unknown). */
   onCastAt?(hit: ClickHit | null): void;
   applyQuality(p: QualityPreset): void;

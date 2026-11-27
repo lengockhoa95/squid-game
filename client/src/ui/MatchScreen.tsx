@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { settingsStore } from '../store/settings.ts';
 import { MINIGAMES, vi, type MinigameId } from '@sp/shared';
 import { matchSceneLoader } from '../core/GameEngine.ts';
 import { network } from '../network/NetworkManager.ts';
@@ -56,6 +57,24 @@ function PhaseLayer({ net }: { net: MatchNetAdapter }) {
   }
 }
 
+/** "Click to capture the mouse" hint while mouse look is available but not active. */
+function MouseLookHint({ movement }: { movement: boolean }) {
+  const enabled = useStore(settingsStore, (s) => s.mouseLook);
+  const playing = useStore(sessionStore, (s) => s.phase === 'ROUND_PLAYING');
+  const active = useStore(sessionStore, (s) => {
+    const me = s.players.find((p) => p.id === s.myId);
+    return !!me && me.alive && me.roundState === 'ACTIVE';
+  });
+  const [locked, setLocked] = useState(() => document.pointerLockElement !== null);
+  useEffect(() => {
+    const on = () => setLocked(document.pointerLockElement !== null);
+    document.addEventListener('pointerlockchange', on);
+    return () => document.removeEventListener('pointerlockchange', on);
+  }, []);
+  if (!enabled || !movement || !playing || !active || locked) return null;
+  return <div className="mouselook-hint">{vi.mouseLookHint}</div>;
+}
+
 export function MatchScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const roomCode = useStore(sessionStore, (s) => s.roomCode);
@@ -88,6 +107,7 @@ export function MatchScreen() {
       <AnnounceBanner />
       <DebugOverlay />
       {movement && playing && <ControlsHint />}
+      <MouseLookHint movement={movement} />
     </div>
   );
 }

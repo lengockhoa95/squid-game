@@ -9,6 +9,7 @@ export function SettingsPanel() {
   const quality = useStore(settingsStore, (s) => s.quality);
   const fpsCap = useStore(settingsStore, (s) => s.fpsCap);
   const sound = useStore(settingsStore, (s) => s.sound);
+  const mouseLook = useStore(settingsStore, (s) => s.mouseLook);
 
   return (
     <div className="settings">
@@ -42,6 +43,13 @@ export function SettingsPanel() {
         <div className="segmented">
           <button type="button" className={sound ? 'active' : ''} onClick={() => settingsStore.set({ sound: true })}>{vi.soundOn}</button>
           <button type="button" className={!sound ? 'active' : ''} onClick={() => settingsStore.set({ sound: false })}>{vi.soundOff}</button>
+        </div>
+      </div>
+      <div className="field">
+        <span className="field-label">{vi.mouseLook}</span>
+        <div className="segmented">
+          <button type="button" className={mouseLook ? 'active' : ''} onClick={() => settingsStore.set({ mouseLook: true })}>{vi.mouseLookOn}</button>
+          <button type="button" className={!mouseLook ? 'active' : ''} onClick={() => settingsStore.set({ mouseLook: false })}>{vi.mouseLookOff}</button>
         </div>
       </div>
     </div>
