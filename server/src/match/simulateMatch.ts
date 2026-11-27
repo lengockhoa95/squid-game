@@ -52,7 +52,7 @@ export function simulateMatch(
     for (const e of state.effects) {
       if (e.id > lastEffect) {
         lastEffect = e.id;
-        casts++;
+        if (e.kind !== 'RESCUE' && e.kind !== 'BUMP') casts++; // card effects, not element casts
       }
     }
     phasesSeen.add(state.phase);

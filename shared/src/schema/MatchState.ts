@@ -93,12 +93,9 @@ export type RlglState = InstanceType<typeof RlglState>;
 export const BridgeState = schema({ rows: t.uint8(), tiles: t.array('uint8') }, 'BridgeState');
 export type BridgeState = InstanceType<typeof BridgeState>;
 
-/** Rope position in [-1, 1]: -1 = team 0 wins, +1 = team 1 wins. */
-export const TugState = schema({ rope: t.float32() }, 'TugState');
-export type TugState = InstanceType<typeof TugState>;
-
-export const ReactionState = schema({ stage: t.string(), attempt: t.uint8() }, 'ReactionState');
-export type ReactionState = InstanceType<typeof ReactionState>;
+/** Sàn Sụp tile states (0 solid, 1 cracking, 2 gone), index = (layer*rows + row)*cols + col. */
+export const CollapseState = schema({ tiles: t.array('uint8') }, 'CollapseState');
+export type CollapseState = InstanceType<typeof CollapseState>;
 
 export const MatchState = schema(
   {
@@ -126,8 +123,7 @@ export const MatchState = schema(
     effects: t.array(ElementEffect),
     rlgl: t.ref(RlglState).optional(),
     bridge: t.ref(BridgeState).optional(),
-    tug: t.ref(TugState).optional(),
-    reaction: t.ref(ReactionState).optional(),
+    collapse: t.ref(CollapseState).optional(),
   },
   'MatchState',
 );

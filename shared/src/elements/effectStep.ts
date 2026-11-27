@@ -7,8 +7,9 @@ import { ELEMENT_FX } from './elements.ts';
 
 /** Area effects that change movement. Server owns the real list; clients mirror it from the synced state. */
 export interface ElementField {
-  pillars: Array<{ x: number; z: number; until: number }>;
-  puddles: Array<{ x: number; z: number; until: number; owner: string }>;
+  /** `y` = height of the floor the effect was placed on (multi-level maps). */
+  pillars: Array<{ x: number; y: number; z: number; until: number }>;
+  puddles: Array<{ x: number; y: number; z: number; until: number; owner: string }>;
   /** Client prediction only: other characters as static obstacles (the server collides pairs itself). */
   bodies: Array<{ x: number; y: number; z: number }>;
 }
@@ -74,10 +75,9 @@ export function effectStep(base: StepFn, field: ElementField, status: ElementSta
 }
 
 function inPuddle(s: CharacterState, field: ElementField, selfId: string, t: number): boolean {
-  if (s.y > 0.5) return false;
   const r2 = ELEMENT_FX.puddleRadius * ELEMENT_FX.puddleRadius;
   for (const p of field.puddles) {
-    if (t >= p.until || p.owner === selfId) continue;
+    if (t >= p.until || p.owner === selfId || Math.abs(s.y - p.y) > 0.5) continue;
     const dx = s.x - p.x;
     const dz = s.z - p.z;
     if (dx * dx + dz * dz < r2) return true;
@@ -89,7 +89,7 @@ function inPuddle(s: CharacterState, field: ElementField, selfId: string, t: num
 export function resolvePillars(s: CharacterState, field: ElementField, t: number): void {
   const minD = ELEMENT_FX.pillarRadius + MOVEMENT.radius;
   for (const p of field.pillars) {
-    if (t >= p.until || s.y >= ELEMENT_FX.pillarHeight) continue;
+    if (t >= p.until || s.y >= p.y + ELEMENT_FX.pillarHeight || s.y < p.y - 1) continue;
     let dx = s.x - p.x;
     let dz = s.z - p.z;
     const d2 = dx * dx + dz * dz;

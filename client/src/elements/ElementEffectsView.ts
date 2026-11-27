@@ -67,8 +67,8 @@ export class ElementEffectsView {
     this.field.pillars.length = 0;
     this.field.puddles.length = 0;
     state.effects.forEach((e) => {
-      if (e.kind === 'PILLAR') this.field.pillars.push({ x: e.x, z: e.z, until: e.until });
-      else if (e.kind === 'PUDDLE') this.field.puddles.push({ x: e.x, z: e.z, until: e.until, owner: e.owner });
+      if (e.kind === 'PILLAR') this.field.pillars.push({ x: e.x, y: e.y, z: e.z, until: e.until });
+      else if (e.kind === 'PUDDLE') this.field.puddles.push({ x: e.x, y: e.y, z: e.z, until: e.until, owner: e.owner });
     });
   }
 
@@ -158,6 +158,7 @@ export class ElementEffectsView {
         return { object: g, kind: e.kind };
       }
       case 'WIND':
+      case 'BUMP':
         return { object: new THREE.Mesh(this.geo.ring, this.mat.wind), kind: e.kind };
       case 'DARK':
         return { object: new THREE.Mesh(this.geo.disc, this.mat.dark), kind: e.kind };
@@ -179,17 +180,17 @@ export class ElementEffectsView {
         const rise = Math.min(1, age / 0.25);
         const sink = Math.min(1, Math.max(0, (e.until - gameTime) / 0.3));
         const h = ELEMENT_FX.pillarHeight * Math.min(rise, sink);
-        o.position.set(e.x, h - ELEMENT_FX.pillarHeight / 2, e.z);
+        o.position.set(e.x, e.y + h - ELEMENT_FX.pillarHeight / 2, e.z);
         break;
       }
       case 'PUDDLE': {
         const r = ELEMENT_FX.puddleRadius * Math.min(1, age / 0.3);
         o.scale.set(r, 1, r);
-        o.position.set(e.x, 0.03, e.z);
+        o.position.set(e.x, e.y + 0.03, e.z);
         break;
       }
       case 'BOLT':
-        o.position.set(e.x, 7, e.z);
+        o.position.set(e.x, e.y + 7, e.z);
         o.visible = Math.floor(age * 30) % 2 === 0 || age > 0.25;
         o.scale.set(1 - f, 1, 1 - f);
         break;
@@ -208,27 +209,33 @@ export class ElementEffectsView {
       case 'RESCUE': {
         const r = 0.8 + f * 0.6;
         o.scale.set(r, 1, r);
-        o.position.set(e.x, 0.2 + f * 2.2, e.z);
+        o.position.set(e.x, e.y + 0.2 + f * 2.2, e.z);
+        break;
+      }
+      case 'BUMP': {
+        const r = 0.4 + 1.6 * f;
+        o.scale.set(r, 1, r);
+        o.position.set(e.x, e.y + 0.6, e.z);
         break;
       }
       case 'WIND': {
         const r = 0.5 + ELEMENT_FX.windRadius * f;
         o.scale.set(r, 1, r);
-        o.position.set(e.x, 0.4, e.z);
+        o.position.set(e.x, e.y + 0.4, e.z);
         break;
       }
       case 'DARK': {
         const r = ELEMENT_FX.darkRadius * Math.min(1, f * 3);
         o.scale.set(r, 1, r);
-        o.position.set(e.x, 0.05, e.z);
+        o.position.set(e.x, e.y + 0.05, e.z);
         break;
       }
       case 'SWAP':
       case 'BLINK': {
         const [a, b] = (o as THREE.Group).children as [THREE.Object3D, THREE.Object3D];
         const r = 0.6 + 1.2 * f;
-        a.position.set(e.x, 0.1 + 1.5 * f, e.z);
-        b.position.set(e.x2, 0.1 + 1.5 * f, e.z2);
+        a.position.set(e.x, e.y + 0.1 + 1.5 * f, e.z);
+        b.position.set(e.x2, e.y + 0.1 + 1.5 * f, e.z2);
         a.scale.set(r, 1, r);
         b.scale.set(r, 1, r);
         break;
@@ -240,7 +247,7 @@ export class ElementEffectsView {
     if (kind === 'BOLT') audio.play('zap', 0.16);
     else if (kind === 'RESCUE') audio.play('pass', 0.2);
     else if (kind === 'PILLAR') audio.play('rumble', 0.2);
-    else if (kind === 'WIND' || kind === 'BLINK' || kind === 'SWAP') audio.play('whoosh', 0.16);
+    else if (kind === 'WIND' || kind === 'BLINK' || kind === 'SWAP' || kind === 'BUMP') audio.play('whoosh', 0.16);
     else audio.play('cast', 0.12);
   }
 }

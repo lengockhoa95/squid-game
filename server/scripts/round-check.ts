@@ -15,6 +15,8 @@ for (let seed = 1; seed <= rounds; seed++) {
   const state = new MatchState();
   state.phase = 'LOBBY';
   state.noElimination = true;
+  state.elementsEnabled = process.env.ELEMENTS !== '0';
+  state.cardsEnabled = process.env.CARDS !== '0';
   const sims = new Map<string, PlayerSim>();
   const npcs = new NPCManager(seed * 31);
   NPCManager.planBots(MAX_PLAYERS, diffs, new Set(), rng).forEach((spec, slot) => {

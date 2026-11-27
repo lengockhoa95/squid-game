@@ -39,6 +39,5 @@ export const VIEW_LOADERS: Readonly<Record<MinigameId, () => Promise<ViewFactory
   RLGL: () => import('../RedLightGreenLight/View.ts').then((m) => m.createView),
   GLASS_BRIDGE: () => import('../GlassBridge/View.ts').then((m) => m.createView),
   OBSTACLE_RACE: () => import('../ObstacleRace/View.ts').then((m) => m.createView),
-  TUG_OF_WAR: () => import('../TugOfWar/View.ts').then((m) => m.createView),
-  QUICK_REACTION: () => import('../QuickReaction/View.ts').then((m) => m.createView),
+  FLOOR_COLLAPSE: () => import('../FloorCollapse/View.ts').then((m) => m.createView),
 };

@@ -351,7 +351,7 @@ export class MatchController {
     o.vy = 6 * taken;
     o.grounded = false;
     this.launchReady.set(from.id, t + 1.5);
-    this.elements.flash('WIND', from, o.x, o.z, t);
+    this.elements.flash('BUMP', from, o.x, o.z, t);
   }
 
   private alivePlayers(): PlayerState[] {

@@ -36,7 +36,7 @@ describe('effectStep', () => {
 
   it('puddles slow others but not their owner', () => {
     const field = createElementField();
-    field.puddles.push({ x: 0, z: -2, until: 10, owner: 'me' });
+    field.puddles.push({ x: 0, y: 0, z: -2, until: 10, owner: 'me' });
     const own = run({ stunUntil: 0, hasteUntil: 0 }, field, 0.5, 'me');
     const other = run({ stunUntil: 0, hasteUntil: 0 }, field, 0.5, 'other');
     expect(Math.abs(other.z)).toBeLessThan(Math.abs(own.z) * 0.6);
@@ -44,7 +44,7 @@ describe('effectStep', () => {
 
   it('pillars block movement until they expire', () => {
     const field = createElementField();
-    field.pillars.push({ x: 0, z: -3, until: 10 });
+    field.pillars.push({ x: 0, y: 0, z: -3, until: 10 });
     const blocked = run({ stunUntil: 0, hasteUntil: 0 }, field, 2);
     expect(blocked.z).toBeGreaterThan(-3 + ELEMENT_FX.pillarRadius - 0.01);
     field.pillars[0]!.until = 0;

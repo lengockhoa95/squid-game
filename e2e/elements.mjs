@@ -114,9 +114,14 @@ while (Date.now() < deadline) {
   if (info.dark && !seenDark) { seenDark = true; log('  >> screen darkened'); await page.screenshot({ path: `${out}/e-dark.png` }); }
   if (info.phase === 'playing' && !info.spectating) {
     const t = info.title;
-    const movement = t.includes('Đèn') || t.includes('Chướng');
+    const movement = t.includes('Đèn') || t.includes('Chướng') || t.includes('Sàn');
     if (movement) {
-      if ((t.includes('Chướng') || info.green) && !wHeld) { await page.keyboard.down('KeyW'); wHeld = true; }
+      if ((t.includes('Chướng') || t.includes('Sàn') || info.green) && !wHeld) { await page.keyboard.down('KeyW'); wHeld = true; }
+      if (t.includes('Sàn')) {
+        // Keep moving on the collapsing floor: steer left/right now and then, hop a lot.
+        if (Math.random() < 0.3) await page.keyboard.press('Space');
+        if (Math.random() < 0.15) { const k = Math.random() < 0.5 ? 'KeyA' : 'KeyD'; await page.keyboard.down(k); await page.waitForTimeout(250); await page.keyboard.up(k); }
+      }
       if (t.includes('Đèn') && !info.green && wHeld) { await page.keyboard.up('KeyW'); wHeld = false; }
     } else if (t.includes('Kéo')) {
       await page.keyboard.press('Space');

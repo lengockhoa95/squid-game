@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRng, MINIGAME_IDS, type MinigameId } from '@sp/shared';
+import { createRng, MINIGAMES, MINIGAME_IDS, type MinigameId } from '@sp/shared';
 import { pickNextGame, planRoundCount } from './RoundScheduler.ts';
 import { decideEliminations } from './EliminationPolicy.ts';
 import { canTransition, assertTransition } from './MatchStateMachine.ts';
@@ -20,7 +20,7 @@ describe('RoundScheduler', () => {
       const alive = 2 + (i % 3); // 2, 3, 4
       const game = pickNextGame(rng, alive, history);
       expect(game).not.toBe(prev);
-      if (alive % 2 === 1) expect(game).not.toBe('TUG_OF_WAR');
+      if (alive % 2 === 1) expect(MINIGAMES[game].needsEvenPlayers).toBe(false);
       history.push(game);
       prev = game;
     }

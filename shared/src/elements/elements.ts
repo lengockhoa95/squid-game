@@ -72,8 +72,6 @@ export const ELEMENT_FX = {
 
 const ACTION_GAME_ELEMENTS: Partial<Record<MinigameId, readonly ElementId[]>> = {
   GLASS_BRIDGE: ['THUNDER', 'SWAP', 'DARK'],
-  TUG_OF_WAR: ['THUNDER', 'DARK'],
-  QUICK_REACTION: ['THUNDER', 'DARK'],
 };
 
 /** Elements usable in a minigame. Movement games allow all of them. */
@@ -87,4 +85,4 @@ export function isElementId(v: unknown): v is ElementId {
 }
 
 /** Kinds stored in MatchState.effects. */
-export type EffectKind = 'PILLAR' | 'PUDDLE' | 'CLONE' | 'BOLT' | 'WIND' | 'BLINK' | 'SWAP' | 'DARK' | 'FIRE' | 'RESCUE';
+export type EffectKind = 'PILLAR' | 'PUDDLE' | 'CLONE' | 'BOLT' | 'WIND' | 'BLINK' | 'SWAP' | 'DARK' | 'FIRE' | 'RESCUE' | 'BUMP';

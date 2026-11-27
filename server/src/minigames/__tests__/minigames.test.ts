@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { RACE, REACTION, RLGL, TILE_BROKEN, TILE_SAFE, TUG, tugInZone, tileIndex } from '@sp/shared';
+import { RACE, RLGL, TILE_BROKEN, TILE_SAFE, tileIndex } from '@sp/shared';
 import { RedLightGreenLight } from '../RedLightGreenLight/Logic.ts';
 import { GlassBridge } from '../GlassBridge/Logic.ts';
-import { TugOfWar } from '../TugOfWar/Logic.ts';
-import { QuickReaction } from '../QuickReaction/Logic.ts';
 import { ObstacleRace } from '../ObstacleRace/Logic.ts';
 import { makeContext, run } from './helpers.ts';
 
@@ -89,95 +87,6 @@ describe('Glass Bridge', () => {
   });
 });
 
-describe('Tug of War', () => {
-  it('splits players into two equal teams', () => {
-    const { ctx, players } = makeContext(4);
-    new TugOfWar().initialize(ctx);
-    expect(players.filter((p) => p.state.team === 0)).toHaveLength(2);
-    expect(players.filter((p) => p.state.team === 1)).toHaveLength(2);
-  });
-
-  it('on-beat pulls are strong, off-beat pulls weak + fatigue, and spam is throttled', () => {
-    const { ctx, players, match } = makeContext(2);
-    const game = new TugOfWar();
-    game.initialize(ctx);
-    const puller = players.find((p) => p.state.team === 1)!;
-    // Find an on-beat time and an off-beat time.
-    let onBeat = 0;
-    while (!tugInZone(onBeat)) onBeat += 0.001;
-    let offBeat = onBeat + TUG.cursorPeriodS / 4;
-    while (tugInZone(offBeat) || tugInZone(offBeat - 0.1) || tugInZone(offBeat + 0.1)) offBeat += 0.01;
-
-    game.handlePlayerInput(puller.id, { kind: 'PULL' }, onBeat);
-    const strong = match.tug!.rope;
-    expect(strong).toBeCloseTo(TUG.strongPull * TUG.ropeGain);
-    game.handlePlayerInput(puller.id, { kind: 'PULL' }, onBeat + 0.01); // too soon: throttled
-    expect(match.tug!.rope).toBe(strong);
-    game.handlePlayerInput(puller.id, { kind: 'PULL' }, offBeat);
-    expect(match.tug!.rope).toBeCloseTo(strong + TUG.weakPull * TUG.ropeGain);
-    const afterWeak = match.tug!.rope;
-    game.handlePlayerInput(puller.id, { kind: 'PULL' }, offBeat + 0.15); // fatigued: no effect
-    expect(match.tug!.rope).toBe(afterWeak);
-  });
-
-  it('the losing team fails the round', () => {
-    const { ctx, players } = makeContext(2);
-    const game = new TugOfWar();
-    game.initialize(ctx);
-    const winner = players.find((p) => p.state.team === 0)!;
-    let t = 0;
-    while (!game.isFinished() && t < 60) {
-      if (tugInZone(t)) game.handlePlayerInput(winner.id, { kind: 'PULL' }, t);
-      t += 0.005;
-    }
-    const outcome = game.finish();
-    expect(outcome.passed.has(winner.id)).toBe(true);
-    expect(outcome.passed.size).toBe(1);
-  });
-});
-
-describe('Quick Reaction', () => {
-  it('penalizes false starts and ranks by total server-measured time', () => {
-    const { ctx, players } = makeContext(2);
-    const game = new QuickReaction();
-    game.initialize(ctx);
-    game.start();
-    let t = 0;
-    let falseStarted = false;
-    const dt = 1 / 60;
-    while (!game.isFinished() && t < 60) {
-      t += dt;
-      game.update(dt, t);
-      const stage = game.publicStage.stage;
-      if (stage === 'WAIT' && !falseStarted) {
-        game.handlePlayerInput('p1', { kind: 'REACT' }, t); // jumps the gun on attempt 1
-        falseStarted = true;
-      }
-      if (stage === 'GO') {
-        game.handlePlayerInput('p0', { kind: 'REACT' }, t + 0.25);
-        if (!game.publicStage.pressed('p1')) game.handlePlayerInput('p1', { kind: 'REACT' }, t + 0.25);
-      }
-    }
-    const outcome = game.finish();
-    expect(outcome.ranking[0]).toBe('p0');
-    expect(players[1]!.state.score).toBeGreaterThanOrEqual(REACTION.falseStartMs);
-    expect(outcome.passed.has('p1')).toBe(false);
-  });
-
-  it('treats impossibly fast reactions as guesses', () => {
-    const { ctx, players } = makeContext(1);
-    const game = new QuickReaction();
-    game.initialize(ctx);
-    let t = 0;
-    while (game.publicStage.stage !== 'GO') {
-      t += 1 / 60;
-      game.update(1 / 60, t);
-    }
-    game.handlePlayerInput('p0', { kind: 'REACT' }, t + 0.01); // 10ms after GO
-    expect(players[0]!.state.score).toBe(REACTION.falseStartMs);
-  });
-});
-
 describe('Obstacle Race', () => {
   it('respawns fallen players at their last checkpoint instead of eliminating them', () => {
     const { ctx, players } = makeContext(1);
@@ -201,5 +110,54 @@ describe('Obstacle Race', () => {
     const outcome = game.finish();
     expect(outcome.passed.has('p0')).toBe(true);
     expect(outcome.passed.has('p1')).toBe(false);
+  });
+});
+
+describe('Floor Collapse', () => {
+  it('tiles crack under a player, drop after the delay, and the player falls to the next floor', async () => {
+    const { FloorCollapse } = await import('../FloorCollapse/Logic.ts');
+    const { COLLAPSE, TILE_CRACKING, TILE_GONE, tileAt, layerTop } = await import('@sp/shared');
+    const { ctx, players, match } = makeContext(2);
+    const game = new FloorCollapse();
+    game.initialize(ctx);
+    const p = players[0]!;
+    run(game, players, 0, 0.1);
+    const under = tileAt(p.sim.state.x, p.sim.state.y, p.sim.state.z);
+    expect(under).toBeGreaterThanOrEqual(0);
+    expect(match.collapse!.tiles[under]).toBe(TILE_CRACKING);
+    run(game, players, 0.1, COLLAPSE.crackSeconds + 0.95); // standing still: the tile drops, we land a floor lower
+    expect(match.collapse!.tiles[under]).toBe(TILE_GONE);
+    expect(p.sim.state.y).toBeCloseTo(layerTop(1), 1);
+    expect(p.state.roundState).toBe('ACTIVE');
+  });
+
+  it('falling through the last floor is out; survivors rank first and pass', async () => {
+    const { FloorCollapse } = await import('../FloorCollapse/Logic.ts');
+    const { COLLAPSE } = await import('@sp/shared');
+    const { ctx, players } = makeContext(3);
+    const game = new FloorCollapse();
+    game.initialize(ctx);
+    players[1]!.sim.state.y = COLLAPSE.killY - 1;
+    run(game, players, 0, 0.05);
+    players[2]!.sim.state.y = COLLAPSE.killY - 1;
+    run(game, players, 1, 0.05);
+    expect(players[1]!.state.roundState).toBe('OUT');
+    expect(game.isFinished()).toBe(true); // one left standing
+    const outcome = game.finish();
+    expect(outcome.ranking).toEqual(['p0', 'p2', 'p1']);
+    expect([...outcome.passed]).toEqual(['p0']);
+  });
+
+  it('Mạng Phụ puts a falling player back on a solid tile', async () => {
+    const { FloorCollapse } = await import('../FloorCollapse/Logic.ts');
+    const { COLLAPSE } = await import('@sp/shared');
+    const { ctx, players } = makeContext(2);
+    let lives = 1;
+    const game = new FloorCollapse();
+    game.initialize({ ...ctx, tryRescue: () => (lives-- > 0) });
+    players[0]!.sim.state.y = COLLAPSE.killY - 1;
+    run(game, players, 0, 0.05);
+    expect(players[0]!.state.roundState).toBe('ACTIVE');
+    expect(players[0]!.sim.state.y).toBeGreaterThan(-1);
   });
 });

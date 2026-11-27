@@ -89,7 +89,7 @@ while (Date.now() < deadline) {
     if (t.includes('Đèn')) {
       if (info.green && !wHeld) { await page.keyboard.down('KeyW'); wHeld = true; }
       if (!info.green && wHeld) { await page.keyboard.up('KeyW'); wHeld = false; }
-    } else if (t.includes('Chướng')) {
+    } else if (t.includes('Chướng') || t.includes('Sàn')) {
       if (!wHeld) { await page.keyboard.down('KeyW'); wHeld = true; }
       if (Math.random() < 0.25) await page.keyboard.press('Space');
     } else if (t.includes('Kéo')) {

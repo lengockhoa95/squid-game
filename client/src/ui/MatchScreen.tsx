@@ -19,15 +19,13 @@ import { AnnounceBanner, CardBar, CardDraft } from '../cards/CardUi.tsx';
 import { RlglHud } from '../minigames/RedLightGreenLight/Hud.tsx';
 import { BridgeHud } from '../minigames/GlassBridge/Hud.tsx';
 import { RaceHud } from '../minigames/ObstacleRace/Hud.tsx';
-import { TugHud } from '../minigames/TugOfWar/Hud.tsx';
-import { ReactionHud } from '../minigames/QuickReaction/Hud.tsx';
+import { CollapseHud } from '../minigames/FloorCollapse/Hud.tsx';
 
 const HUDS: Record<MinigameId, (props: { net: MatchNetAdapter }) => ReactNode> = {
   RLGL: RlglHud,
   GLASS_BRIDGE: BridgeHud,
   OBSTACLE_RACE: RaceHud,
-  TUG_OF_WAR: TugHud,
-  QUICK_REACTION: ReactionHud,
+  FLOOR_COLLAPSE: CollapseHud,
 };
 
 function PhaseLayer({ net }: { net: MatchNetAdapter }) {

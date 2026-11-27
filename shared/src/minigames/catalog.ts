@@ -1,6 +1,6 @@
-export type MinigameId = 'RLGL' | 'GLASS_BRIDGE' | 'OBSTACLE_RACE' | 'TUG_OF_WAR' | 'QUICK_REACTION';
+export type MinigameId = 'RLGL' | 'GLASS_BRIDGE' | 'OBSTACLE_RACE' | 'FLOOR_COLLAPSE';
 
-export const MINIGAME_IDS: readonly MinigameId[] = ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'TUG_OF_WAR', 'QUICK_REACTION'];
+export const MINIGAME_IDS: readonly MinigameId[] = ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE'];
 
 export interface MinigameInfo {
   id: MinigameId;
@@ -54,30 +54,17 @@ export const MINIGAMES: Readonly<Record<MinigameId, MinigameInfo>> = {
     movement: true,
     needsEvenPlayers: false,
   },
-  TUG_OF_WAR: {
-    id: 'TUG_OF_WAR',
-    title: 'Kéo Co',
+  FLOOR_COLLAPSE: {
+    id: 'FLOOR_COLLAPSE',
+    title: 'Sàn Sụp',
     rules: [
-      'Hai đội kéo dây về phía mình.',
-      'Click (hoặc Space) khi kim chạy vào vùng xanh để kéo mạnh.',
-      'Bấm lệch nhịp chỉ kéo yếu và bị mệt một chút.',
-      'Đội thua sẽ bị loại.',
+      'Ô gạch bạn đứng lên sẽ rung rồi rơi sau chưa tới 1 giây — đừng đứng yên!',
+      'Rơi khỏi tầng trên thì xuống tầng dưới. Có 3 tầng.',
+      'Rơi khỏi tầng cuối cùng là thua.',
+      'Còn đứng khi hết giờ (hoặc là người cuối cùng) để qua vòng.',
     ],
-    timeLimit: 45,
-    movement: false,
-    needsEvenPlayers: true,
-  },
-  QUICK_REACTION: {
-    id: 'QUICK_REACTION',
-    title: 'Phản Xạ Nhanh',
-    rules: [
-      'Chờ đèn chuyển sang GO!',
-      'Click (hoặc Space) thật nhanh khi thấy GO.',
-      'Bấm trước GO bị tính 2000ms cho lượt đó.',
-      '5 lượt — tổng thời gian chậm nhất bị loại.',
-    ],
-    timeLimit: 50,
-    movement: false,
+    timeLimit: 100,
+    movement: true,
     needsEvenPlayers: false,
   },
 };

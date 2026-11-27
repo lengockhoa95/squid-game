@@ -80,7 +80,7 @@ describe('ElementSystem', () => {
     expect(Math.hypot(pillar.x, pillar.z)).toBeCloseTo(ELEMENTS.EARTH.range, 5);
     expect(match.effects[0]!.kind).toBe('PILLAR');
     // b walks straight into a pillar placed in front of it
-    sys.field.pillars[0] = { x: b.sim.state.x, z: b.sim.state.z - 3, until: 100 };
+    sys.field.pillars[0] = { x: b.sim.state.x, y: 0, z: b.sim.state.z - 3, until: 100 };
     const step = sys.wrapStep(new RedLightGreenLight().step, b);
     const startZ = b.sim.state.z;
     for (let i = 0; i < 120; i++) step(b.sim.state, { dirX: 0, dirZ: -1, jump: false }, 1 / 60, 1);

@@ -156,12 +156,12 @@ export class ElementSystem {
     const { x, z } = clampToRange(me.x, me.z, rawX, rawZ, ELEMENTS[element].range);
     switch (element) {
       case 'EARTH':
-        this.field.pillars.push({ x, z, until: t + ELEMENT_FX.pillarSeconds });
-        this.addEffect('PILLAR', caster, x, z, t, ELEMENT_FX.pillarSeconds);
+        this.field.pillars.push({ x, y: me.y, z, until: t + ELEMENT_FX.pillarSeconds });
+        this.addEffect('PILLAR', caster, x, z, t, ELEMENT_FX.pillarSeconds).y = me.y;
         return true;
       case 'WATER':
-        this.field.puddles.push({ x, z, until: t + ELEMENT_FX.puddleSeconds, owner: caster.id });
-        this.addEffect('PUDDLE', caster, x, z, t, ELEMENT_FX.puddleSeconds);
+        this.field.puddles.push({ x, y: me.y, z, until: t + ELEMENT_FX.puddleSeconds, owner: caster.id });
+        this.addEffect('PUDDLE', caster, x, z, t, ELEMENT_FX.puddleSeconds).y = me.y;
         return true;
       case 'THUNDER': {
         let target = this.nearestOther(caster, x, z, ELEMENT_FX.thunderHitRadius);
@@ -308,7 +308,7 @@ export class ElementSystem {
     e.z = z;
     e.x2 = x;
     e.z2 = z;
-    e.y = 0;
+    e.y = owner.sim.state.y; // floor height of the caster (multi-level maps)
     e.yaw = 0;
     e.start = t;
     e.until = t + seconds;

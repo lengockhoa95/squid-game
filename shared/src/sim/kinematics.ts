@@ -21,14 +21,19 @@ export interface MoveIntent {
   jump: boolean;
 }
 
-/** Axis-aligned box standing on y = 0 with its top at `top`. */
+/** Axis-aligned box with its top at `top`. Without `bottom` it stands on the ground (solid all the way down). */
 export interface Box {
   minX: number;
   maxX: number;
   minZ: number;
   maxZ: number;
   top: number;
+  /** Underside of a floating box (e.g. an upper floor): characters fully below it pass underneath. */
+  bottom?: number;
 }
+
+/** Character height used to decide whether a floating box is overhead. */
+export const CHARACTER_HEIGHT = 1.2;
 
 export interface SimWorld {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -138,6 +143,7 @@ function resolveBoxes(s: CharacterState, boxes: readonly Box[], p: MovementParam
   const r = p.radius;
   for (const box of boxes) {
     if (box.top <= s.y + p.stepHeight) continue; // walkable, not blocking
+    if (box.bottom !== undefined && s.y + CHARACTER_HEIGHT <= box.bottom) continue; // overhead
     const cx = Math.max(box.minX, Math.min(s.x, box.maxX));
     const cz = Math.max(box.minZ, Math.min(s.z, box.maxZ));
     let nx = s.x - cx;
