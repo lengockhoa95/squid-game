@@ -114,6 +114,14 @@ class NetworkManager {
     this.room?.send(MSG.CARDS_TOGGLE, { enabled });
   }
 
+  setGameEnabled(id: string, enabled: boolean): void {
+    this.room?.send(MSG.GAME_TOGGLE, { id, enabled });
+  }
+
+  setElementEnabled(id: string, enabled: boolean): void {
+    this.room?.send(MSG.ELEMENT_TOGGLE, { id, enabled });
+  }
+
   /** Adapter for the networked scene; null when not in a room. */
   getAdapter(): MatchNetAdapter | null {
     if (!this.room) return null;
@@ -237,6 +245,10 @@ class NetworkManager {
       noElimination: state.noElimination,
       cardsEnabled: state.cardsEnabled,
     });
+    const games = [...state.disabledGames];
+    const elements = [...state.disabledElements];
+    if (games.join() !== s.disabledGames.join()) sessionStore.set({ disabledGames: games });
+    if (elements.join() !== s.disabledElements.join()) sessionStore.set({ disabledElements: elements });
 
     let resultsSig = '';
     state.results.forEach((r) => {

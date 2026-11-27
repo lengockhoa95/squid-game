@@ -20,12 +20,18 @@ import { RlglHud } from '../minigames/RedLightGreenLight/Hud.tsx';
 import { BridgeHud } from '../minigames/GlassBridge/Hud.tsx';
 import { RaceHud } from '../minigames/ObstacleRace/Hud.tsx';
 import { CollapseHud } from '../minigames/FloorCollapse/Hud.tsx';
+import { TowerHud } from '../minigames/TowerClimb/Hud.tsx';
+import { MazeHud } from '../minigames/Maze/Hud.tsx';
+import { ParkourHud } from '../minigames/Parkour/Hud.tsx';
 
 const HUDS: Record<MinigameId, (props: { net: MatchNetAdapter }) => ReactNode> = {
   RLGL: RlglHud,
   GLASS_BRIDGE: BridgeHud,
   OBSTACLE_RACE: RaceHud,
   FLOOR_COLLAPSE: CollapseHud,
+  TOWER_CLIMB: TowerHud,
+  MAZE: MazeHud,
+  PARKOUR: ParkourHud,
 };
 
 function PhaseLayer({ net }: { net: MatchNetAdapter }) {

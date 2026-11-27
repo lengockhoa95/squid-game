@@ -10,6 +10,12 @@ import { ObstacleRace } from '../ObstacleRace/Logic.ts';
 import { RaceStrategy } from '../ObstacleRace/NPCStrategy.ts';
 import { FloorCollapse } from '../FloorCollapse/Logic.ts';
 import { CollapseStrategy } from '../FloorCollapse/NPCStrategy.ts';
+import { TowerClimb } from '../TowerClimb/Logic.ts';
+import { TowerStrategy } from '../TowerClimb/NPCStrategy.ts';
+import { MazeRun } from '../Maze/Logic.ts';
+import { MazeStrategy } from '../Maze/NPCStrategy.ts';
+import { Parkour } from '../Parkour/Logic.ts';
+import { ParkourStrategy } from '../Parkour/NPCStrategy.ts';
 
 export interface MinigameBundle {
   game: ServerMinigame;
@@ -29,6 +35,18 @@ export const MINIGAME_FACTORIES: Partial<Record<MinigameId, MinigameFactory>> = 
     return { game, strategy: new BridgeStrategy(game, match) };
   },
   OBSTACLE_RACE: () => ({ game: new ObstacleRace(), strategy: new RaceStrategy() }),
+  PARKOUR: () => {
+    const game = new Parkour();
+    return { game, strategy: new ParkourStrategy(game) };
+  },
+  MAZE: () => {
+    const game = new MazeRun();
+    return { game, strategy: new MazeStrategy(game) };
+  },
+  TOWER_CLIMB: () => {
+    const game = new TowerClimb();
+    return { game, strategy: new TowerStrategy(game) };
+  },
   FLOOR_COLLAPSE: () => {
     const game = new FloorCollapse();
     return { game, strategy: new CollapseStrategy(game) };

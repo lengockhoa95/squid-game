@@ -97,6 +97,13 @@ export type BridgeState = InstanceType<typeof BridgeState>;
 export const CollapseState = schema({ tiles: t.array('uint8') }, 'CollapseState');
 export type CollapseState = InstanceType<typeof CollapseState>;
 
+/** Mê Cung: maze seed (clients rebuild the same walls) and the minotaur. */
+export const MazeState = schema(
+  { seed: t.uint32(), mx: t.float32(), mz: t.float32(), myaw: t.float32(), active: t.boolean() },
+  'MazeState',
+);
+export type MazeState = InstanceType<typeof MazeState>;
+
 export const MatchState = schema(
   {
     phase: t.string(),
@@ -120,10 +127,14 @@ export const MatchState = schema(
     noElimination: t.boolean().default(false),
     /** Skill card draft between rounds. */
     cardsEnabled: t.boolean().default(true),
+    /** Host's picks: minigames / elements taken out of the random pool (empty = everything on). */
+    disabledGames: t.array('string'),
+    disabledElements: t.array('string'),
     effects: t.array(ElementEffect),
     rlgl: t.ref(RlglState).optional(),
     bridge: t.ref(BridgeState).optional(),
     collapse: t.ref(CollapseState).optional(),
+    maze: t.ref(MazeState).optional(),
   },
   'MatchState',
 );

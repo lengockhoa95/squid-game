@@ -214,3 +214,27 @@ describe('MatchController + elements', () => {
     expect(h1.z).toBe(z); // the jump was ignored
   });
 });
+
+describe('host-disabled pools', () => {
+  it('disabled elements are never assigned or allowed', () => {
+    const { ctx, players, match } = makeContext(3);
+    match.disabledElements.push('EARTH', 'WATER', 'THUNDER', 'WIND', 'FIRE', 'SWAP', 'CLONE');
+    const game = new RedLightGreenLight();
+    game.initialize(ctx);
+    const sys = new ElementSystem(match, ctx.rng);
+    sys.beginRound(players, game);
+    expect([...sys.allowedElements()].sort()).toEqual(['BLINK', 'DARK']);
+    for (const p of players) expect(['BLINK', 'DARK']).toContain(p.state.element);
+  });
+
+  it('matches only schedule games the host left on', async () => {
+    const { simulateMatch } = await import('../match/simulateMatch.ts');
+    const { MatchState } = await import('@sp/shared/schema');
+    void MatchState;
+    for (let seed = 1; seed <= 4; seed++) {
+      const r = simulateMatch(seed, ['NORMAL', 'NORMAL', 'HARD'], undefined, true, true, ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE']);
+      expect(new Set(r.games)).toEqual(new Set(['TOWER_CLIMB', 'MAZE', 'PARKOUR'].filter((g) => r.games.includes(g as never))));
+      for (const g of r.games) expect(['TOWER_CLIMB', 'MAZE', 'PARKOUR']).toContain(g);
+    }
+  }, 60000);
+});

@@ -131,7 +131,9 @@ class MatchScene implements GameScene {
   }
 
   getAutoAlignYaw(): number | null {
-    return this.local?.isClickMoving ? this.local.state.yaw : null;
+    // Keyboard movement: the camera drifts back behind the character while it runs.
+    const s = this.local?.state;
+    return s && s.vx * s.vx + s.vz * s.vz > 4 ? s.yaw : null;
   }
 
   getClickTargets(): readonly THREE.Object3D[] {

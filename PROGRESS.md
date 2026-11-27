@@ -114,6 +114,23 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
   - Animation `rise`/`pop` ghi đè transform căn giữa làm overlay giật.
 - [x] Test: 158 unit/integration; E2E chọn thẻ + hướng dẫn trong `e2e/elements.mjs`.
 
+## Phase 11 — Game di chuyển mới, chọn game/nguyên tố ✅
+
+- [x] Bỏ Kéo Co và Phản Xạ Nhanh. Thêm 4 game di chuyển:
+  - **Sàn Sụp:** 3 tầng 16×16; tầng phía trên nhân vật tự làm mờ.
+  - **Tháp Leo:** 42 bục xoắn ốc, có bục trượt và bục ma; dung nham dâng nhanh dần.
+  - **Mê Cung:** 15×15 tạo từ seed, có lối vòng; Minotaur tìm đường bằng BFS, nhanh dần; bị bắt thì thua.
+  - **Parkour:** 8 loại chướng ngại, 7 checkpoint.
+- [x] NPC riêng cho từng game:
+  - Sàn Sụp: luôn chạy, nhảy cóc.
+  - Tháp Leo: chờ bục ma, nhảy theo khoảng cách.
+  - Mê Cung: đi đường ngắn nhất; Khó/Thông minh né Minotaur, có do dự và rẽ nhầm.
+  - Parkour: đi theo điểm mốc, nhảy ở mép.
+- [x] Host tick bỏ minigame (luôn còn ít nhất 1) và nguyên tố trong màn chờ.
+- [x] Camera tự xoay ra sau lưng khi chạy về phía trước (đi ngang thì không xoay).
+- [x] Hộp va chạm có mặt dưới (sàn nhiều tầng); nguyên tố và hiệu ứng theo độ cao người dùng.
+- [x] Test: 166 unit/integration.
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).

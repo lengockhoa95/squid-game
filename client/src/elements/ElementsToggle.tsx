@@ -1,4 +1,5 @@
-import { vi } from '@sp/shared';
+import { ELEMENTS, ELEMENT_IDS, MINIGAMES, MINIGAME_IDS, vi } from '@sp/shared';
+import type { CSSProperties } from 'react';
 import { network } from '../network/NetworkManager.ts';
 import { sessionStore } from '../network/sessionStore.ts';
 import { useStore } from '../store/UIStore.ts';
@@ -17,14 +18,62 @@ export function ElementsToggle({ editable }: { editable: boolean }) {
   const elements = useStore(sessionStore, (s) => s.elementsEnabled);
   const noElim = useStore(sessionStore, (s) => s.noElimination);
   const cards = useStore(sessionStore, (s) => s.cardsEnabled);
+  const offGames = useStore(sessionStore, (s) => s.disabledGames);
+  const offElements = useStore(sessionStore, (s) => s.disabledElements);
+  const lastGame = offGames.length >= MINIGAME_IDS.length - 1;
   return (
     <>
+      <section className="npc-settings pool-games">
+        <h2>{vi.poolGames}</h2>
+        <p className="muted">{vi.poolGamesDesc}</p>
+        <div className="pool-chips">
+          {MINIGAME_IDS.map((id) => {
+            const on = !offGames.includes(id);
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`pool-chip ${on ? 'is-on' : ''}`}
+                aria-pressed={on}
+                disabled={!editable || (on && lastGame)}
+                onClick={() => network.setGameEnabled(id, !on)}
+              >
+                <span className="pool-check" aria-hidden="true">{on ? '✓' : ''}</span>
+                {MINIGAMES[id].title}
+              </button>
+            );
+          })}
+        </div>
+      </section>
       <section className="npc-settings elements-toggle">
         <div className="npc-head">
           <h2>{vi.elementsMode}</h2>
           <OnOff value={elements} editable={editable} onChange={(v) => network.setElementsEnabled(v)} label={vi.elementsMode} />
         </div>
         <p className="muted">{vi.elementsModeDesc}</p>
+        {elements && (
+          <div className="pool-chips" aria-label={vi.poolElements}>
+            {ELEMENT_IDS.map((id) => {
+              const on = !offElements.includes(id);
+              const info = ELEMENTS[id];
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`pool-chip ${on ? 'is-on' : ''}`}
+                  style={{ '--el': info.color } as CSSProperties}
+                  aria-pressed={on}
+                  title={info.desc}
+                  disabled={!editable}
+                  onClick={() => network.setElementEnabled(id, !on)}
+                >
+                  <span className="pool-check" aria-hidden="true">{on ? '✓' : ''}</span>
+                  {info.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
       <section className="npc-settings no-elim-toggle">
         <div className="npc-head">

@@ -25,10 +25,11 @@ export function ElementPicker({ net }: { net: MatchNetAdapter }) {
   const enabled = useStore(sessionStore, (s) => s.elementsEnabled);
   const game = useStore(sessionStore, (s) => s.currentGame);
   const alive = useStore(sessionStore, (s) => s.players.find((p) => p.id === s.myId)?.alive ?? false);
+  const off = useStore(sessionStore, (s) => s.disabledElements);
   const mine = useMyElement();
   if (!enabled || !game || !alive) return null;
   const movement = MINIGAMES[game].movement;
-  const list = elementsFor(game, movement);
+  const list = elementsFor(game, movement).filter((id) => !off.includes(id));
   if (list.length === 0) return <div className="element-picker"><small className="muted">{vi.elementNoneHere}</small></div>;
   return (
     <div className="element-picker">

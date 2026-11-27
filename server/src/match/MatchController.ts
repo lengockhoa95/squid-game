@@ -51,6 +51,8 @@ export class MatchController {
   private participants: GamePlayer[] = [];
   private history: MinigameId[] = [];
   private readonly available: MinigameId[];
+  /** This match's pool: available games minus the ones the host ticked off. */
+  private pool: MinigameId[] = [];
   private readonly steps = new Map<string, StepFn>();
   readonly elements: ElementSystem;
   readonly cards: CardSystem;
@@ -77,6 +79,9 @@ export class MatchController {
     s.totalRounds = s.noElimination ? NO_ELIMINATION_ROUNDS : planRoundCount(this.d.rng);
     s.roundIndex = 0;
     s.winnerId = '';
+    const off = new Set(s.disabledGames);
+    this.pool = this.available.filter((id) => !off.has(id));
+    if (this.pool.length === 0) this.pool = [...this.available];
     s.results.clear();
     this.history = [];
     for (const p of s.players.values()) {
@@ -168,7 +173,7 @@ export class MatchController {
     const s = this.d.state;
     s.roundIndex += 1;
     const alive = this.alivePlayers();
-    const id = pickNextGame(this.d.rng, alive.length, this.history, this.available);
+    const id = pickNextGame(this.d.rng, alive.length, this.history, this.pool);
     this.history.push(id);
     s.currentGame = id;
     s.gameTime = 0;

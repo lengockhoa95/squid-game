@@ -23,3 +23,11 @@ export function parseNpcConfig(raw: unknown): NpcConfigMessage | null {
 }
 
 export const DEFAULT_NPC_DIFFICULTIES: readonly Difficulty[] = [DIFFICULTIES[1]!, DIFFICULTIES[1]!, DIFFICULTIES[1]!, DIFFICULTIES[1]!];
+
+/** Validates {id, enabled} for GAME_TOGGLE / ELEMENT_TOGGLE against a list of known ids. */
+export function parseItemToggle<T extends string>(raw: unknown, ids: readonly T[]): { id: T; enabled: boolean } | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const { id, enabled } = raw as { id?: unknown; enabled?: unknown };
+  if (typeof enabled !== 'boolean' || typeof id !== 'string' || !(ids as readonly string[]).includes(id)) return null;
+  return { id: id as T, enabled };
+}

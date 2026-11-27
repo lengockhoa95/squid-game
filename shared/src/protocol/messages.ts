@@ -19,6 +19,9 @@ export const MSG = {
   /** Host toggles "no elimination" mode: everyone plays every round and scores points. */
   NO_ELIMINATION_TOGGLE: 'noEliminationToggle',
   CARDS_TOGGLE: 'cardsToggle',
+  /** Host ticks a minigame / element in or out of the pool: {id, enabled}. */
+  GAME_TOGGLE: 'gameToggle',
+  ELEMENT_TOGGLE: 'elementToggle',
   /** Choose one card of your offer during the round result. */
   PICK_CARD: 'pickCard',
   /** Server → one client: Mắt Thần bridge hints {rows: [[row, brokenSide], ...]}. */

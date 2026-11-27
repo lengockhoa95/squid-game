@@ -13,6 +13,7 @@ const FOLLOW_SHARPNESS = 10;
 const ROTATE_SHARPNESS = 14;
 const AUTO_ALIGN_RATE = 1.6; // rad/s max auto-rotation speed
 const AUTO_ALIGN_DELAY_MS = 1500;
+const AUTO_ALIGN_MAX_ANGLE = (70 * Math.PI) / 180;
 const MOUSE_SENSITIVITY = 0.005;
 const KEY_ROTATE_SPEED = 2.2; // rad/s
 
@@ -78,8 +79,12 @@ export class CameraManager {
       // Camera behind the character: offset direction is opposite to its facing.
       const behind = autoAlignYaw + Math.PI;
       const diff = wrapAngle(behind - this.yaw);
-      const step = AUTO_ALIGN_RATE * dt;
-      this.yaw += Math.abs(diff) <= step ? diff : Math.sign(diff) * step;
+      // Only while running roughly away from the camera: strafing or running back toward it must not
+      // drag the camera around (with camera-relative keys that would spin the player in circles).
+      if (Math.abs(diff) < AUTO_ALIGN_MAX_ANGLE) {
+        const step = AUTO_ALIGN_RATE * dt;
+        this.yaw += Math.abs(diff) <= step ? diff : Math.sign(diff) * step;
+      }
     }
 
     const kFollow = 1 - Math.exp(-FOLLOW_SHARPNESS * dt);

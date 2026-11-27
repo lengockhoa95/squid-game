@@ -45,8 +45,10 @@ export interface Sweeper {
   z: number;
   length: number;
   speed: number;
-  /** Bar height: characters whose feet are above this are not hit (jump over it). */
+  /** Bar height above its floor: characters whose feet are higher are not hit (jump over it). */
   height: number;
+  /** Floor height the bar spins on (default 0). */
+  y?: number;
 }
 export const SWEEPERS: readonly Sweeper[] = [
   { x: 0, z: -30, length: 5, speed: 1.5, height: 0.7 },
@@ -95,10 +97,11 @@ export function sweeperAngle(sw: Sweeper, t: number): number {
 }
 
 /** Rotating bars knock characters back when they touch them (unless jumping over). */
-export function applySweepers(s: CharacterState, t: number, radius: number): boolean {
+export function applySweepers(s: CharacterState, t: number, radius: number, list: readonly Sweeper[] = SWEEPERS): boolean {
   let hit = false;
-  for (const sw of SWEEPERS) {
-    if (s.y > sw.height) continue;
+  for (const sw of list) {
+    if (sw.y !== undefined && Math.abs(s.y - sw.y) > 1.5) continue; // bar on another level
+    if (s.y > (sw.y ?? 0) + sw.height) continue;
     const a = sweeperAngle(sw, t);
     const ex = Math.cos(a);
     const ez = Math.sin(a);

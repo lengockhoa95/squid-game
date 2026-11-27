@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { boot, type ColyseusTestServer } from '@colyseus/testing';
-import { MAX_PLAYERS, MSG, ROOM_CODE_LENGTH, ROOM_NAME } from '@sp/shared';
+import { MAX_PLAYERS, MINIGAME_IDS, MSG, ROOM_CODE_LENGTH, ROOM_NAME } from '@sp/shared';
 import type { MatchState } from '@sp/shared/schema';
 import { createServer } from '../app.ts';
 import type { MatchRoom } from './MatchRoom.ts';
@@ -229,4 +229,18 @@ describe('MatchRoom match flow', () => {
     await guest.leave();
     await waitFor(() => state.winnerId === host.sessionId, 10000);
   }, 20000);
+
+  it('host ticks minigames and elements out of the pool (never all games)', async () => {
+    const { host, others, state } = await createLobby(['Host', 'Guest']);
+    const denied = others[0]!.waitForMessage(MSG.ERROR);
+    others[0]!.send(MSG.GAME_TOGGLE, { id: 'RLGL', enabled: false });
+    expect(await denied).toEqual({ code: 'NOT_HOST' });
+    for (const id of MINIGAME_IDS) host.send(MSG.GAME_TOGGLE, { id, enabled: false });
+    host.send(MSG.GAME_TOGGLE, { id: 'NOPE', enabled: false });
+    host.send(MSG.ELEMENT_TOGGLE, { id: 'FIRE', enabled: false });
+    await waitFor(() => state.disabledElements.length === 1);
+    expect(state.disabledGames.length).toBe(MINIGAME_IDS.length - 1); // the last one stays on
+    host.send(MSG.GAME_TOGGLE, { id: MINIGAME_IDS[0], enabled: true });
+    await waitFor(() => !state.disabledGames.includes(MINIGAME_IDS[0]!));
+  });
 });

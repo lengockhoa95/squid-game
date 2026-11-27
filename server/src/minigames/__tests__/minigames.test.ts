@@ -161,3 +161,106 @@ describe('Floor Collapse', () => {
     expect(players[0]!.sim.state.y).toBeGreaterThan(-1);
   });
 });
+
+describe('Tower Climb', () => {
+  it('reaching the top platform finishes; lava below you is out', async () => {
+    const { TowerClimb } = await import('../TowerClimb/Logic.ts');
+    const { TOWER, TOWER_PLATFORMS, platformCenter, lavaHeight } = await import('@sp/shared');
+    const { ctx, players } = makeContext(2);
+    const game = new TowerClimb();
+    game.initialize(ctx);
+    const top = TOWER_PLATFORMS[TOWER.platforms - 1]!;
+    const c = platformCenter(top, 1);
+    players[0]!.sim.reset(c.x, c.z, 0);
+    players[0]!.sim.state.y = top.y;
+    run(game, players, 1, 0.1);
+    expect(players[0]!.state.roundState).toBe('FINISHED');
+    // Player 1 stands on the ground floor: once the lava is above y=0 they burn.
+    let t = 1;
+    while (lavaHeight(t) < 0.1) t += 0.5;
+    run(game, players, t, 0.1);
+    expect(players[1]!.state.roundState).toBe('OUT');
+    const outcome = game.finish();
+    expect(outcome.ranking[0]).toBe('p0');
+    expect(outcome.passed.has('p0')).toBe(true);
+  });
+
+  it('ghost platforms vanish from the collision world and come back', async () => {
+    const { TOWER_PLATFORMS, createTowerWorld, updateTowerWorld, ghostIsSolid } = await import('@sp/shared');
+    const tw = createTowerWorld();
+    const ghost = TOWER_PLATFORMS.find((p) => p.kind === 'ghost')!;
+    let sawSolid = false;
+    let sawGone = false;
+    for (let t = 0; t < 6; t += 0.1) {
+      updateTowerWorld(tw, t);
+      const away = tw.platforms[ghost.index]!.minX > 1e5;
+      expect(away).toBe(!ghostIsSolid(ghost, t));
+      if (away) sawGone = true;
+      else sawSolid = true;
+    }
+    expect(sawSolid && sawGone).toBe(true);
+  });
+});
+
+describe('Maze', () => {
+  it('generates the same maze for a seed, with every cell reachable from the exit', async () => {
+    const { MAZE, MAZE_EXIT_COL, generateMaze, mazeDistances } = await import('@sp/shared');
+    const a = generateMaze(1234);
+    expect(generateMaze(1234)).toEqual(a);
+    expect(generateMaze(99)).not.toEqual(a);
+    const dist = mazeDistances(a, 0, MAZE_EXIT_COL);
+    expect([...dist].every((d) => d >= 0)).toBe(true);
+    expect(dist.length).toBe(MAZE.rows * MAZE.cols);
+  });
+
+  it('the minotaur catches a player who stands still; the exit gate finishes', async () => {
+    const { MazeRun } = await import('../Maze/Logic.ts');
+    const { MAZE, MAZE_EXIT_Z } = await import('@sp/shared');
+    const { ctx, players } = makeContext(2);
+    const game = new MazeRun();
+    game.initialize(ctx);
+    players[1]!.sim.reset(players[1]!.sim.state.x, MAZE_EXIT_Z - 0.5, Math.PI);
+    run(game, players, 0, 0.1);
+    expect(players[1]!.state.roundState).toBe('FINISHED');
+    run(game, players, 0.1, MAZE.minotaurDelay + 8);
+    expect(players[0]!.state.roundState).toBe('OUT');
+    expect(game.finish().details.get('p0')).toBe('Bị Minotaur bắt');
+  });
+});
+
+describe('Parkour', () => {
+  it('jump pads launch, the conveyor drags you back', async () => {
+    const { PARKOUR, PARKOUR_STATIC, createCharacterState, createParkourWorld, parkourStep, MOVEMENT } = await import('@sp/shared');
+    const step = parkourStep(createParkourWorld(), MOVEMENT.radius);
+    const pad = PARKOUR_STATIC.find((b) => b.kind === 'pad')!;
+    const s = createCharacterState(0, (pad.minZ + pad.maxZ) / 2);
+    s.y = pad.top;
+    step(s, { dirX: 0, dirZ: 0, jump: false }, 1 / 60, 0);
+    expect(s.vy).toBeGreaterThan(PARKOUR.padLaunch - 1);
+    const belt = PARKOUR_STATIC.find((b) => b.kind === 'conveyor')!;
+    const c = createCharacterState(0, (belt.minZ + belt.maxZ) / 2);
+    c.y = belt.top;
+    const z0 = c.z;
+    for (let i = 0; i < 60; i++) step(c, { dirX: 0, dirZ: 0, jump: false }, 1 / 60, i / 60);
+    expect(c.z - z0).toBeGreaterThan(PARKOUR.conveyorSpeed * 0.9);
+  });
+
+  it('falling respawns at the last checkpoint (at its height); crossing the line finishes', async () => {
+    const { Parkour } = await import('../Parkour/Logic.ts');
+    const { PARKOUR } = await import('@sp/shared');
+    const { ctx, players } = makeContext(2);
+    const game = new Parkour();
+    game.initialize(ctx);
+    const p = players[0]!;
+    p.sim.reset(0, -50, Math.PI);
+    p.sim.state.y = PARKOUR.deck;
+    run(game, players, 0, 0.1); // stood on the high deck
+    p.sim.state.y = PARKOUR.killY - 1;
+    run(game, players, 0.1, 1 / 60);
+    expect(p.sim.state.z).toBeCloseTo(-47.5, 1);
+    expect(p.sim.state.y).toBeCloseTo(PARKOUR.deck, 1);
+    players[1]!.sim.reset(0, PARKOUR.finishZ - 0.5, Math.PI);
+    run(game, players, 1, 0.1);
+    expect(players[1]!.state.roundState).toBe('FINISHED');
+  });
+});

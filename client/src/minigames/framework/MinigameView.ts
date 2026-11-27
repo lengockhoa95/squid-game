@@ -40,4 +40,7 @@ export const VIEW_LOADERS: Readonly<Record<MinigameId, () => Promise<ViewFactory
   GLASS_BRIDGE: () => import('../GlassBridge/View.ts').then((m) => m.createView),
   OBSTACLE_RACE: () => import('../ObstacleRace/View.ts').then((m) => m.createView),
   FLOOR_COLLAPSE: () => import('../FloorCollapse/View.ts').then((m) => m.createView),
+  TOWER_CLIMB: () => import('../TowerClimb/View.ts').then((m) => m.createView),
+  MAZE: () => import('../Maze/View.ts').then((m) => m.createView),
+  PARKOUR: () => import('../Parkour/View.ts').then((m) => m.createView),
 };

@@ -63,7 +63,8 @@ export class ElementSystem {
     this.clear();
     this.players = players;
     this.game = game;
-    this.allowed = this.enabled ? elementsFor(game.id as MinigameId, game.step !== null) : [];
+    const off = new Set(this.state.disabledElements);
+    this.allowed = this.enabled ? elementsFor(game.id as MinigameId, game.step !== null).filter((id) => !off.has(id)) : [];
     for (const p of this.state.players.values()) p.element = ''; // spectators have no element
     for (const p of players) {
       const s = p.state;

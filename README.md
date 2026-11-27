@@ -43,7 +43,7 @@ Mở http://localhost:5173 → nhập tên → **Tạo phòng** (hoặc **Sân t
 | `PORT` | server | `2567` | Cổng Colyseus |
 | `VITE_SERVER_URL` | client (lúc build) | `http(s)://<host đang mở trang>:2567` | Địa chỉ server khi deploy khác máy/cổng |
 | `COLYSEUS_LATENCY` | server | – | Giả lập độ trễ (ms) để thử prediction |
-| `SP_GAMES` | server | – (tất cả) | Chỉ chơi các minigame này khi test, ví dụ `SP_GAMES=RLGL,OBSTACLE_RACE` |
+| `SP_GAMES` | server | – (tất cả) | Chỉ chơi các minigame này khi test, ví dụ `SP_GAMES=MAZE,PARKOUR` (RLGL, GLASS_BRIDGE, OBSTACLE_RACE, FLOOR_COLLAPSE, TOWER_CLIMB, MAZE, PARKOUR) |
 
 ## Chạy bằng Docker
 
@@ -73,11 +73,15 @@ docker compose down
 
 | Minigame | Cách chơi |
 |---|---|
-| Đèn Xanh – Đèn Đỏ | W để chạy khi đèn xanh, thả phím khi đèn đỏ |
+| Đèn Xanh – Đèn Đỏ | W để chạy khi đèn xanh, thả phím khi đèn đỏ (đường 80m) |
 | Cầu Kính | Mỗi hàng 3 tấm, 1 tấm vỡ. Click tấm kính hàng kế tiếp (A/S/D). Mọi người chơi cùng lúc |
-| Vượt Chướng Ngại | WASD để chạy, Space để nhảy qua hố và tường |
-| Kéo Co | Click/Space khi kim vào vùng xanh |
-| Phản Xạ Nhanh | Click/Space khi màn hình chuyển xanh (BẤM!), 5 lượt |
+| Vượt Chướng Ngại | WASD để chạy, Space để nhảy qua hố và tường, né khối đẩy và thanh quét |
+| Sàn Sụp | 3 tầng gạch; ô vừa đứng lên sẽ sụp. Rơi khỏi tầng cuối là thua |
+| Tháp Leo | Nhảy bục xoắn ốc lên đỉnh tháp trước khi dung nham dâng tới |
+| Mê Cung | Tìm cổng ra, Minotaur được thả sau 5 giây và đuổi theo, ngày càng nhanh |
+| Parkour | Đá nhảy, rào, cầu thăng bằng, bệ bật, búa trượt, băng chuyền, thanh quét, bục di động |
+
+Host tick để bỏ bớt minigame và nguyên tố ngay trong màn chờ (mặc định bật tất cả, luôn còn ít nhất 1 game).
 
 Trong màn chờ có nút **Hướng dẫn chơi** (tự mở ở lần đầu): điều khiển bằng chuột, nguyên tố, thẻ kỹ năng, minigame.
 

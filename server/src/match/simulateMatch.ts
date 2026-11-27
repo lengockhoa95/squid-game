@@ -23,12 +23,14 @@ export function simulateMatch(
   available?: MinigameId[],
   elements = true,
   noElimination = false,
+  disabledGames: readonly string[] = [],
 ): SimulatedMatch & { casts: number; eliminatedCount: number; points: number[]; winnerPoints: number } {
   const rng = createRng(seed);
   const state = new MatchState();
   state.phase = 'LOBBY';
   state.elementsEnabled = elements;
   state.noElimination = noElimination;
+  for (const g of disabledGames) state.disabledGames.push(g);
   const sims = new Map<string, PlayerSim>();
   const npcs = new NPCManager(seed * 7919);
   const specs = NPCManager.planBots(Math.min(MAX_PLAYERS, difficulties.length), difficulties, new Set(), rng);

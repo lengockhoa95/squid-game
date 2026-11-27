@@ -2,7 +2,7 @@ import { Room, type Client } from '@colyseus/core';
 import {
   ERROR_CODES, IN_MATCH_PHASES, MAX_PLAYERS, MSG, PATCH_MS, PLAYGROUND_SPAWNS, RECONNECT_SECONDS, SIM_DT, SIM_HZ,
   DEFAULT_NPC_DIFFICULTIES, isDifficulty, parseCast, parseElementsToggle, parseGameAction, parseMoveBatch, parseNpcConfig,
-  parsePickCard, parsePickElement, sanitizeNickname,
+  ELEMENT_IDS, MINIGAME_IDS, parseItemToggle, parsePickCard, parsePickElement, sanitizeNickname,
   type ErrorCodeName, type JoinOptions, type MinigameId, type Phase,
 } from '@sp/shared';
 import { MatchState } from '@sp/shared/schema';
@@ -30,6 +30,9 @@ const RATE_LIMITS = {
   [MSG.NO_ELIMINATION_TOGGLE]: { perSecond: 4, burst: 4 },
   [MSG.CARDS_TOGGLE]: { perSecond: 4, burst: 4 },
   [MSG.PICK_CARD]: { perSecond: 4, burst: 4 },
+  // Hosts click through checkbox lists quickly.
+  [MSG.GAME_TOGGLE]: { perSecond: 10, burst: 16 },
+  [MSG.ELEMENT_TOGGLE]: { perSecond: 10, burst: 16 },
 };
 const KICK_AFTER_VIOLATIONS = 300;
 const KICK_CLOSE_CODE = 4002;
@@ -115,6 +118,25 @@ export class MatchRoom extends Room {
       if (this.state.phase !== 'LOBBY') return this.sendError(client, ERROR_CODES.BAD_PHASE);
       const toggle = parseElementsToggle(msg);
       if (toggle) this.state.cardsEnabled = toggle.enabled;
+    });
+    this.onMessage(MSG.GAME_TOGGLE, (client, msg: unknown) => {
+      if (!this.hostLobbyAction(client, MSG.GAME_TOGGLE)) return;
+      const t = parseItemToggle(msg, MINIGAME_IDS);
+      if (!t) return;
+      const off = this.state.disabledGames;
+      const i = off.indexOf(t.id);
+      if (t.enabled && i >= 0) off.splice(i, 1);
+      // Keep at least one game in the pool.
+      if (!t.enabled && i < 0 && off.length < MINIGAME_IDS.length - 1) off.push(t.id);
+    });
+    this.onMessage(MSG.ELEMENT_TOGGLE, (client, msg: unknown) => {
+      if (!this.hostLobbyAction(client, MSG.ELEMENT_TOGGLE)) return;
+      const t = parseItemToggle(msg, ELEMENT_IDS);
+      if (!t) return;
+      const off = this.state.disabledElements;
+      const i = off.indexOf(t.id);
+      if (t.enabled && i >= 0) off.splice(i, 1);
+      if (!t.enabled && i < 0) off.push(t.id);
     });
     this.onMessage(MSG.PICK_CARD, (client, msg: unknown) => {
       if (!this.allow(client, MSG.PICK_CARD)) return;
@@ -270,6 +292,20 @@ export class MatchRoom extends Room {
     this.state.results.clear();
     this.clampNpcCount();
     void this.unlock();
+  }
+
+  /** Rate limit + host only + lobby only (sends the matching error otherwise). */
+  private hostLobbyAction(client: Client, type: string): boolean {
+    if (!this.allow(client, type)) return false;
+    if (client.sessionId !== this.state.hostId) {
+      this.sendError(client, ERROR_CODES.NOT_HOST);
+      return false;
+    }
+    if (this.state.phase !== 'LOBBY') {
+      this.sendError(client, ERROR_CODES.BAD_PHASE);
+      return false;
+    }
+    return true;
   }
 
   private humans() {
