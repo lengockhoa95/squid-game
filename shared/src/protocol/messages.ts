@@ -21,6 +21,8 @@ export const MSG = {
   CARDS_TOGGLE: 'cardsToggle',
   /** Host ticks a minigame / element in or out of the pool: {id, enabled}. */
   GAME_TOGGLE: 'gameToggle',
+  /** Lobby: pick your character {id}. */
+  PICK_CHARACTER: 'pickCharacter',
   ELEMENT_TOGGLE: 'elementToggle',
   /** Choose one card of your offer during the round result. */
   PICK_CARD: 'pickCard',

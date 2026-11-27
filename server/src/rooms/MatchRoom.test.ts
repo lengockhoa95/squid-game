@@ -243,4 +243,22 @@ describe('MatchRoom match flow', () => {
     host.send(MSG.GAME_TOGGLE, { id: MINIGAME_IDS[0], enabled: true });
     await waitFor(() => !state.disabledGames.includes(MINIGAME_IDS[0]!));
   });
+
+  it('players pick characters in the lobby; bots get unused ones', async () => {
+    const { host, state } = await createLobby(['Host']);
+    host.send(MSG.PICK_CHARACTER, { id: 'character-robot' });
+    host.send(MSG.PICK_CHARACTER, { id: 'not-a-character' });
+    await waitFor(() => state.players.get(host.sessionId)!.character === 'character-robot');
+    host.send(MSG.NPC_CONFIG, { count: 3, difficulties: ['EASY', 'EASY', 'EASY'] });
+    host.send(MSG.READY, { ready: true });
+    await waitFor(() => state.players.get(host.sessionId)!.ready);
+    host.send(MSG.START);
+    await waitFor(() => state.players.size === 4);
+    const picks = [...state.players.values()].map((p) => p.character);
+    expect(new Set(picks).size).toBe(4);
+    expect(picks.every((c) => c.startsWith('character-'))).toBe(true);
+    host.send(MSG.PICK_CHARACTER, { id: 'character-alien' }); // not in the lobby any more
+    await new Promise((r) => setTimeout(r, 100));
+    expect(state.players.get(host.sessionId)!.character).toBe('character-robot');
+  });
 });

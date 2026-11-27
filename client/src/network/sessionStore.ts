@@ -19,6 +19,7 @@ export interface LobbyPlayer {
   cards: string;
   cardOffer: string;
   lives: number;
+  character: string;
 }
 
 export interface ResultRow {

@@ -81,6 +81,8 @@ docker compose down
 | Mê Cung | Tìm cổng ra, Minotaur được thả sau 5 giây và đuổi theo, ngày càng nhanh |
 | Parkour | Đá nhảy, rào, cầu thăng bằng, bệ bật, búa trượt, băng chuyền, thanh quét, bục di động |
 
+Mỗi người chọn nhân vật trong màn chờ (20 nhân vật [Kenney Mini Characters](https://kenney.nl/assets/mini-characters-1), CC0 — cảm ơn Kenney); NPC tự lấy nhân vật chưa ai chọn. Tên người chơi hiện trên đầu nhân vật.
+
 Host tick để bỏ bớt minigame và nguyên tố ngay trong màn chờ (mặc định bật tất cả, luôn còn ít nhất 1 game).
 
 Trong màn chờ có nút **Hướng dẫn chơi** (tự mở ở lần đầu): điều khiển bằng chuột, nguyên tố, thẻ kỹ năng, minigame.

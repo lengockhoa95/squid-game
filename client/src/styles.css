@@ -743,3 +743,38 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
   text-align: center;
   max-width: calc(100% - 24px);
 }
+
+/* Character picker */
+.char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.char-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.char-option img { image-rendering: auto; }
+.char-option span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.char-option:hover { border-color: var(--neon); color: var(--text); }
+.char-option.is-picked { border-color: var(--neon); color: var(--text); box-shadow: 0 0 0 2px var(--neon); }
+.char-option.is-taken::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4f9a;
+}
+.slot-portrait { position: relative; display: inline-flex; }
+.slot-portrait img { width: 44px; height: 44px; border-radius: 12px; background: var(--bg); }
+.slot-portrait .avatar { position: absolute; right: -6px; bottom: -6px; width: 20px; height: 20px; font-size: 10px; }

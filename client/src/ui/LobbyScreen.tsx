@@ -7,11 +7,17 @@ import { Avatar } from './Avatar.tsx';
 import { NpcSettings, DIFFICULTY_LABEL } from './NpcSettings.tsx';
 import { ElementsToggle } from '../elements/ElementsToggle.tsx';
 import { HowToPlay } from './HowToPlay.tsx';
+import { CharacterPicker } from './CharacterPicker.tsx';
+import { characterPreview } from '../player/characters.ts';
+import { characterFor } from '@sp/shared';
 
 function PlayerCard({ p, isHost, isMe }: { p: LobbyPlayer; isHost: boolean; isMe: boolean }) {
   return (
     <li className={`slot-card ${p.ready ? 'is-ready' : ''}`}>
-      <Avatar slot={p.slot} name={p.nickname} />
+      <span className="slot-portrait">
+        <img src={characterPreview(characterFor(p.character, p.slot))} alt="" width={44} height={44} />
+        <Avatar slot={p.slot} name={p.nickname} />
+      </span>
       <div className="slot-info">
         <div className="slot-name">
           {p.nickname}
@@ -89,6 +95,7 @@ export function LobbyScreen() {
           ))}
         </ul>
 
+        <CharacterPicker />
         <NpcSettings editable={amHost} />
         <ElementsToggle editable={amHost} />
 

@@ -4,8 +4,8 @@ import {
 } from '@sp/shared';
 import type { CameraPreset, ClickHit, FrameInput, GameScene, SceneContext } from '../../core/GameScene.ts';
 import { ResourceTracker } from '../../core/ResourceTracker.ts';
-import { PlayerModel } from '../../player/PlayerModel.ts';
-import { AnimationController, type Pose } from '../../player/AnimationController.ts';
+import type { CharacterBody, Pose } from '../../player/CharacterBody.ts';
+import { createCharacterBody } from '../../player/characters.ts';
 import { FIXED_DT, PlayerController } from '../../player/PlayerController.ts';
 import { ClickMarker } from '../../player/ClickMarker.ts';
 import { NameTag } from '../../player/NameTag.ts';
@@ -21,8 +21,7 @@ const MAX_STEPS_PER_FRAME = 6;
 const RENDER_DELAY_MS = 100;
 
 interface Actor {
-  model: PlayerModel;
-  anim: AnimationController;
+  model: CharacterBody;
   interp: RemoteInterpolator;
   generation: number;
   /** Nickname above the head (none for the local player). */
@@ -113,7 +112,7 @@ class MatchScene implements GameScene {
       if (!a.interp.sample(renderTime, this.sample)) continue;
       a.model.group.position.set(this.sample.x, this.sample.y, this.sample.z);
       a.model.group.rotation.y = this.sample.yaw;
-      a.anim.update(dt, this.sample.speed, this.sample.grounded);
+      a.model.animate(dt, this.sample.speed, this.sample.grounded);
     }
 
     this.effects.update(dt, state, gameTime, (id) => {
@@ -334,7 +333,7 @@ class MatchScene implements GameScene {
       actor.model.group.visible = this.participants.has(p.id);
       const pose: Pose =
         p.roundState === 'OUT' ? 'fallen' : p.roundState === 'FINISHED' || (phase === 'MATCH_END' && p.id === winnerId) ? 'cheer' : 'normal';
-      actor.anim.setPose(pose);
+      actor.model.setPose(pose);
       actor.model.setElement(p.element);
       actor.model.setAura(this.awakenColor(p.cards));
       if (p.id === this.net.localId) this.syncLocal(p, actor, now);
@@ -352,15 +351,15 @@ class MatchScene implements GameScene {
     let a = this.actors.get(p.id);
     if (!a) {
       const look = SLOT_LOOKS[p.slot] ?? SLOT_LOOKS[0]!;
-      const model = new PlayerModel(this.ctx.materials, look.color, look.accessory);
+      const model = createCharacterBody(this.ctx.materials, p.slot, p.character);
       model.group.position.set(p.x, p.y, p.z);
       this.root.add(model.group);
       let tag: NameTag | null = null;
       if (p.id !== this.net.localId) {
         tag = new NameTag(p.nickname, look.color);
-        tag.attach(model.group);
+        tag.attach(model.group, model.tagHeight);
       }
-      a = { model, anim: new AnimationController(model), interp: new RemoteInterpolator(), generation: gen, tag };
+      a = { model, interp: new RemoteInterpolator(), generation: gen, tag };
       this.actors.set(p.id, a);
     }
     a.generation = gen;

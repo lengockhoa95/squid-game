@@ -131,11 +131,20 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
 - [x] Hộp va chạm có mặt dưới (sàn nhiều tầng); nguyên tố và hiệu ứng theo độ cao người dùng.
 - [x] Test: 166 unit/integration.
 
+## Phase 12 — Cầu Kính tự do, chuột kiểu bắn súng, nhân vật Kenney ✅
+
+- [x] Cầu Kính thành game di chuyển: đi/nhảy trên kính, đáp xuống tấm vỡ là rơi; mọi nguyên tố dùng được
+- [x] Xoay camera bằng chuột kiểu bắn súng (khoá con trỏ, tâm ngắm qua vai), tắt được trong Cài đặt
+- [x] Tên người chơi trên đầu nhân vật (cả bản sao Phân thân)
+- [x] 20 nhân vật Kenney Mini Characters (glTF, CC0) với animation đứng/đi/chạy/nhảy/ngã/ăn mừng; nhân vật vẽ bằng code là dự phòng khi tải lỗi
+- [x] Chọn nhân vật trong màn chờ; NPC tự lấy nhân vật chưa ai chọn; Minotaur là zombie Kenney có sừng
+- [x] Test: 166 unit/integration; E2E trận đầy đủ + multiplayer qua với model mới
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).
 - Trận 4 người thường 2–3 vòng: trận dừng khi còn 1 người; 4–5 vòng chỉ khi có vòng không ai bị loại.
-- Chỉ hỗ trợ chuột + bàn phím (chưa có điều khiển cảm ứng).
+- Chỉ hỗ trợ chuột + bàn phím (chưa có điều khiển cảm ứng — chưa chơi được bằng tay trên iPad/điện thoại).
 - Camera chưa tránh tường; khi FPS < 10 nhân vật của mình đi chậm hơn.
 - Room code duy nhất trong 1 tiến trình server (đủ cho triển khai 1 server).
 - Va chạm ở client dự đoán theo vị trí người khác ở snapshot gần nhất, nên khi chen nhau nhân vật có thể giật nhẹ.

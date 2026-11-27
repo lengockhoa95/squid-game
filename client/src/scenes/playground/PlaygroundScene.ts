@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { ARENA_HALF, createPlaygroundWorld, createRng, SLOT_LOOKS, staticWorldStep, type QualityPreset, type SimWorld } from '@sp/shared';
 import type { ClickHit, FrameInput, GameScene, SceneContext } from '../../core/GameScene.ts';
 import { ResourceTracker } from '../../core/ResourceTracker.ts';
-import { PlayerModel } from '../../player/PlayerModel.ts';
+import type { CharacterBody } from '../../player/CharacterBody.ts';
+import { createCharacterBody } from '../../player/characters.ts';
 import { FIXED_DT, PlayerController } from '../../player/PlayerController.ts';
 import { ClickMarker } from '../../player/ClickMarker.ts';
 import { PlaygroundEnvironment } from './PlaygroundEnvironment.ts';
@@ -28,7 +29,7 @@ class PlaygroundScene implements GameScene {
   private readonly world: SimWorld = createPlaygroundWorld();
   private readonly player: PlayerController;
   private readonly bots: Bot[] = [];
-  private readonly models: PlayerModel[] = [];
+  private readonly models: CharacterBody[] = [];
   private readonly marker: ClickMarker;
   private readonly cameraTarget = new THREE.Vector3();
   private accumulator = 0;
@@ -38,15 +39,13 @@ class PlaygroundScene implements GameScene {
     this.marker = new ClickMarker(this.resources);
     this.root.add(this.marker.mesh);
 
-    const look = SLOT_LOOKS[0]!;
-    const playerModel = new PlayerModel(ctx.materials, look.color, look.accessory);
+    const playerModel = createCharacterBody(ctx.materials, 0);
     this.models.push(playerModel);
     this.root.add(playerModel.group);
     this.player = new PlayerController(staticWorldStep(this.world), playerModel, 0, 0, Math.PI, this.world.killY); // face away from the camera
 
     DEMO_SPAWNS.forEach((spawn, i) => {
-      const botLook = SLOT_LOOKS[i + 1]!;
-      const model = new PlayerModel(ctx.materials, botLook.color, botLook.accessory);
+      const model = createCharacterBody(ctx.materials, i + 1);
       this.models.push(model);
       this.root.add(model.group);
       this.bots.push({ ctrl: new PlayerController(staticWorldStep(this.world), model, spawn.x, spawn.z, 0, this.world.killY), rng: createRng(100 + i), idle: 0.5 + i });

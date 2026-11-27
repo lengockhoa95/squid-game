@@ -114,6 +114,10 @@ class NetworkManager {
     this.room?.send(MSG.CARDS_TOGGLE, { enabled });
   }
 
+  setCharacter(id: string): void {
+    this.room?.send(MSG.PICK_CHARACTER, { id });
+  }
+
   setGameEnabled(id: string, enabled: boolean): void {
     this.room?.send(MSG.GAME_TOGGLE, { id, enabled });
   }
@@ -263,7 +267,7 @@ class NetworkManager {
 
     let signature = '';
     state.players.forEach((p) => {
-      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.difficulty}|${p.ready}|${p.connected}|${p.alive}|${p.roundState}|${p.team}|${p.element}|${p.points}|${p.cards}|${p.cardOffer}|${p.lives};`;
+      signature += `${p.id}|${p.nickname}|${p.slot}|${p.isBot}|${p.difficulty}|${p.ready}|${p.connected}|${p.alive}|${p.roundState}|${p.team}|${p.element}|${p.points}|${p.cards}|${p.cardOffer}|${p.lives}|${p.character};`;
     });
     if (signature === this.lobbySignature) return;
     this.lobbySignature = signature;
@@ -272,7 +276,7 @@ class NetworkManager {
       players.push({
         id: p.id, nickname: p.nickname, slot: p.slot, isBot: p.isBot, difficulty: p.difficulty, ready: p.ready,
         connected: p.connected, alive: p.alive, roundState: p.roundState, team: p.team, element: p.element, points: p.points,
-        cards: p.cards, cardOffer: p.cardOffer, lives: p.lives,
+        cards: p.cards, cardOffer: p.cardOffer, lives: p.lives, character: p.character,
       });
       this.detectAwakening(p.id, p.nickname, p.cards);
     });

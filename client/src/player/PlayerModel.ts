@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { CHARACTER_SCALE } from '@sp/shared';
 import type { MaterialLibrary } from '../core/MaterialLibrary.ts';
 import { ElementLook } from './ElementLook.ts';
+import { AnimationController } from './AnimationController.ts';
+import type { CharacterBody, Pose } from './CharacterBody.ts';
 
 export type Accessory = 'none' | 'cap' | 'glasses' | 'band';
 
@@ -54,7 +56,9 @@ function releaseGeometries(): void {
  * Procedural low-poly character (~10 meshes, no textures, no skeleton).
  * Origin is at the feet; +Z is the facing direction.
  */
-export class PlayerModel {
+export class PlayerModel implements CharacterBody {
+  readonly tagHeight = 2.55;
+  private anim: AnimationController | null = null;
   readonly group = new THREE.Group();
   /** Inner pivot used for whole-body poses (falling over) without touching position/yaw on `group`. */
   readonly poseGroup = new THREE.Group();
@@ -128,6 +132,16 @@ export class PlayerModel {
     if (!css && !this.look) return;
     this.look ??= new ElementLook(this.materials, { torso: this.torso, armL: this.armL, armR: this.armR });
     this.look.setAura(css ? Number.parseInt(css.slice(1), 16) : -1, this.poseGroup);
+  }
+
+  animate(dt: number, horizontalSpeed: number, grounded: boolean): void {
+    this.anim ??= new AnimationController(this);
+    this.anim.update(dt, horizontalSpeed, grounded);
+  }
+
+  setPose(pose: Pose): void {
+    this.anim ??= new AnimationController(this);
+    this.anim.setPose(pose);
   }
 
   /** Animate cosmetic extras (element charm). */

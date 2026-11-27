@@ -5,7 +5,8 @@ const STRIDE_FREQ = 2.1; // base stride cycles per second, scaled up with speed
 const SWING = 0.9; // max limb swing (rad)
 const BLEND = 10;
 
-export type Pose = 'normal' | 'fallen' | 'cheer';
+import type { Pose } from './CharacterBody.ts';
+export type { Pose };
 
 /** Procedural animation: idle breathing, run cycle scaled by speed, airborne pose. */
 export class AnimationController {

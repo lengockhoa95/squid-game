@@ -3,15 +3,15 @@ import { ELEMENT_FX, SLOT_LOOKS, createElementField, type ElementField } from '@
 import type { ElementEffect, MatchState } from '@sp/shared/schema';
 import type { MaterialLibrary } from '../core/MaterialLibrary.ts';
 import { ResourceTracker } from '../core/ResourceTracker.ts';
-import { PlayerModel } from '../player/PlayerModel.ts';
-import { AnimationController } from '../player/AnimationController.ts';
+import type { CharacterBody } from '../player/CharacterBody.ts';
+import { createCharacterBody } from '../player/characters.ts';
 import { NameTag } from '../player/NameTag.ts';
 import { audio } from '../audio/AudioManager.ts';
 
 interface Drawn {
   object: THREE.Object3D;
   kind: string;
-  clone?: { model: PlayerModel; anim: AnimationController; tag: NameTag | null };
+  clone?: { model: CharacterBody; tag: NameTag | null };
 }
 
 interface StatusMarks {
@@ -148,15 +148,15 @@ export class ElementEffectsView {
         return { object: new THREE.Mesh(this.geo.bolt, this.mat.bolt), kind: e.kind };
       case 'CLONE': {
         const look = SLOT_LOOKS[e.slot] ?? SLOT_LOOKS[0]!;
-        const model = new PlayerModel(this.materials, look.color, look.accessory);
-        model.setElement('CLONE'); // same tattoo and name as the caster: clones are indistinguishable
         const owner = state.players.get(e.owner);
+        const model = createCharacterBody(this.materials, e.slot, owner?.character ?? '');
+        model.setElement('CLONE'); // same body, tattoo and name as the caster: clones are indistinguishable
         let tag: NameTag | null = null;
         if (owner) {
           tag = new NameTag(owner.nickname, look.color);
-          tag.attach(model.group);
+          tag.attach(model.group, model.tagHeight);
         }
-        return { object: model.group, kind: e.kind, clone: { model, anim: new AnimationController(model), tag } };
+        return { object: model.group, kind: e.kind, clone: { model, tag } };
       }
       case 'SWAP': {
         const g = new THREE.Group();
@@ -214,7 +214,7 @@ export class ElementEffectsView {
         g.position.z += (e.z - g.position.z) * k;
         g.position.y = e.y;
         g.rotation.y = e.yaw;
-        c.anim.update(dt, ELEMENT_FX.cloneSpeed, true);
+        c.model.animate(dt, ELEMENT_FX.cloneSpeed, true);
         break;
       }
       case 'RESCUE': {

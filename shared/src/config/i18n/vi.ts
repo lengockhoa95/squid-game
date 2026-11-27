@@ -140,6 +140,7 @@ export const vi = {
   mouseLookOn: 'Kiểu bắn súng',
   mouseLookOff: 'Giữ chuột phải',
   mouseLookHint: 'Click vào màn hình để xoay camera bằng chuột · Esc để thả chuột',
+  characterPick: 'Nhân vật của bạn',
   errNotHost: 'Chỉ host mới làm được việc này.',
   errNotAllReady: 'Tất cả người chơi phải sẵn sàng.',
   errBadPhase: 'Không thể làm việc này lúc này.',

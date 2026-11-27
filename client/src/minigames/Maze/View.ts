@@ -8,7 +8,8 @@ import type { ResourceTracker } from '../../core/ResourceTracker.ts';
 import type { MinigameView, ViewFrame } from '../framework/MinigameView.ts';
 import { StageLights, setSky } from '../framework/stage.ts';
 import { PlayerModel } from '../../player/PlayerModel.ts';
-import { AnimationController } from '../../player/AnimationController.ts';
+import type { CharacterBody } from '../../player/CharacterBody.ts';
+import { MINOTAUR_CHARACTER, createNamedBody } from '../../player/characters.ts';
 
 const DEG = Math.PI / 180;
 const MAX_WALLS = (MAZE.rows + 1) * MAZE.cols + MAZE.rows * (MAZE.cols + 1);
@@ -22,8 +23,7 @@ class MazeView implements MinigameView {
   readonly cameraPreset = { yaw: 0, pitch: 58 * DEG, distance: 13 };
   private readonly lights: StageLights;
   private readonly walls: THREE.InstancedMesh;
-  private readonly minotaur: PlayerModel;
-  private readonly anim: AnimationController;
+  private readonly minotaur: CharacterBody;
   private seed = -1;
   private readonly mtx = new THREE.Matrix4();
   private readonly last = new THREE.Vector3();
@@ -59,18 +59,19 @@ class MazeView implements MinigameView {
     line.position.set(gate.x, 0.01, MAZE_EXIT_Z);
     root.add(beam, line);
 
-    // Minotaur: a big dark-red character with horns.
-    this.minotaur = new PlayerModel(m, 0x7a1f1f, 'none');
-    this.minotaur.group.scale.setScalar(1.5);
-    const horn = res.track(new THREE.ConeGeometry(0.09, 0.4, 6));
+    // Minotaur: a big horned zombie (Kenney character; procedural fallback if not loaded).
+    const kenney = createNamedBody(m, MINOTAUR_CHARACTER);
+    this.minotaur = kenney ?? new PlayerModel(m, 0x7a1f1f, 'none');
+    this.minotaur.group.scale.setScalar(kenney ? 1.6 : 1.5);
+    const horn = res.track(new THREE.ConeGeometry(kenney ? 0.05 : 0.09, kenney ? 0.18 : 0.4, 6));
     for (const side of [-1, 1]) {
       const h = new THREE.Mesh(horn, m.lambert(0xf2e6c9));
-      h.position.set(side * 0.28, 0.28, 0);
+      if (kenney) h.position.set(side * 0.2, 0.32, 0);
+      else h.position.set(side * 0.28, 0.28, 0);
       h.rotation.z = -side * 0.7;
       this.minotaur.head.add(h);
     }
     this.minotaur.group.visible = false;
-    this.anim = new AnimationController(this.minotaur);
     root.add(this.minotaur.group);
     this.applyQuality(ctx.quality);
   }
@@ -92,7 +93,7 @@ class MazeView implements MinigameView {
         g.position.z += (maze.mz - g.position.z) * k;
         g.rotation.y = maze.myaw;
         const speed = dt > 0 ? this.last.distanceTo(g.position) / dt : 0;
-        this.anim.update(dt, speed, true);
+        this.minotaur.animate(dt, speed, true);
       }
     }
     this.lights.follow(frame.focus);

@@ -2,8 +2,7 @@ import {
   createCharacterState, intentTowardTarget,
   type CharacterState, type MoveIntent, type StepFn,
 } from '@sp/shared';
-import type { PlayerModel } from './PlayerModel.ts';
-import { AnimationController } from './AnimationController.ts';
+import type { CharacterBody } from './CharacterBody.ts';
 
 export const FIXED_DT = 1 / 60;
 /** Corrections larger than this are treated as teleports (snap instead of smoothing). */
@@ -20,8 +19,7 @@ function lerpAngle(a: number, b: number, t: number): number {
  */
 export class PlayerController {
   readonly state: CharacterState;
-  readonly model: PlayerModel;
-  private readonly anim: AnimationController;
+  readonly model: CharacterBody;
   private step: StepFn;
   private readonly killY: number | null;
   private readonly spawnX: number;
@@ -42,7 +40,7 @@ export class PlayerController {
   /**
    * @param killY when set, falling below it respawns locally (offline only; online the server respawns).
    */
-  constructor(step: StepFn, model: PlayerModel, spawnX: number, spawnZ: number, spawnYaw = 0, killY: number | null = null) {
+  constructor(step: StepFn, model: CharacterBody, spawnX: number, spawnZ: number, spawnYaw = 0, killY: number | null = null) {
     this.step = step;
     this.killY = killY;
     this.model = model;
@@ -54,7 +52,6 @@ export class PlayerController {
     this.prevX = spawnX;
     this.prevY = 0;
     this.prevZ = spawnZ;
-    this.anim = new AnimationController(model);
     this.syncModel(1, 0);
   }
 
@@ -170,6 +167,6 @@ export class PlayerController {
     );
     this.visualYaw = lerpAngle(this.visualYaw, s.yaw, 1 - Math.exp(-14 * dt));
     this.model.group.rotation.y = this.visualYaw;
-    this.anim.update(dt, Math.hypot(s.vx, s.vz), s.grounded);
+    this.model.animate(dt, Math.hypot(s.vx, s.vz), s.grounded);
   }
 }

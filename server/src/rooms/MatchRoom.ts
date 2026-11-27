@@ -2,7 +2,7 @@ import { Room, type Client } from '@colyseus/core';
 import {
   ERROR_CODES, IN_MATCH_PHASES, MAX_PLAYERS, MSG, PATCH_MS, PLAYGROUND_SPAWNS, RECONNECT_SECONDS, SIM_DT, SIM_HZ,
   DEFAULT_NPC_DIFFICULTIES, isDifficulty, parseCast, parseElementsToggle, parseGameAction, parseMoveBatch, parseNpcConfig,
-  ELEMENT_IDS, MINIGAME_IDS, parseItemToggle, parsePickCard, parsePickElement, sanitizeNickname,
+  CHARACTER_IDS, ELEMENT_IDS, MINIGAME_IDS, characterFor, isCharacterId, parseItemToggle, parsePickCard, parsePickElement, sanitizeNickname,
   type ErrorCodeName, type JoinOptions, type MinigameId, type Phase,
 } from '@sp/shared';
 import { MatchState } from '@sp/shared/schema';
@@ -32,6 +32,7 @@ const RATE_LIMITS = {
   [MSG.PICK_CARD]: { perSecond: 4, burst: 4 },
   // Hosts click through checkbox lists quickly.
   [MSG.GAME_TOGGLE]: { perSecond: 10, burst: 16 },
+  [MSG.PICK_CHARACTER]: { perSecond: 6, burst: 6 },
   [MSG.ELEMENT_TOGGLE]: { perSecond: 10, burst: 16 },
 };
 const KICK_AFTER_VIOLATIONS = 300;
@@ -138,6 +139,13 @@ export class MatchRoom extends Room {
       if (t.enabled && i >= 0) off.splice(i, 1);
       if (!t.enabled && i < 0) off.push(t.id);
     });
+    this.onMessage(MSG.PICK_CHARACTER, (client, msg: unknown) => {
+      if (!this.allow(client, MSG.PICK_CHARACTER)) return;
+      if (this.state.phase !== 'LOBBY') return this.sendError(client, ERROR_CODES.BAD_PHASE);
+      const id = (msg as { id?: unknown } | null)?.id;
+      const p = this.state.players.get(client.sessionId);
+      if (p && isCharacterId(id)) p.character = id;
+    });
     this.onMessage(MSG.PICK_CARD, (client, msg: unknown) => {
       if (!this.allow(client, MSG.PICK_CARD)) return;
       const pick = parsePickCard(msg);
@@ -236,6 +244,10 @@ export class MatchRoom extends Room {
         id: spec.id, nickname: spec.nickname, slot, joinOrder: ++this.joinCounter, isBot: true, difficulty: spec.difficulty,
       });
       this.npcs.add(spec, state, sim);
+      // Bots take a character nobody is using yet.
+      const used = new Set([...this.state.players.values()].map((pl) => characterFor(pl.character, pl.slot)));
+      const free = CHARACTER_IDS.filter((c) => !used.has(c));
+      state.character = free[Math.floor(this.rng() * free.length)] ?? '';
     }
     void this.lock();
     this.controller.begin();

@@ -73,6 +73,18 @@ export interface LookTargets {
   armR: THREE.Object3D;
 }
 
+/** Where the pieces sit, in each target's local space; `unit` scales every piece (different rigs). */
+export interface LookAnchors {
+  emblem: [number, number, number];
+  bandY: number;
+  orbitY: number;
+  auraY: number;
+  unit: number;
+}
+
+/** Defaults for the procedural PlayerModel. */
+export const PROCEDURAL_ANCHORS: LookAnchors = { emblem: [0, 0.42, 0.39], bandY: -0.16, orbitY: 1.45, auraY: 0.05, unit: 1 };
+
 export class ElementLook {
   private readonly materials: MaterialLibrary;
   private readonly targets: LookTargets;
@@ -83,12 +95,15 @@ export class ElementLook {
   private time = 0;
   private aura: THREE.Mesh | null = null;
   private auraColor = -1;
+  private readonly anchors: LookAnchors;
 
-  constructor(materials: MaterialLibrary, targets: LookTargets) {
+  constructor(materials: MaterialLibrary, targets: LookTargets, anchors: LookAnchors = PROCEDURAL_ANCHORS) {
     this.materials = materials;
     this.targets = targets;
+    this.anchors = anchors;
     this.geo = acquire();
-    this.orbit.position.y = 1.45; // above the head (torso space)
+    this.orbit.position.y = anchors.orbitY; // above the head (torso space)
+    this.orbit.scale.setScalar(anchors.unit);
     targets.torso.add(this.orbit);
   }
 
@@ -106,13 +121,15 @@ export class ElementLook {
     const glow = this.materials.basic(color);
 
     const emblem = new THREE.Mesh(this.geo.emblem, glow);
-    emblem.position.set(0, 0.42, 0.39); // chest, in front of the body cylinder
+    emblem.position.set(...this.anchors.emblem); // chest, in front of the body
+    emblem.scale.multiplyScalar(this.anchors.unit);
     this.targets.torso.add(emblem);
     this.parts.push(emblem);
 
     for (const arm of [this.targets.armL, this.targets.armR]) {
       const band = new THREE.Mesh(this.geo.band, glow);
-      band.position.y = -0.16;
+      band.position.y = this.anchors.bandY;
+      band.scale.setScalar(this.anchors.unit);
       arm.add(band);
       this.parts.push(band);
     }
@@ -136,7 +153,7 @@ export class ElementLook {
     this.aura = null;
     if (color < 0) return;
     this.aura = new THREE.Mesh(this.geo.aura, this.materials.basic(color));
-    this.aura.position.y = 0.05;
+    this.aura.position.y = this.anchors.auraY;
     root.add(this.aura);
   }
 
@@ -144,11 +161,11 @@ export class ElementLook {
     this.time += dt;
     if (this.aura) {
       this.aura.rotation.y += dt * 1.5;
-      this.aura.scale.setScalar(1 + Math.sin(this.time * 5) * 0.08);
+      this.aura.scale.setScalar(this.anchors.unit * (1 + Math.sin(this.time * 5) * 0.08));
     }
     if (!this.current) return;
     this.orbit.rotation.y += dt * 2.2;
-    this.orbit.position.y = 1.45 + Math.sin(this.time * 3) * 0.05;
+    this.orbit.position.y = this.anchors.orbitY + Math.sin(this.time * 3) * 0.05 * this.anchors.unit;
     const spin = this.current === 'FIRE' ? 0 : dt * 4;
     for (const c of this.orbit.children) c.rotation.y += spin;
   }

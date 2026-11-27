@@ -41,6 +41,8 @@ export const PlayerState = schema(
     cards: t.string(),
     cardOffer: t.string(),
     lives: t.uint8(),
+    /** Picked Kenney character id ('' = slot default). */
+    character: t.string(),
     /** Double jump used (mirrors CharacterState.airJumped for reconciliation). */
     airJumped: t.boolean(),
   },

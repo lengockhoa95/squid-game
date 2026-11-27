@@ -22,14 +22,24 @@ export interface EngineOptions {
 const STATS_INTERVAL_S = 0.25;
 const UP_NORMAL_MIN = 0.5;
 
+/** Character models (Kenney glTF); failures fall back to the procedural characters. */
+async function loadCharacters(names?: string[]): Promise<void> {
+  const { preloadCharacters } = await import('../player/characters.ts');
+  await preloadCharacters(names).catch(() => false);
+}
+
 export const playgroundLoader: SceneLoader = async (ctx) => {
-  const mod = await import('../scenes/playground/PlaygroundScene.ts');
+  const [mod] = await Promise.all([import('../scenes/playground/PlaygroundScene.ts'), loadCharacters()]);
   return mod.createPlaygroundScene(ctx);
 };
 
 export function matchSceneLoader(net: MatchNetAdapter): SceneLoader {
   return async (ctx) => {
-    const mod = await import('../scenes/match/MatchScene.ts');
+    // Everyone's picked character (bots included: they are in the state once the match starts).
+    const { characterFor, SLOT_CHARACTERS } = await import('@sp/shared');
+    const names = new Set<string>([...SLOT_CHARACTERS, 'character-zombie']);
+    net.forEachPlayer((p) => names.add(characterFor(p.character, p.slot)));
+    const [mod] = await Promise.all([import('../scenes/match/MatchScene.ts'), loadCharacters([...names])]);
     return mod.createMatchScene(ctx, net);
   };
 }
