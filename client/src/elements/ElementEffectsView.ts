@@ -297,19 +297,32 @@ export class ElementEffectsView {
         const yaw = Math.atan2(e.x2 - e.x, e.z2 - e.z);
         const from = this.tmpA.set(e.x + Math.sin(yaw) * 0.5, e.y + 0.75, e.z + Math.cos(yaw) * 0.5).clone();
         const to = this.tmpB.set(e.x2, e.y + 0.75, e.z2).clone();
-        if (!bow) fx.sprite({ tex: 'muzzle_01', color: 0xffd23f, pos: from, life: 0.08, size: 0.9, size1: 0.5 });
+        if (!bow) {
+          fx.sprite({ tex: 'muzzle_01', color: 0xffd23f, pos: from, life: 0.1, size: 1.4, size1: 0.6 });
+          fx.sprite({ tex: 'light_01', color: 0xffb040, pos: from, life: 0.12, size: 1.6, size1: 0.4 });
+        }
         const hit = from.distanceTo(to) > 0.5;
-        fx.streak('trace_01', bow ? 0xfff0c8 : 0xffe27a, from, to, bow ? 40 : 70, bow ? 1.4 : 2.2, bow ? 0.22 : 0.3, () => {
-          if (hit) fx.sparks(to, bow ? 0xffffff : 0xffc23f, 5, 3);
-        });
+        // Slower and wider than real bullets so every shot is easy to follow.
+        fx.streak('trace_01', bow ? 0xe8fff0 : 0xffe040, from, to, bow ? 30 : 45, bow ? 3.5 : 4.5, bow ? 1.1 : 1.3, () => {
+          if (hit) fx.sparks(to, bow ? 0xc8ffd0 : 0xffc23f, 7, 3.5);
+        }, bow ? 1 : 1.2);
         break;
       }
       case 'SLASH': {
         const yaw = Math.atan2(e.x2 - e.x, e.z2 - e.z);
         const reach = Math.max(1.2, Math.hypot(e.x2 - e.x, e.z2 - e.z));
-        const pos = { x: e.x + Math.sin(yaw) * reach * 0.45, y: e.y + 0.75, z: e.z + Math.cos(yaw) * reach * 0.45 };
-        fx.decal('slash_01', 0xffffff, pos, yaw, 0.35, reach * 1.2, reach * 1.6, 0.22);
-        fx.decal('slash_01', 0x9fd8ff, pos, yaw + 0.3, 0.35, reach * 1.0, reach * 1.4, 0.18, true, 0.6);
+        // A solid swing band (white core + coloured rim) plus sparks along its edge.
+        const at = { x: e.x, y: e.y + 0.8, z: e.z };
+        fx.arc(at, yaw, reach * 0.45, reach, 1.15, -0.7, 0xffffff, 0.24);
+        fx.arc(at, yaw, reach * 0.85, reach * 1.08, 1.2, -0.7, 0x5ab8ff, 0.28);
+        fx.arc(at, yaw, reach * 0.3, reach * 0.95, 1.1, -0.7, 0xfff0a0, 0.2, true);
+        for (let k = -2; k <= 2; k++) {
+          const a = yaw + k * 0.45;
+          fx.sprite({
+            tex: 'spark_01', color: 0xbfe8ff, pos: { x: e.x + Math.sin(a) * reach * 0.9, y: e.y + 0.8, z: e.z + Math.cos(a) * reach * 0.9 },
+            life: 0.2, size: 0.5, size1: 0.1, vel: { x: Math.sin(a) * 3, y: 1, z: Math.cos(a) * 3 },
+          });
+        }
         break;
       }
       case 'QUAKE':

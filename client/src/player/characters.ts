@@ -89,10 +89,10 @@ export function createWeaponModel(model: string): THREE.Object3D | null {
 
 /** How each weapon sits in the hand: tilt around x, size, and the model-space height of the grip. */
 const WEAPON_GRIP: Record<string, { rotX: number; scale: number; gripY: number }> = {
-  'weapon-sword': { rotX: 1.0, scale: 1.6, gripY: 0 },
-  'weapon-spear': { rotX: Math.PI / 2, scale: 1.7, gripY: 0.22 },
+  'weapon-sword': { rotX: 0.35, scale: 1.7, gripY: 0 },
+  'weapon-spear': { rotX: Math.PI / 2 - 0.2, scale: 2, gripY: 0.25 },
   'weapon-bow': { rotX: 0, scale: 1.5, gripY: 0.24 },
-  'weapon-shooter': { rotX: 0, scale: 1.6, gripY: 0 },
+  'weapon-shooter': { rotX: 0, scale: 1.6, gripY: 0.02 },
 };
 
 class KenneyBody implements CharacterBody {
@@ -115,8 +115,8 @@ class KenneyBody implements CharacterBody {
   private attackT = -1;
   private attackClip: Clip = 'attack-melee-right';
   private weapon: THREE.Object3D | null = null;
-  /** Right arm rotation at the start of the idle clip. */
-  private readonly armIdle = new THREE.Quaternion();
+  /** Right arm held forward (first frame of the "holding-right" clip): used while carrying a weapon. */
+  private readonly armHold = new THREE.Quaternion();
   private weaponName = '';
 
   constructor(gltf: GLTF, materials: MaterialLibrary) {
@@ -133,8 +133,8 @@ class KenneyBody implements CharacterBody {
     this.armL = this.inner.getObjectByName('arm-left') ?? this.torso;
     this.armR = this.inner.getObjectByName('arm-right') ?? this.torso;
     this.mixer = new THREE.AnimationMixer(this.inner);
-    const idleArm = gltf.animations.find((a) => a.name === 'idle')?.tracks.find((tr) => tr.name === `${this.armR.name}.quaternion`);
-    if (idleArm && idleArm.values.length >= 4) this.armIdle.fromArray(idleArm.values as unknown as number[], 0);
+    const holdArm = gltf.animations.find((a) => a.name === 'holding-right')?.tracks.find((tr) => tr.name === `${this.armR.name}.quaternion`);
+    if (holdArm && holdArm.values.length >= 4) this.armHold.fromArray(holdArm.values as unknown as number[], 0);
     for (const name of ['idle', 'walk', 'sprint', 'jump', 'die', 'emote-yes', 'attack-melee-right', 'holding-right-shoot'] as const) {
       const clip = gltf.animations.find((a) => a.name === name);
       if (!clip) continue;
@@ -162,6 +162,8 @@ class KenneyBody implements CharacterBody {
     const walk = this.actions.get('walk');
     if (walk && clip === 'walk') walk.timeScale = Math.max(0.6, horizontalSpeed / 3);
     this.mixer.update(dt);
+    // Carrying a weapon: the right arm stays raised forward (except while swinging / shooting).
+    if (this.weapon && this.attackT < 0 && this.pose === 'normal') this.armR.quaternion.copy(this.armHold);
     this.look?.update(dt);
     if (this.attackT >= 0) {
       this.attackT += dt;
@@ -185,15 +187,16 @@ class KenneyBody implements CharacterBody {
     // Not loaded yet: keep trying on the next state update.
     this.weaponName = model && !this.weapon ? '' : model;
     if (!this.weapon) return;
-    // In the right hand (the arm hangs down, −y). Kenney weapons stand up along +y; each one
+    // In the right fist. Kenney weapons stand up along +y; each one
     // gets its own grip: sword raised forward, spear level, bow upright, gun barrel forward.
     const g = WEAPON_GRIP[model] ?? WEAPON_GRIP['weapon-sword']!;
-    // The idle clip swings the arm outward: undo that so the weapon points forward while standing.
-    const q = this.armIdle.clone().invert().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(g.rotX, 0, 0)));
+    // Oriented against the held-forward arm so the weapon points where the character faces.
+    const q = this.armHold.clone().invert().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(g.rotX, 0, 0)));
     this.weapon.scale.setScalar(g.scale);
     this.weapon.quaternion.copy(q);
-    // Hand = end of the arm (arm-local −y); move the grip point (model-space y) onto it.
-    this.weapon.position.set(0, -0.15, 0.02).sub(new THREE.Vector3(0, g.gripY * g.scale, 0).applyQuaternion(q));
+    // Kenney arms rest straight out sideways (T-pose, arm-local −x); the fist is ~0.25 from the
+    // shoulder. Move the grip point (model-space y) onto the fist.
+    this.weapon.position.set(-0.25, 0, 0).sub(new THREE.Vector3(0, g.gripY * g.scale, 0).applyQuaternion(q));
     this.armR.add(this.weapon);
   }
 

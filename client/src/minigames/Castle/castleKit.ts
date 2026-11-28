@@ -11,6 +11,8 @@ const PIECES = [
   'wall', 'wall-corner', 'wall-doorway', 'wall-half', 'gate', 'tower-hexagon-base', 'tower-hexagon-mid', 'tower-hexagon-roof',
   'tower-square-base', 'tower-square-mid', 'tower-square-top-roof', 'tower-square-arch', 'flag', 'flag-banner-long',
   'tree-large', 'tree-small', 'rocks-large', 'rocks-small', 'siege-catapult', 'siege-ballista',
+  'tower-square-mid-windows', 'tower-square-mid-door', 'tower-square-top-roof-high-windows', 'tower-square-top-roof-high',
+  'tower-hexagon-top', 'wall-pillar', 'stairs-stone',
 ] as const;
 type Piece = (typeof PIECES)[number];
 
@@ -90,9 +92,15 @@ export function buildCastle(): { root: THREE.Group; gate: THREE.Object3D | null 
     add(piece('tower-hexagon-roof', sx, TILE * 1.6 * 2.3, wallZ, TILE * 1.6));
   }
   for (const sx of [-9, 9]) add(piece('flag-banner-long', sx, 0.2, wallZ - TILE / 2 - 0.05, [TILE, TILE * 0.9, TILE], Math.PI / 2));
+  buildKeep(add, wallZ);
+  // Stone walls along both sides of the battlefield, up to the monster lair: the whole map is walled in.
+  for (const sx of [-h - 1, h + 1]) {
+    for (let z = CASTLE.spawnZ - 2; z < wallZ - TILE / 2; z += TILE) add(piece('wall', sx, 0, z, [TILE, 0.8 * TILE, TILE], Math.PI / 2));
+    for (let z = CASTLE.spawnZ + 8; z < wallZ - 4; z += 12) add(piece('wall-pillar', sx, 0, z, [TILE * 1.1, TILE * 1.05, TILE * 1.1]));
+  }
   // Siege engines behind the wall (defenders' side).
-  add(piece('siege-catapult', -8, 0, wallZ + 5, 2.2, Math.PI));
-  add(piece('siege-ballista', 8, 0, wallZ + 5, 2.2, Math.PI));
+  add(piece('siege-catapult', -10, 0, wallZ + 5, 2.2, Math.PI));
+  add(piece('siege-ballista', 10, 0, wallZ + 5, 2.2, Math.PI));
   // Courtyard low walls = the collision boxes (1 m high).
   for (const b of createCastleWorld().boxes.slice(1)) {
     for (let x = b.minX + 0.5; x < b.maxX; x += 1) {
@@ -106,10 +114,10 @@ export function buildCastle(): { root: THREE.Group; gate: THREE.Object3D | null 
     if (Math.abs(x) < 3) continue;
     add(piece('wall', x, 0, lairZ, TILE));
   }
-  // Trees and rocks outside the playfield.
+  // Trees and rocks outside the walls.
   for (let i = 0; i < 26; i++) {
     const side = i % 2 === 0 ? -1 : 1;
-    const x = side * (h + 2.5 + hash(i) * 6);
+    const x = side * (h + 4 + hash(i) * 6);
     const z = CASTLE.spawnZ - 6 + (i / 26) * (CASTLE.gateZ - CASTLE.spawnZ + 10) + hash(i + 50) * 2;
     const kind: Piece = hash(i + 9) < 0.55 ? 'tree-large' : hash(i + 9) < 0.8 ? 'tree-small' : 'rocks-large';
     add(piece(kind, x, 0, z, 2 + hash(i + 3) * 1.5, hash(i + 7) * Math.PI * 2));
@@ -118,4 +126,53 @@ export function buildCastle(): { root: THREE.Group; gate: THREE.Object3D | null 
     add(piece('rocks-small', (hash(i + 90) * 2 - 1) * (h - 2), 0, CASTLE.spawnZ + 3 + hash(i + 70) * 30, 1.5, hash(i) * 6));
   }
   return { root, gate };
+}
+
+type Add = (o: THREE.Object3D | null) => THREE.Object3D | null;
+
+/** Back of the castle grounds (behind the front wall). */
+const YARD_DEPTH = 26;
+
+/**
+ * Behind the gate: a walled castle yard (side + back walls, hexagon towers at the corners) with a
+ * four-storey keep in the middle, two side towers and a gatehouse tower row — tall enough to be
+ * seen over the front wall from the battlefield.
+ */
+function buildKeep(add: Add, wallZ: number): void {
+  const h = CASTLE.halfWidth;
+  const backZ = wallZ + YARD_DEPTH;
+  // Side walls and back wall of the yard.
+  for (const sx of [-h, h]) {
+    for (let z = wallZ + TILE; z < backZ; z += TILE) add(piece('wall', sx, 0, z, TILE, Math.PI / 2));
+  }
+  for (let x = -h + TILE / 2; x < h; x += TILE) add(piece('wall', x, 0, backZ, TILE));
+  for (const sx of [-h, h]) {
+    add(piece('tower-hexagon-base', sx, 0, backZ, TILE * 1.6));
+    add(piece('tower-hexagon-mid', sx, TILE * 1.6 * 1.31, backZ, TILE * 1.6));
+    add(piece('tower-hexagon-roof', sx, TILE * 1.6 * 2.3, backZ, TILE * 1.6));
+  }
+  // The keep: four storeys and a high roof.
+  const kz = wallZ + YARD_DEPTH * 0.55;
+  const K = 6;
+  const storeys: Piece[] = ['tower-square-mid-door', 'tower-square-mid-windows', 'tower-square-mid', 'tower-square-mid-windows'];
+  add(piece('tower-square-base', 0, 0, kz, K, Math.PI));
+  storeys.forEach((name, i) => add(piece(name, 0, K * 1.01 * (i + 1), kz, [K * 0.95, K, K * 0.95], Math.PI)));
+  add(piece('tower-square-top-roof-high-windows', 0, K * 1.01 * (storeys.length + 1), kz, K, Math.PI));
+  add(piece('flag', 0, K * 1.01 * (storeys.length + 1) + K * 1.6, kz, K * 0.6, Math.PI / 2));
+  // Two side towers (three storeys) flanking the keep, and smaller ones by the gate.
+  const S = 3.6;
+  for (const sx of [-8.5, 8.5]) {
+    add(piece('tower-square-base', sx, 0, kz + 1, S, Math.PI));
+    add(piece('tower-square-mid-windows', sx, S * 1.01, kz + 1, S, Math.PI));
+    add(piece('tower-square-mid', sx, S * 2.02, kz + 1, S, Math.PI));
+    add(piece('tower-square-top-roof-high', sx, S * 3.03, kz + 1, S, Math.PI));
+    add(piece('flag-banner-long', sx, S * 0.4, kz + 1 - S / 2 - 0.05, [S * 0.5, S * 0.8, S * 0.5], Math.PI / 2));
+  }
+  for (const sx of [-5, 5]) {
+    add(piece('tower-hexagon-base', sx, 0, wallZ + 6, TILE * 1.3));
+    add(piece('tower-hexagon-mid', sx, TILE * 1.3 * 1.31, wallZ + 6, TILE * 1.3));
+    add(piece('tower-hexagon-top', sx, TILE * 1.3 * 2.32, wallZ + 6, TILE * 1.3));
+  }
+  // Stairs up to the keep door.
+  add(piece('stairs-stone', 0, 0, kz - K / 2 - 1, [3, 1.2, 2], Math.PI));
 }

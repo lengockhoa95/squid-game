@@ -107,6 +107,7 @@ export const vi = {
   controlCombatLeft: 'Click trái: đánh theo tâm ngắm',
   controlCombatRight: 'Chuột phải: dùng nguyên tố tại tâm ngắm',
   elementStunned: 'Bị sét đánh!',
+  monsterStunned: 'Bị quái húc!',
   controlElement: 'Phím F: dùng nguyên tố tại con trỏ',
   noElimMode: 'Không bị loại',
   noElimModeDesc: 'Thua vẫn chơi tiếp: đủ 5 vòng, cộng điểm theo thứ hạng, nhiều điểm nhất thắng.',

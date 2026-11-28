@@ -40,11 +40,11 @@ export interface WeaponInfo {
 }
 
 export const WEAPONS: Readonly<Record<WeaponId, WeaponInfo>> = {
-  FIST: { id: 'FIST', name: 'Tay không', model: '', damage: 1, range: 1.7, arc: 0.9, ranged: false, cooldown: 0.4 },
-  SWORD: { id: 'SWORD', name: 'Kiếm', model: 'weapon-sword', damage: 3, range: 2.4, arc: 1.2, ranged: false, cooldown: 0.45 },
-  SPEAR: { id: 'SPEAR', name: 'Giáo', model: 'weapon-spear', damage: 3.5, range: 3.4, arc: 0.45, ranged: false, cooldown: 0.55 },
-  BOW: { id: 'BOW', name: 'Cung', model: 'weapon-bow', damage: 4, range: 18, arc: 0, ranged: true, cooldown: 0.9 },
-  GUN: { id: 'GUN', name: 'Súng', model: 'weapon-shooter', damage: 1.6, range: 20, arc: 0, ranged: true, cooldown: 0.22 },
+  FIST: { id: 'FIST', name: 'Tay không', model: '', damage: 1, range: 2.2, arc: 1, ranged: false, cooldown: 0.4 },
+  SWORD: { id: 'SWORD', name: 'Kiếm', model: 'weapon-sword', damage: 3, range: 3.4, arc: 1.4, ranged: false, cooldown: 0.45 },
+  SPEAR: { id: 'SPEAR', name: 'Giáo', model: 'weapon-spear', damage: 3.5, range: 5, arc: 0.55, ranged: false, cooldown: 0.55 },
+  BOW: { id: 'BOW', name: 'Cung', model: 'weapon-bow', damage: 4, range: 26, arc: 0, ranged: true, cooldown: 0.9 },
+  GUN: { id: 'GUN', name: 'Súng', model: 'weapon-shooter', damage: 1.6, range: 24, arc: 0, ranged: true, cooldown: 0.22 },
 };
 
 export const DROP_WEAPONS: readonly WeaponId[] = ['SWORD', 'SPEAR', 'BOW', 'GUN'];

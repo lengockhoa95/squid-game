@@ -102,7 +102,7 @@ export function ElementBar({ net }: { net: MatchNetAdapter }) {
   return (
     <>
       <div ref={dark} className="dark-overlay" style={{ opacity: 0 }} />
-      <div ref={stun} className="stun-banner" style={{ display: 'none' }}>{vi.elementStunned}</div>
+      <div ref={stun} className="stun-banner" style={{ display: 'none' }}>{game !== '' && MINIGAMES[game].combat ? vi.monsterStunned : vi.elementStunned}</div>
       {enabled && info && active && (
         <div className="element-bar">
           <button

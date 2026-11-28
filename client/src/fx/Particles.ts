@@ -2,19 +2,32 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /**
- * Lightweight particle effects on Kenney "Particle Pack" textures (CC0): white shapes on a
- * transparent background, tinted per effect and drawn additively.
+ * Lightweight particle effects on Kenney "Particle Pack" textures (CC0, black-background
+ * versions). Glow layers draw the texture additively; solid layers use its brightness as alpha
+ * with a flat colour (so they stay visible over bright grass).
  * - sprites: camera-facing puffs (flash, sparks, smoke, flames)
  * - streaks: crossed quads along a direction (bullet / arrow trails)
  * - decals: flat quads on the ground or along a swing (slash, scorch, shock ring)
  */
 const BASE = `${import.meta.env.BASE_URL ?? '/'}fx/`;
 export type FxTexture =
-  | 'muzzle_01' | 'trace_01' | 'slash_01' | 'spark_01' | 'flame_01' | 'fire_01' | 'smoke_01'
+  | 'muzzle_01' | 'trace_01' | 'slash_01' | 'slash_02' | 'spark_01' | 'flame_01' | 'fire_01' | 'smoke_01'
   | 'star_01' | 'magic_01' | 'circle_01' | 'scorch_01' | 'light_01' | 'twirl_01';
 
 const textures = new Map<FxTexture, THREE.Texture>();
 const loader = new THREE.TextureLoader();
+
+function material<M extends THREE.SpriteMaterial | THREE.MeshBasicMaterial>(m: M, name: FxTexture, additive: boolean): M {
+  m.transparent = true;
+  m.depthWrite = false;
+  if (additive) {
+    m.map = texture(name);
+    m.blending = THREE.AdditiveBlending;
+  } else {
+    m.alphaMap = texture(name);
+  }
+  return m;
+}
 
 function texture(name: FxTexture): THREE.Texture {
   let t = textures.get(name);
@@ -38,9 +51,11 @@ interface Particle {
   opacity: number;
   spin: number;
   /** Streak: travels from `from` to `to` (then calls onArrive). */
-  streak?: { from: THREE.Vector3; to: THREE.Vector3; length: number; onArrive?: () => void };
+  streak?: { from: THREE.Vector3; to: THREE.Vector3; length: number; onArrive?: () => void; glow?: THREE.Sprite; color: THREE.ColorRepresentation; width: number };
   /** Decal: scales uniformly in its own plane. */
   decal?: boolean;
+  /** Geometry made for this particle (disposed with it). */
+  ownsGeometry?: boolean;
 }
 
 export interface SpriteOptions {
@@ -78,36 +93,40 @@ export class Particles {
 
   sprite(o: SpriteOptions): void {
     if (this.list.length >= MAX_PARTICLES) return;
-    const material = new THREE.SpriteMaterial({
-      map: texture(o.tex), color: o.color, transparent: true, depthWrite: false,
-      blending: o.additive === false ? THREE.NormalBlending : THREE.AdditiveBlending, opacity: o.opacity ?? 1,
-    });
-    const s = new THREE.Sprite(material);
+    const mat = material(new THREE.SpriteMaterial({ color: o.color, opacity: o.opacity ?? 1 }), o.tex, o.additive !== false);
+    const s = new THREE.Sprite(mat);
     s.position.set(o.pos.x, o.pos.y, o.pos.z);
     s.scale.setScalar(o.size);
-    material.rotation = Math.random() * Math.PI * 2;
+    mat.rotation = Math.random() * Math.PI * 2;
     this.root.add(s);
     this.list.push({
-      object: s, material, age: 0, life: o.life, vel: new THREE.Vector3(o.vel?.x ?? 0, o.vel?.y ?? 0, o.vel?.z ?? 0),
+      object: s, material: mat, age: 0, life: o.life, vel: new THREE.Vector3(o.vel?.x ?? 0, o.vel?.y ?? 0, o.vel?.z ?? 0),
       gravity: o.gravity ?? 0, size0: o.size, size1: o.size1 ?? o.size, opacity: o.opacity ?? 1, spin: o.spin ?? 0,
     });
   }
 
   /** A trail flying from `from` to `to` at `speed` m/s; `onArrive` fires at the end (impact puff). */
-  streak(tex: FxTexture, color: THREE.ColorRepresentation, from: THREE.Vector3, to: THREE.Vector3, speed: number, length: number, width: number, onArrive?: () => void): void {
+  streak(tex: FxTexture, color: THREE.ColorRepresentation, from: THREE.Vector3, to: THREE.Vector3, speed: number, length: number, width: number, onArrive?: () => void, glowSize = 0): void {
     if (this.list.length >= MAX_PARTICLES) return;
-    const material = new THREE.MeshBasicMaterial({
-      map: texture(tex), color, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
-    });
-    const m = new THREE.Mesh(this.cross, material);
+    // Solid colour (an additive streak vanishes over bright grass).
+    const mat = material(new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }), tex, false);
+    const m = new THREE.Mesh(this.cross, mat);
     m.position.copy(from);
     m.lookAt(to);
     m.scale.set(width, width, 0.01);
     this.root.add(m);
     const life = Math.max(0.05, from.distanceTo(to) / speed);
+    // Bright head so the projectile reads at any distance.
+    let glow: THREE.Sprite | undefined;
+    if (glowSize > 0) {
+      glow = new THREE.Sprite(material(new THREE.SpriteMaterial({ color }), 'light_01', true));
+      glow.scale.setScalar(glowSize);
+      glow.position.copy(from);
+      this.root.add(glow);
+    }
     this.list.push({
-      object: m, material, age: 0, life, vel: new THREE.Vector3(), gravity: 0, size0: width, size1: width, opacity: 1, spin: 0,
-      streak: { from: from.clone(), to: to.clone(), length, onArrive },
+      object: m, material: mat, age: 0, life, vel: new THREE.Vector3(), gravity: 0, size0: width, size1: width, opacity: 1, spin: 0,
+      streak: { from: from.clone(), to: to.clone(), length, onArrive, glow, color, width },
     });
   }
 
@@ -117,17 +136,47 @@ export class Particles {
    */
   decal(tex: FxTexture, color: THREE.ColorRepresentation, pos: THREE.Vector3Like, yaw: number, tilt: number, size: number, size1: number, life: number, additive = true, opacity = 1): void {
     if (this.list.length >= MAX_PARTICLES) return;
-    const material = new THREE.MeshBasicMaterial({
-      map: texture(tex), color, transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity,
-      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
-    });
-    const m = new THREE.Mesh(this.quad, material);
+    const mat = material(new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, opacity }), tex, additive);
+    const m = new THREE.Mesh(this.quad, mat);
     m.position.set(pos.x, pos.y, pos.z);
     m.rotation.set(0, yaw, 0, 'YXZ');
     m.rotateX(-Math.PI / 2 + tilt);
     m.scale.setScalar(size);
     this.root.add(m);
-    this.list.push({ object: m, material, age: 0, life, vel: new THREE.Vector3(), gravity: 0, size0: size, size1, opacity, spin: 0, decal: true });
+    this.list.push({ object: m, material: mat, age: 0, life, vel: new THREE.Vector3(), gravity: 0, size0: size, size1, opacity, spin: 0, decal: true });
+  }
+
+  /**
+   * A solid swing arc (ring sector) around `pos`, facing `yaw`, opening ±`half` rad, tilted `tilt`
+   * from flat. Bright at the leading edge, fading toward the trailing edge.
+   */
+  arc(pos: THREE.Vector3Like, yaw: number, inner: number, outer: number, half: number, tilt: number, color: THREE.ColorRepresentation, life: number, additive = false): void {
+    if (this.list.length >= MAX_PARTICLES) return;
+    const seg = 18;
+    const geo = new THREE.RingGeometry(inner / outer, 1, seg, 1, Math.PI / 2 - half, half * 2);
+    // Alpha along the swing: leading edge (one end) opaque, trailing end transparent.
+    const pos3 = geo.getAttribute('position');
+    const colors = new Float32Array(pos3.count * 4);
+    const c = new THREE.Color(color);
+    for (let i = 0; i < pos3.count; i++) {
+      const ang = Math.atan2(pos3.getY(i), pos3.getX(i)) - (Math.PI / 2 - half);
+      const a = Math.max(0, Math.min(1, ang / (half * 2)));
+      colors.set([c.r, c.g, c.b, 0.15 + 0.85 * a * a], i * 4);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+    const mat = new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(pos.x, pos.y, pos.z);
+    // Ring is in XY with +y = forward: lay it down, then turn to the swing direction.
+    m.rotation.set(0, yaw, 0, 'YXZ');
+    m.rotateX(-Math.PI / 2 + tilt);
+    m.rotateZ(Math.PI); // +y of the ring → forward (+z after the lay-down)
+    m.scale.setScalar(outer * 0.8);
+    this.root.add(m);
+    this.list.push({ object: m, material: mat, age: 0, life, vel: new THREE.Vector3(), gravity: 0, size0: outer * 0.8, size1: outer * 1.05, opacity: 1, spin: 0, decal: true, ownsGeometry: true });
   }
 
   update(dt: number): void {
@@ -142,6 +191,14 @@ export class Particles {
         const dir = new THREE.Vector3().subVectors(st.to, st.from).normalize();
         p.object.position.copy(head).addScaledVector(dir, -len);
         p.object.scale.z = Math.max(0.01, len);
+        st.glow?.position.copy(head);
+        // Camera-facing dots behind the head: the trail reads from every angle.
+        const step = 0.35;
+        const back = Math.min(len, st.length);
+        for (let k = 0; k * step < back && k < 6; k++) {
+          const at = head.clone().addScaledVector(dir, -k * step - Math.random() * step);
+          this.sprite({ tex: 'light_01', color: st.color, pos: at, life: 0.12 + Math.random() * 0.08, size: st.width * 0.5, size1: st.width * 0.15, opacity: 0.9, additive: false });
+        }
       } else {
         p.vel.y -= p.gravity * dt;
         p.object.position.addScaledVector(p.vel, dt);
@@ -153,8 +210,13 @@ export class Particles {
       }
       if (p.age < p.life) continue;
       p.streak?.onArrive?.();
+      if (p.streak?.glow) {
+        p.streak.glow.removeFromParent();
+        p.streak.glow.material.dispose();
+      }
       p.object.removeFromParent();
       p.material.dispose();
+      if (p.ownsGeometry) (p.object as THREE.Mesh).geometry.dispose();
       this.list.splice(i, 1);
     }
   }
@@ -163,6 +225,7 @@ export class Particles {
     for (const p of this.list) {
       p.object.removeFromParent();
       p.material.dispose();
+      if (p.ownsGeometry) (p.object as THREE.Mesh).geometry.dispose();
     }
     this.list.length = 0;
     this.quad.dispose();

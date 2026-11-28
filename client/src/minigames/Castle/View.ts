@@ -10,6 +10,7 @@ import { StageLights, placeBox, setSky } from '../framework/stage.ts';
 import { createWeaponModel } from '../../player/characters.ts';
 import { MonsterModel, loadMonsters, monstersLoaded, type MonsterAnim } from './monsters.ts';
 import { buildCastle, loadCastleKit } from './castleKit.ts';
+import { grassTexture, roadTexture } from './ground.ts';
 import { Particles } from '../../fx/Particles.ts';
 
 const DEG = Math.PI / 180;
@@ -63,10 +64,27 @@ class CastleView implements MinigameView {
     const m = ctx.materials;
     const unit = res.track(new THREE.BoxGeometry(1, 1, 1));
     const h = CASTLE.halfWidth;
-    const ground = placeBox(new THREE.Mesh(unit, m.lambert(0x7bbf5a)), -h - 6, h + 6, CASTLE.spawnZ - 12, CASTLE.gateZ + 8, -1, 0);
+    // Textured grass (procedural) and a dirt road from the monster lair to the gate.
+    const minZ = CASTLE.spawnZ - 20;
+    const maxZ = CASTLE.gateZ + 40;
+    const grass = res.track(grassTexture());
+    grass.repeat.set(80 / 8, (maxZ - minZ) / 8);
+    const groundMat = res.track(new THREE.MeshLambertMaterial({ map: grass }));
+    const ground = new THREE.Mesh(res.track(new THREE.PlaneGeometry(80, maxZ - minZ).rotateX(-Math.PI / 2)), groundMat);
+    ground.position.set(0, 0, (minZ + maxZ) / 2);
     ground.receiveShadow = true;
     root.add(ground);
     this.clickTargets.push(ground);
+    const roadLen = CASTLE.gateZ + 1 - (CASTLE.spawnZ - 2);
+    const road = res.track(roadTexture());
+    road.repeat.set(1, roadLen / 8);
+    const roadMesh = new THREE.Mesh(
+      res.track(new THREE.PlaneGeometry(9, roadLen).rotateX(-Math.PI / 2)),
+      res.track(new THREE.MeshLambertMaterial({ map: road, transparent: true, depthWrite: false })),
+    );
+    roadMesh.position.set(0, 0.02, (CASTLE.gateZ + 1 + CASTLE.spawnZ - 2) / 2);
+    roadMesh.receiveShadow = true;
+    root.add(roadMesh);
     const placeholders = new THREE.Group();
     root.add(placeholders);
     // Castle wall (a low parapet so the camera behind the players can see over it), towers, gate.

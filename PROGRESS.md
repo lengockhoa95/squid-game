@@ -186,6 +186,10 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
 - [x] Chuột trái đánh theo tâm ngắm (quay lưng vẫn đánh được), chuột phải dùng nguyên tố.
 - [x] Nguyên tố đánh quái thay vì người: Lôi, Gió, Bóng tối, Hoán đổi, Đất, Nước, Lửa, Phân thân.
 - [x] Map dựng bằng Kenney Castle Kit; hiệu ứng đạn, chém, lửa rồng, tia lửa khi trúng bằng Kenney Particle Pack.
+- [x] Cầm vũ khí bằng tư thế "holding-right" của Kenney (tay giơ ra trước), vũ khí gắn đúng nắm tay.
+- [x] Tầm đánh xa hơn (kiếm 3.4m, giáo 5m, cung 26m, súng 24m); vệt chém dạng dải cung đặc, đạn có đầu sáng + đuôi chấm sáng.
+- [x] Lâu đài nhiều tầng (tháp chính 4 tầng, tháp phụ), tường bao quanh sân thành và hai bên chiến trường.
+- [x] Mặt đất cỏ vẽ bằng code + con đường đất từ hang quái tới cổng.
 
 ## Hạn chế đã biết
 
