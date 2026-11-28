@@ -35,6 +35,7 @@ export interface NetPlayer {
   readonly character: string;
   readonly moveMul: number;
   readonly weapon: string;
+  readonly downed: boolean;
 }
 
 /** What networked scenes/HUDs need from the session — keeps them SDK-agnostic. */

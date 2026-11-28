@@ -189,6 +189,8 @@ export class ElementEffectsView {
         return { object: new THREE.Mesh(this.geo.ring, this.mat.rescue), kind: e.kind };
       case 'SLASH':
       case 'SHOT':
+      case 'TORNADO':
+      case 'THRUST':
       case 'BREATH':
       case 'GATE_HIT':
       case 'QUAKE':
@@ -259,6 +261,19 @@ export class ElementEffectsView {
         o.position.set(e.x, e.y + 0.05, e.z);
         break;
       }
+      case 'TORNADO': {
+        // Lốc Kiếm: a spinning column of wind flying along its path.
+        const p = Math.min(1, f);
+        const x = e.x + (e.x2 - e.x) * p;
+        const z = e.z + (e.z2 - e.z) * p;
+        for (let k = 0; k < 3; k++) {
+          const a = gameTime * 14 + k * 2.1;
+          const yy = 0.3 + k * 0.7;
+          const r = 0.4 + k * 0.35;
+          this.fx.sprite({ tex: 'twirl_01', color: k === 1 ? 0xbfffe0 : 0x7bffb0, pos: { x: x + Math.cos(a) * r, y: e.y + yy, z: z + Math.sin(a) * r }, life: 0.25, size: 0.9 + k * 0.4, size1: 0.3, spin: 8, opacity: 0.9, additive: false });
+        }
+        break;
+      }
       case 'BREATH': {
         // Keep the fire stream going while the effect lives.
         const yaw = Math.atan2(e.x2 - e.x, e.z2 - e.z);
@@ -323,6 +338,13 @@ export class ElementEffectsView {
             life: 0.2, size: 0.5, size1: 0.1, vel: { x: Math.sin(a) * 3, y: 1, z: Math.cos(a) * 3 },
           });
         }
+        break;
+      }
+      case 'THRUST': {
+        // Thương Xuyên Thấu: a long pink lance of light.
+        const from = this.tmpA.set(e.x, e.y + 0.8, e.z).clone();
+        const to = this.tmpB.set(e.x2, e.y + 0.8, e.z2).clone();
+        fx.streak('trace_01', 0xff7bd5, from, to, 60, 6, 1.4, () => fx.sparks(to, 0xff9be0, 6, 3), 1.2);
         break;
       }
       case 'QUAKE':

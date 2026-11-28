@@ -881,3 +881,11 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
 .perk-ult { font-size: 12px; opacity: 0.7; }
 .perk-ult.is-next { opacity: 1; color: #ffd23f; font-weight: 700; }
 .castle-waves { margin-top: 10px; gap: 10px; flex-wrap: wrap; }
+.castle-hp { width: min(320px, 100%); display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 800; }
+.hp-fill { background: linear-gradient(90deg, #3fcf6a, #9bff7b); transform: scaleX(1); transition: transform 0.15s; }
+.hp-fill.is-low { background: linear-gradient(90deg, #ff3b3b, #ff8a5a); }
+.castle-down { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); padding: 14px 20px; border-radius: 14px; background: rgba(20, 10, 16, 0.85); color: #fff; text-align: center; display: flex; flex-direction: column; gap: 6px; min-width: 260px; pointer-events: none; }
+.castle-down strong { font-size: 22px; color: #ff6b6b; }
+.revive-fill { background: #7bffb0; transform: scaleX(0); }
+.castle-element-pick { position: absolute; left: 50%; bottom: 210px; transform: translateX(-50%); width: min(760px, calc(100% - 24px)); pointer-events: auto; }
+.castle-element-pick .element-picker { background: rgba(16, 14, 28, 0.85); border-radius: 14px; padding: 8px 10px; }

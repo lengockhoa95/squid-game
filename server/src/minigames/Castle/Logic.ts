@@ -1,11 +1,13 @@
 import {
-  CASTLE, DRAGON, DROP_WEAPONS, ELEMENT_FX, MAX_TIER, MONSTERS, MONSTER_HIT, PERK_IDS, PERK_MAX, RAGE_DAMAGE, ULT,
-  castleSpawn, castleStep, castleTimeLimit, castleWave, castleWaveCount, createCastleWorld, formatPerks,
-  isPerkId, isWeaponId, parsePerks, rollRarity, ultimatesFor, weaponStats,
+  BOSS_HP_PER_PLAYER, CASTLE, DRAGON, DROP_WEAPONS, ELEMENT_FX, MAX_TIER, MINOTAUR, MONSTERS, MONSTER_HIT, PERK_IDS, PERK_MAX,
+  PLAYER_HP, RAGE_DAMAGE, SKILL, SLIME_KING, ULT,
+  castleSpawn, castleStep, castleTimeLimit, castleWave, castleWaveCount, createCastleWorld, formatPerks, inMoat, isBoss,
+  isPerkId, isWeaponId, parsePerks, pitTileAt, rollRarity, ultimatesFor, weaponStats,
   type GameAction, type MonsterKind, type PerkId, type StepFn, type WeaponId,
 } from '@sp/shared';
 import { CastleState, Monster, WeaponPickup } from '@sp/shared/schema';
 import type { GamePlayer, MinigameContext, RoundOutcome, ServerMinigame } from '../framework/types.ts';
+import { CastleHazards, type MoatPrey } from './Hazards.ts';
 
 interface MonsterBrain {
   m: Monster;
@@ -19,6 +21,16 @@ interface MonsterBrain {
   angle?: number;
   breathAt?: number;
   breathYaw?: number;
+  // Minotaur: CHASE → WIND (telegraph) → CHARGE. Vua Slime: hops; splits at 2/3 and 1/3 hp.
+  bossPhase?: 'CHASE' | 'WIND' | 'CHARGE' | 'HOP';
+  bossUntil?: number;
+  chargeYaw?: number;
+  hopFromX?: number;
+  hopFromZ?: number;
+  hopToX?: number;
+  hopToZ?: number;
+  splits?: number;
+  hitIds?: Set<string>;
   /** Element statuses: frozen by lightning / wandering in the dark. */
   stunUntil: number;
   confusedUntil: number;
@@ -41,21 +53,43 @@ const PVE = {
 } as const;
 
 const DIE_SECONDS = 1.2;
+
+/** Lốc Kiếm tornado in flight. */
+interface Tornado {
+  owner: GamePlayer;
+  x: number;
+  z: number;
+  dx: number;
+  dz: number;
+  until: number;
+  damage: number;
+  hit: Set<number>;
+}
 const DRAGON_CIRCLE = 10;
 
 /**
  * Thủ Thành: monsters come in waves toward the gate; players fight them with fists or dropped
  * weapons (right click). Every 5th wave is the dragon boss; the host picks how many waves.
  * Between waves everyone picks a weapon skill card; maxed lines (and Truyền thuyết weapons)
- * unlock ultimates, fired when the rage meter is full. Players are never eliminated by
- * monsters (only knocked back and stunned); the round ranks by points.
+ * unlock ultimates, fired when the rage meter is full. Players have health: at 0 they go down
+ * until a teammate revives them (or they get up at the castle after a while). The map reuses
+ * hazards from other games (moat with sharks, collapsing floor, belts and jump pads).
+ * The round ranks by points.
  * PlayerState.score = points (kills, boss damage).
  */
 export class Castle implements ServerMinigame {
   readonly id = 'CASTLE' as const;
-  private readonly world = createCastleWorld();
-  readonly step: StepFn = castleStep(this.world);
-  readonly bounds = this.world.bounds;
+  private readonly cw = createCastleWorld();
+  readonly step: StepFn = castleStep(this.cw);
+  readonly bounds = this.cw.world.bounds;
+  private hazards!: CastleHazards;
+  private readonly tornadoes: Tornado[] = [];
+  private readonly swings = new Map<string, number>();
+  /** Last time each player took damage (regeneration waits a bit). */
+  private readonly hurtAt = new Map<string, number>();
+  private readonly downAt = new Map<string, number>();
+  private readonly downs = new Map<string, number>();
+  private readonly regen = new Map<string, number>();
   private ctx!: MinigameContext;
   private state!: CastleState;
   private brains: MonsterBrain[] = [];
@@ -85,6 +119,7 @@ export class Castle implements ServerMinigame {
     this.state.waves = this.waves;
     this.state.wave = 0;
     this.state.breakUntil = CASTLE.prepSeconds;
+    this.hazards = new CastleHazards(this.state, this.cw, ctx.rng);
     ctx.match.castle = this.state;
     for (const p of ctx.players) {
       const s = castleSpawn(p.state.slot);
@@ -103,7 +138,7 @@ export class Castle implements ServerMinigame {
 
   handleAttack(id: string, t: number, aimYaw?: number): void {
     const p = this.ctx.players.find((pl) => pl.id === id);
-    if (!p || p.state.roundState !== 'ACTIVE' || t < (this.attackReady.get(id) ?? 0)) return;
+    if (!p || p.state.roundState !== 'ACTIVE' || p.state.downed || t < (this.attackReady.get(id) ?? 0)) return;
     const weapon: WeaponId = isWeaponId(p.state.weapon) ? p.state.weapon : 'FIST';
     const perks = parsePerks(p.state.perks);
     const w = weaponStats(weapon, p.state.weaponTier, perks);
@@ -139,10 +174,42 @@ export class Castle implements ServerMinigame {
       const reach = w.pierce || struck.length === 0 ? w.range : struck[0]!.along;
       this.ctx.flash?.('SHOT', id, s.x, s.z, s.x + fx * reach, s.z + fz * reach);
       for (const h of struck) this.damage(h.b, roll(), p, t);
+      // Đạn Nảy: the shot hops on to more monsters nearby.
+      const bounces = perks.BOUNCE ?? 0;
+      if (bounces > 0 && struck[0]) this.bounce(struck[0].b, bounces, roll() * SKILL.bounceDamage, p, t);
       return;
     }
     this.ctx.flash?.('SLASH', id, s.x, s.z, s.x + fx * w.range, s.z + fz * w.range);
+    const hitNow = new Set<MonsterBrain>();
+    // Thương Xuyên Thấu: a long thrust hits everything on the line.
+    const pierce = perks.PIERCE ?? 0;
+    if (pierce > 0) {
+      const len = w.range * (1 + SKILL.pierceReach * pierce);
+      this.ctx.flash?.('THRUST', id, s.x, s.z, s.x + fx * len, s.z + fz * len);
+      for (const b of this.alive()) {
+        if (b.m.y > 2.4) continue;
+        const dx = b.m.x - s.x;
+        const dz = b.m.z - s.z;
+        const along = dx * fx + dz * fz;
+        if (along < 0 || along > len + MONSTERS[b.m.kind as MonsterKind].radius) continue;
+        if (Math.abs(dx * fz - dz * fx) > SKILL.pierceWidth + MONSTERS[b.m.kind as MonsterKind].radius) continue;
+        hitNow.add(b);
+        this.damage(b, roll() * (1 + SKILL.pierceDamage * pierce + (pierce >= PERK_MAX ? 0.3 : 0)), p, t);
+      }
+    }
+    // Lốc Kiếm: every (4 − level) swings a tornado flies off.
+    const tornado = perks.TORNADO ?? 0;
+    if (tornado > 0) {
+      const n = (this.swings.get(id) ?? 0) + 1;
+      this.swings.set(id, n);
+      if (n % Math.max(1, 4 - tornado) === 0) {
+        const len = SKILL.tornadoSpeed * SKILL.tornadoSeconds;
+        this.ctx.flash?.('TORNADO', id, s.x, s.z, s.x + fx * len, s.z + fz * len);
+        this.tornadoes.push({ owner: p, x: s.x, z: s.z, dx: fx, dz: fz, until: t + SKILL.tornadoSeconds, damage: w.damage * SKILL.tornadoDamage * (1 + tornado * 0.25), hit: new Set() });
+      }
+    }
     for (const b of this.alive()) {
+      if (hitNow.has(b)) continue;
       const info = MONSTERS[b.m.kind as MonsterKind];
       if (b.m.y > 2.4) continue; // flying out of reach (the dragon in the air)
       const dx = b.m.x - s.x;
@@ -152,7 +219,7 @@ export class Castle implements ServerMinigame {
       const ang = Math.acos(Math.max(-1, Math.min(1, (dx * fx + dz * fz) / (d || 1))));
       if (d > info.radius && ang > w.arc) continue;
       this.damage(b, roll(), p, t);
-      if (b.m.kind !== 'DRAGON' && d > 0.01) {
+      if (!isBoss(b.m.kind) && d > 0.01) {
         b.m.x += (dx / d) * 0.8; // knocked back a little
         b.m.z += (dz / d) * 0.8;
       }
@@ -174,7 +241,7 @@ export class Castle implements ServerMinigame {
         for (const b of hit) {
           this.ctx.flash?.('BOLT', casterId, b.m.x, b.m.z);
           this.damage(b, PVE.thunderDamage, p, t);
-          b.stunUntil = t + PVE.thunderStun * (b.m.kind === 'DRAGON' ? 0.5 : 1);
+          b.stunUntil = t + PVE.thunderStun * (isBoss(b.m.kind) ? 0.4 : 1);
         }
         return true;
       }
@@ -182,7 +249,7 @@ export class Castle implements ServerMinigame {
         this.ctx.flash?.('WIND', casterId, me.x, me.z);
         for (const b of within(me.x, me.z, PVE.windRadius)) {
           this.damage(b, PVE.windDamage, p, t);
-          if (b.m.kind === 'DRAGON') continue;
+          if (isBoss(b.m.kind)) continue;
           const dx = b.m.x - me.x;
           const dz = b.m.z - me.z;
           const d = Math.hypot(dx, dz) || 1;
@@ -193,7 +260,7 @@ export class Castle implements ServerMinigame {
         return true;
       case 'SWAP': {
         // Hoán đổi: the monster nearest the cursor is sent back to the monster gate.
-        const target = within(x, z, PVE.swapRadius).filter((b) => b.m.kind !== 'DRAGON')
+        const target = within(x, z, PVE.swapRadius).filter((b) => !isBoss(b.m.kind))
           .sort((a, b) => Math.hypot(a.m.x - x, a.m.z - z) - Math.hypot(b.m.x - x, b.m.z - z))[0];
         if (!target) return false;
         this.ctx.flash?.('SWAP', casterId, target.m.x, target.m.z, target.m.x, CASTLE.spawnZ);
@@ -204,7 +271,7 @@ export class Castle implements ServerMinigame {
         // Bóng tối: monsters in the cloud lose their way (no gate damage, no hits).
         this.ctx.flash?.('DARK', casterId, x, z);
         for (const b of within(x, z, 5)) {
-          b.confusedUntil = t + PVE.darkConfuse * (b.m.kind === 'DRAGON' ? 0.5 : 1);
+          b.confusedUntil = t + PVE.darkConfuse * (isBoss(b.m.kind) ? 0.4 : 1);
           b.wanderYaw = this.ctx.rng() * Math.PI * 2;
         }
         return true;
@@ -221,6 +288,11 @@ export class Castle implements ServerMinigame {
     const s = bot.sim.state;
     const best = alive.reduce((a, b) => (b.m.z - Math.hypot(b.m.x - s.x, b.m.z - s.z) * 0.5 > a.m.z - Math.hypot(a.m.x - s.x, a.m.z - s.z) * 0.5 ? b : a));
     return { x: best.m.x, z: best.m.z };
+  }
+
+  /** Between waves everyone may switch to another element. */
+  allowElementPick(): boolean {
+    return this.mode === 'BREAK';
   }
 
   /** Weapon card pick between waves. */
@@ -242,6 +314,10 @@ export class Castle implements ServerMinigame {
     this.waveFlow(t);
     this.spawnPending(t);
     const active = this.ctx.players.filter((p) => p.state.roundState === 'ACTIVE');
+    this.health(dt, t, active);
+    this.hazards.updatePit(t, this.mode === 'WAVE');
+    this.hazards.updateSharks(dt, t, this.moatPrey(active, t));
+    this.updateTornadoes(dt, t);
     this.readElementField(t);
     for (const b of this.brains) {
       if (b.m.state === 'DIE') continue;
@@ -253,8 +329,18 @@ export class Castle implements ServerMinigame {
         this.wander(b, dt);
         continue;
       }
-      if (b.m.kind === 'DRAGON') this.dragon(b, active, dt, t);
-      else this.walker(b, active, dt, t);
+      const standing = active.filter((p) => !p.state.downed);
+      if (b.m.kind === 'DRAGON') this.dragon(b, standing, dt, t);
+      else if (b.m.kind === 'MINOTAUR') this.minotaur(b, standing, dt, t);
+      else if (b.m.kind === 'SLIME_KING') this.slimeKing(b, standing, dt, t);
+      else this.walker(b, standing, dt, t);
+      // The gate stops everything that walks (players pass, monsters must break it).
+      if (!MONSTERS[b.m.kind as MonsterKind].fly) b.m.z = Math.min(b.m.z, CASTLE.gateZ - MONSTERS[b.m.kind as MonsterKind].radius);
+      // Sàn sụp: walkers on a dropped tile fall to their doom (bosses are too big to fall).
+      if (!MONSTERS[b.m.kind as MonsterKind].fly && !isBoss(b.m.kind)) {
+        const tile = pitTileAt(b.m.x, b.m.z);
+        if (tile >= 0 && this.hazards.tileGone(tile)) this.kill(b, t);
+      }
     }
     this.pillarBlock();
     this.separate();
@@ -272,8 +358,9 @@ export class Castle implements ServerMinigame {
   }
 
   /** Public for bots: living monsters and weapon pickups (everyone sees them). */
-  view(): { monsters: readonly Monster[]; pickups: readonly WeaponPickup[] } {
-    return { monsters: this.alive().map((b) => b.m), pickups: [...this.state.pickups] };
+  view(): { monsters: readonly Monster[]; pickups: readonly WeaponPickup[]; downed: ReadonlyArray<{ id: string; x: number; z: number }> } {
+    const downed = this.ctx.players.filter((p) => p.state.downed).map((p) => ({ id: p.id, x: p.sim.state.x, z: p.sim.state.z }));
+    return { monsters: this.alive().map((b) => b.m), pickups: [...this.state.pickups], downed };
   }
 
   getState(): CastleState {
@@ -295,7 +382,8 @@ export class Castle implements ServerMinigame {
         ? ` · cổng sập ở đợt ${this.state.wave}`
         : ` · tới đợt ${this.state.wave}/${this.waves}`;
     for (const p of this.ctx.players) {
-      details.set(p.id, `${Math.floor(this.points.get(p.id) ?? 0)} điểm · diệt ${this.kills.get(p.id) ?? 0} quái${end}`);
+      const downs = this.downs.get(p.id) ?? 0;
+      details.set(p.id, `${Math.floor(this.points.get(p.id) ?? 0)} điểm · diệt ${this.kills.get(p.id) ?? 0} quái${downs ? ` · gục ${downs} lần` : ''}${end}`);
     }
     return { ranking, passed, details };
   }
@@ -327,7 +415,7 @@ export class Castle implements ServerMinigame {
       st.wave++;
       st.breakUntil = 0;
       this.mode = 'WAVE';
-      for (const sp of castleWave(st.wave, this.ctx.players.length)) {
+      for (const sp of castleWave(st.wave, this.ctx.players.length, this.waves)) {
         for (let i = 0; i < sp.count; i++) this.pending.push({ at: t + i * 0.6, kind: sp.kind, hpMul: sp.hpMul });
       }
       return;
@@ -342,7 +430,11 @@ export class Castle implements ServerMinigame {
     st.breakUntil = t + CASTLE.breakSeconds;
     st.gate = Math.min(st.gateMax, st.gate + st.gateMax * CASTLE.gateRepair);
     for (const p of this.ctx.players) {
-      if (p.state.roundState === 'ACTIVE') p.state.perkOffer = this.dealPerks(p).join(',');
+      if (p.state.roundState !== 'ACTIVE') continue;
+      p.state.perkOffer = this.dealPerks(p).join(',');
+      // Breather: everyone gets back up and heals a bit.
+      if (p.state.downed) this.standUp(p, PLAYER_HP.reviveHp, t);
+      p.state.hp = Math.min(PLAYER_HP.max, p.state.hp + PLAYER_HP.waveHeal);
     }
   }
 
@@ -375,6 +467,9 @@ export class Castle implements ServerMinigame {
     p.state.perks = '';
     p.state.perkOffer = '';
     p.state.rage = 0;
+    p.state.hp = PLAYER_HP.max;
+    p.state.downed = false;
+    p.state.revive = 0;
   }
 
   private ultimate(kind: PerkId, p: GamePlayer, power: number, t: number): void {
@@ -440,7 +535,7 @@ export class Castle implements ServerMinigame {
     }
   }
 
-  private spawn(kind: MonsterKind, t: number, hpMul = 1): void {
+  private spawn(kind: MonsterKind, t: number, hpMul = 1): MonsterBrain {
     const info = MONSTERS[kind];
     const m = new Monster();
     m.id = this.nextId++;
@@ -449,7 +544,8 @@ export class Castle implements ServerMinigame {
     m.z = CASTLE.spawnZ;
     m.y = info.fly;
     m.yaw = 0;
-    m.maxHp = Math.round((kind === 'DRAGON' ? DRAGON.hpPerPlayer * this.ctx.players.length : info.hp) * hpMul);
+    const bossHp = BOSS_HP_PER_PLAYER[kind];
+    m.maxHp = Math.round((bossHp ? bossHp * this.ctx.players.length : info.hp) * hpMul);
     m.hp = m.maxHp;
     m.state = kind === 'DRAGON' ? 'FLY' : 'WALK';
     this.state.monsters.push(m);
@@ -458,8 +554,14 @@ export class Castle implements ServerMinigame {
       b.phase = 'FLY';
       b.phaseUntil = t + DRAGON.flySeconds;
       b.angle = 0;
+    } else if (kind === 'MINOTAUR' || kind === 'SLIME_KING') {
+      m.x = 0;
+      b.bossPhase = 'CHASE';
+      b.bossUntil = t + (kind === 'MINOTAUR' ? MINOTAUR.chaseSeconds : SLIME_KING.hopEvery);
+      b.splits = 0;
     }
     this.brains.push(b);
+    return b;
   }
 
   /** Slimes/skeletons walk to the gate; bats hunt players. Contact knocks players back. */
@@ -504,7 +606,7 @@ export class Castle implements ServerMinigame {
       if (pd < info.radius + 0.6 && Math.abs(ps.y + 0.8 - m.y) < 1.6) {
         b.hitReady = t + MONSTER_HIT.cooldown;
         m.state = 'ATTACK';
-        this.hitPlayer(prey, m.x, m.z, t, MONSTER_HIT.knockback, MONSTER_HIT.stun);
+        this.hurt(prey, PLAYER_HP.hit[m.kind as MonsterKind], m.x, m.z, t, MONSTER_HIT.knockback, MONSTER_HIT.stun);
       }
     }
   }
@@ -551,7 +653,7 @@ export class Castle implements ServerMinigame {
           const pdist = Math.hypot(px, pz);
           if (pdist > DRAGON.breathRange || t < p.state.stunUntil) continue;
           const ang = Math.acos(Math.max(-1, Math.min(1, (px * Math.sin(b.breathYaw!) + pz * Math.cos(b.breathYaw!)) / (pdist || 1))));
-          if (ang < DRAGON.breathArc) this.hitPlayer(p, m.x, m.z, t, 12, 1.4);
+          if (ang < DRAGON.breathArc) this.hurt(p, PLAYER_HP.breath, m.x, m.z, t, 12, 1.4);
         }
       } else {
         m.state = 'LAND';
@@ -571,12 +673,21 @@ export class Castle implements ServerMinigame {
     m.hp -= dealt;
     m.hitAt = t;
     if (!fromUlt) by.state.rage = Math.min(1, by.state.rage + dealt / RAGE_DAMAGE);
-    if (m.kind === 'DRAGON') this.addPoints(by.id, dealt * DRAGON.pointsPerHp);
+    if (isBoss(m.kind)) this.addPoints(by.id, dealt * DRAGON.pointsPerHp);
+    // Vua Slime splits off small slimes at 2/3 and 1/3 health.
+    if (m.kind === 'SLIME_KING' && m.hp > 0) {
+      const due = m.hp < m.maxHp / 3 ? 2 : m.hp < (m.maxHp * 2) / 3 ? 1 : 0;
+      while ((b.splits ?? 0) < due) {
+        b.splits = (b.splits ?? 0) + 1;
+        this.spawnSlimes(m.x, m.z, SLIME_KING.splitCount, t);
+      }
+    }
     if (m.hp > 0) return;
     m.state = 'DIE';
     b.removeAt = t + DIE_SECONDS;
     this.kills.set(by.id, (this.kills.get(by.id) ?? 0) + 1);
-    if (m.kind === 'DRAGON') {
+    if (m.kind === 'SLIME_KING') this.spawnSlimes(m.x, m.z, SLIME_KING.deathSplit, t);
+    if (isBoss(m.kind)) {
       this.addPoints(by.id, DRAGON.killBonus);
       this.bossKills++;
       // Boss loot: one Huyền thoại+ weapon per player around the corpse.
@@ -628,7 +739,15 @@ export class Castle implements ServerMinigame {
     }
   }
 
-  private hitPlayer(p: GamePlayer, fromX: number, fromZ: number, t: number, speed: number, stun: number): void {
+  /** Damage + knockback + stun. At 0 health the player goes down. */
+  private hurt(p: GamePlayer, amount: number, fromX: number, fromZ: number, t: number, speed: number, stun: number): void {
+    if (p.state.downed) return;
+    this.hurtAt.set(p.id, t);
+    p.state.hp = Math.max(0, p.state.hp - Math.round(amount));
+    if (p.state.hp <= 0) {
+      this.goDown(p, t);
+      return;
+    }
     const s = p.sim.state;
     const dx = s.x - fromX;
     const dz = s.z - fromZ;
@@ -644,6 +763,7 @@ export class Castle implements ServerMinigame {
     let best: GamePlayer | null = null;
     let bestD = within;
     for (const p of players) {
+      if (p.state.downed) continue;
       const d = Math.hypot(p.sim.state.x - x, p.sim.state.z - z);
       if (d < bestD) {
         bestD = d;
@@ -752,6 +872,246 @@ export class Castle implements ServerMinigame {
     m.z = Math.max(CASTLE.spawnZ, Math.min(CASTLE.gateZ - info.radius - 0.5, m.z));
     m.yaw = b.wanderYaw;
     m.state = 'WALK';
+  }
+
+  // --- health ---------------------------------------------------------------------------------
+
+  private goDown(p: GamePlayer, t: number): void {
+    p.state.downed = true;
+    p.state.hp = 0;
+    p.state.revive = 0;
+    p.state.stunUntil = t + 9999; // cannot move or act while down
+    p.state.rage = 0;
+    this.downAt.set(p.id, t);
+    this.downs.set(p.id, (this.downs.get(p.id) ?? 0) + 1);
+    const s = p.sim.state;
+    s.vx = s.vz = 0;
+  }
+
+  private standUp(p: GamePlayer, hp: number, t: number): void {
+    p.state.downed = false;
+    p.state.revive = 0;
+    p.state.hp = hp;
+    p.state.stunUntil = t;
+    this.hurtAt.set(p.id, t);
+  }
+
+  /** Falls, regeneration, revives by teammates, auto get-up at the castle. */
+  private health(dt: number, t: number, active: readonly GamePlayer[]): void {
+    for (const p of active) {
+      const s = p.sim.state;
+      // Fell through the collapsing floor: hurt, back at the castle.
+      if (s.y < -3) {
+        const sp = castleSpawn(p.state.slot);
+        p.sim.reset(sp.x, sp.z, sp.yaw);
+        this.hurt(p, PLAYER_HP.fall, sp.x, sp.z + 1, t, 0, 0.3);
+        continue;
+      }
+      if (!p.state.downed) {
+        if (t - (this.hurtAt.get(p.id) ?? -99) > PLAYER_HP.regenDelay && p.state.hp < PLAYER_HP.max) {
+          // hp is a whole number: accumulate the fractions.
+          const acc = (this.regen.get(p.id) ?? 0) + PLAYER_HP.regenPerSecond * dt;
+          const whole = Math.floor(acc);
+          this.regen.set(p.id, acc - whole);
+          if (whole > 0) p.state.hp = Math.min(PLAYER_HP.max, p.state.hp + whole);
+        }
+        continue;
+      }
+      // Downed: a standing teammate close by fills the revive bar.
+      const helper = active.find((o) => o !== p && !o.state.downed && Math.hypot(o.sim.state.x - s.x, o.sim.state.z - s.z) < PLAYER_HP.reviveRadius);
+      p.state.revive = helper ? p.state.revive + dt / PLAYER_HP.reviveSeconds : Math.max(0, p.state.revive - dt * 0.5);
+      if (p.state.revive >= 1) {
+        this.standUp(p, PLAYER_HP.reviveHp, t);
+        this.ctx.tryRescue?.(p.id);
+        if (helper) this.addPoints(helper.id, 3);
+        continue;
+      }
+      if (t - (this.downAt.get(p.id) ?? t) >= PLAYER_HP.autoReviveSeconds) {
+        const sp = castleSpawn(p.state.slot);
+        p.sim.reset(sp.x, sp.z, sp.yaw);
+        this.standUp(p, PLAYER_HP.autoReviveHp, t);
+        this.addPoints(p.id, -PLAYER_HP.downPenalty);
+      }
+    }
+  }
+
+  /** Players and monsters wading in the moat (shark food). */
+  private moatPrey(active: readonly GamePlayer[], t: number): MoatPrey[] {
+    const out: MoatPrey[] = [];
+    for (const p of active) {
+      const s = p.sim.state;
+      if (p.state.downed || s.y > 0.3 || !inMoat(s.x, s.z)) continue;
+      out.push({ x: s.x, z: s.z, bite: (fx, fz) => this.hurt(p, PLAYER_HP.shark, fx, s.z < fz ? fz + 3 : fz - 3, t, 10, 0.8) });
+    }
+    for (const b of this.alive()) {
+      if (MONSTERS[b.m.kind as MonsterKind].fly || isBoss(b.m.kind) || !inMoat(b.m.x, b.m.z)) continue;
+      out.push({
+        x: b.m.x, z: b.m.z,
+        bite: () => {
+          b.m.hp = Math.max(0, b.m.hp - 3);
+          b.m.hitAt = t;
+          if (b.m.hp <= 0) this.kill(b, t);
+        },
+      });
+    }
+    return out;
+  }
+
+  // --- skills / bosses -------------------------------------------------------------------------
+
+  /** Đạn Nảy: chain from `from` to the nearest monsters not hit yet. */
+  private bounce(from: MonsterBrain, count: number, dmg: number, p: GamePlayer, t: number): void {
+    const hit = new Set<MonsterBrain>([from]);
+    let cur = from;
+    for (let i = 0; i < count; i++) {
+      let next: MonsterBrain | null = null;
+      let best: number = SKILL.bounceRange;
+      for (const b of this.alive()) {
+        if (hit.has(b)) continue;
+        const d = Math.hypot(b.m.x - cur.m.x, b.m.z - cur.m.z);
+        if (d < best) {
+          best = d;
+          next = b;
+        }
+      }
+      if (!next) return;
+      this.ctx.flash?.('SHOT', p.id, cur.m.x, cur.m.z, next.m.x, next.m.z);
+      this.damage(next, dmg, p, t);
+      hit.add(next);
+      cur = next;
+    }
+  }
+
+  private updateTornadoes(dt: number, t: number): void {
+    for (let i = this.tornadoes.length - 1; i >= 0; i--) {
+      const tw = this.tornadoes[i]!;
+      tw.x += tw.dx * SKILL.tornadoSpeed * dt;
+      tw.z += tw.dz * SKILL.tornadoSpeed * dt;
+      for (const b of this.alive()) {
+        if (b.m.y > 2.4 || Math.hypot(b.m.x - tw.x, b.m.z - tw.z) > SKILL.tornadoRadius + MONSTERS[b.m.kind as MonsterKind].radius) continue;
+        if (!isBoss(b.m.kind)) {
+          // Swept along with the wind.
+          b.m.x += tw.dx * SKILL.tornadoSpeed * dt * 0.8;
+          b.m.z += tw.dz * SKILL.tornadoSpeed * dt * 0.8;
+        }
+        if (tw.hit.has(b.m.id)) continue;
+        tw.hit.add(b.m.id);
+        this.damage(b, tw.damage, tw.owner, t);
+      }
+      if (t >= tw.until) this.tornadoes.splice(i, 1);
+    }
+  }
+
+  /** Minotaur: walk at the nearest player, stamp (telegraph), then charge in a straight line. */
+  private minotaur(b: MonsterBrain, players: readonly GamePlayer[], dt: number, t: number): void {
+    const m = b.m;
+    const prey = this.nearest(players, m.x, m.z, 99);
+    if (b.bossPhase === 'CHASE') {
+      m.state = 'WALK';
+      if (prey) this.moveToward(m, prey.sim.state.x, prey.sim.state.z, MONSTERS.MINOTAUR.speed, dt);
+      else this.moveToward(m, m.x, CASTLE.gateZ - 1.5, MONSTERS.MINOTAUR.speed, dt);
+      if (t >= (b.bossUntil ?? 0)) {
+        b.bossPhase = 'WIND';
+        b.bossUntil = t + MINOTAUR.windSeconds;
+        const tx = prey ? prey.sim.state.x : m.x;
+        const tz = prey ? prey.sim.state.z : CASTLE.gateZ;
+        b.chargeYaw = Math.atan2(tx - m.x, tz - m.z);
+        m.yaw = b.chargeYaw;
+      }
+    } else if (b.bossPhase === 'WIND') {
+      m.state = 'ATTACK'; // pawing the ground: get out of the way!
+      if (t >= (b.bossUntil ?? 0)) {
+        b.bossPhase = 'CHARGE';
+        b.bossUntil = t + MINOTAUR.chargeSeconds;
+        b.hitIds = new Set();
+        this.ctx.flash?.('QUAKE', '', m.x, m.z);
+      }
+    } else {
+      m.state = 'CHARGE';
+      const yaw = b.chargeYaw ?? 0;
+      m.x += Math.sin(yaw) * MINOTAUR.chargeSpeed * dt;
+      m.z += Math.cos(yaw) * MINOTAUR.chargeSpeed * dt;
+      for (const p of players) {
+        if (b.hitIds?.has(p.id)) continue;
+        if (Math.hypot(p.sim.state.x - m.x, p.sim.state.z - m.z) > MONSTERS.MINOTAUR.radius + 0.6) continue;
+        b.hitIds?.add(p.id);
+        this.hurt(p, MINOTAUR.damage, m.x, m.z, t, MINOTAUR.knock, 1);
+      }
+      const h = CASTLE.halfWidth - 1;
+      const hitGate = m.z >= CASTLE.gateZ - MONSTERS.MINOTAUR.radius;
+      if (hitGate) {
+        this.state.gate = Math.max(0, this.state.gate - MINOTAUR.gateDamage);
+        this.ctx.flash?.('GATE_HIT', '', m.x, CASTLE.gateZ);
+      }
+      m.x = Math.max(-h, Math.min(h, m.x));
+      m.z = Math.max(CASTLE.spawnZ, Math.min(CASTLE.gateZ - MONSTERS.MINOTAUR.radius, m.z));
+      if (t >= (b.bossUntil ?? 0) || hitGate) {
+        b.bossPhase = 'CHASE';
+        b.bossUntil = t + MINOTAUR.chaseSeconds;
+      }
+    }
+  }
+
+  /** Vua Slime: creeps toward players (or the gate), every few seconds hops onto one and slams. */
+  private slimeKing(b: MonsterBrain, players: readonly GamePlayer[], dt: number, t: number): void {
+    const m = b.m;
+    const prey = this.nearest(players, m.x, m.z, 99);
+    if (b.bossPhase === 'HOP') {
+      const f = Math.min(1, 1 - ((b.bossUntil ?? t) - t) / SLIME_KING.hopSeconds);
+      m.x = (b.hopFromX ?? m.x) + ((b.hopToX ?? m.x) - (b.hopFromX ?? m.x)) * f;
+      m.z = (b.hopFromZ ?? m.z) + ((b.hopToZ ?? m.z) - (b.hopFromZ ?? m.z)) * f;
+      m.y = Math.sin(f * Math.PI) * SLIME_KING.hopHeight;
+      m.state = 'ATTACK';
+      if (f >= 1) {
+        m.y = 0;
+        this.ctx.flash?.('QUAKE', '', m.x, m.z);
+        for (const p of players) {
+          if (Math.hypot(p.sim.state.x - m.x, p.sim.state.z - m.z) < SLIME_KING.slamRadius) this.hurt(p, SLIME_KING.damage, m.x, m.z, t, SLIME_KING.knock, 0.8);
+        }
+        if (m.z >= CASTLE.gateZ - 3) this.state.gate = Math.max(0, this.state.gate - 8);
+        b.bossPhase = 'CHASE';
+        b.bossUntil = t + SLIME_KING.hopEvery;
+      }
+      return;
+    }
+    m.state = 'WALK';
+    const tx = prey ? prey.sim.state.x : m.x;
+    const tz = prey ? prey.sim.state.z : CASTLE.gateZ - 2;
+    this.moveToward(m, tx, tz, MONSTERS.SLIME_KING.speed, dt);
+    if (!prey && m.z >= CASTLE.gateZ - MONSTERS.SLIME_KING.radius - 0.1) {
+      m.state = 'ATTACK';
+      this.state.gate = Math.max(0, this.state.gate - MONSTERS.SLIME_KING.gateDps * dt);
+    }
+    if (t >= (b.bossUntil ?? 0)) {
+      b.bossPhase = 'HOP';
+      b.bossUntil = t + SLIME_KING.hopSeconds;
+      b.hopFromX = m.x;
+      b.hopFromZ = m.z;
+      // Hop up to 7 m toward the target.
+      const dx = tx - m.x;
+      const dz = tz - m.z;
+      const d = Math.hypot(dx, dz);
+      const k = d > 7 ? 7 / d : 1;
+      b.hopToX = m.x + dx * k;
+      b.hopToZ = Math.min(CASTLE.gateZ - 2, m.z + dz * k);
+    }
+  }
+
+  private spawnSlimes(x: number, z: number, count: number, t: number): void {
+    for (let i = 0; i < count; i++) {
+      const s = this.spawn('SLIME', t, 1 + this.state.wave * 0.1);
+      const a = (i / count) * Math.PI * 2;
+      s.m.x = x + Math.cos(a) * 2;
+      s.m.z = Math.min(CASTLE.gateZ - 1, z + Math.sin(a) * 2);
+    }
+  }
+
+  /** Dies without a killer (fell into the pit, eaten by a shark). */
+  private kill(b: MonsterBrain, t: number): void {
+    if (b.m.state === 'DIE') return;
+    b.m.hp = 0;
+    b.m.state = 'DIE';
+    b.removeAt = t + DIE_SECONDS;
   }
 
   private addPoints(id: string, n: number): void {

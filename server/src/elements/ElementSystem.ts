@@ -87,7 +87,8 @@ export class ElementSystem {
 
   pick(id: string, element: ElementId): boolean {
     const phase = this.state.phase;
-    if (phase !== 'ROUND_INTRO' && phase !== 'ROUND_COUNTDOWN') return false;
+    const between = phase === 'ROUND_PLAYING' && this.game?.allowElementPick?.() === true;
+    if (phase !== 'ROUND_INTRO' && phase !== 'ROUND_COUNTDOWN' && !between) return false;
     const p = this.players.find((pl) => pl.id === id);
     if (!p || !this.allowed.includes(element)) return false;
     p.state.element = element;

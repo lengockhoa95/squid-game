@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
-  PERKS, PERK_MAX, RARITIES, WEAPONS, isBossWave, isPerkId, isWeaponId, parsePerks, ultimatesFor, vi,
-  type PerkId, type WeaponId,
+  BOSS_NAMES, PERKS, PERK_MAX, PLAYER_HP, RARITIES, WEAPONS, isBoss, isBossWave, isPerkId, isWeaponId, parsePerks, ultimatesFor, vi,
+  type MonsterKind, type PerkId, type WeaponId,
 } from '@sp/shared';
+import { ElementPicker } from '../../elements/ElementHud.tsx';
 import type { MatchNetAdapter } from '../../network/types.ts';
 import { useAnimationFrame } from '../../ui/match/useAnimationFrame.ts';
 
@@ -13,9 +14,12 @@ interface Slow {
   perks: string;
   offer: PerkId[];
   breakLeft: number;
+  boss: string;
+  downed: boolean;
+  downLeft: number;
 }
 
-const EMPTY: Slow = { wave: '', weapon: 'FIST', tier: 0, perks: '', offer: [], breakLeft: 0 };
+const EMPTY: Slow = { wave: '', weapon: 'FIST', tier: 0, perks: '', offer: [], breakLeft: 0, boss: '', downed: false, downLeft: 0 };
 
 /**
  * Thủ Thành HUD: wave / boss bar, gate HP, weapon (rarity colour), weapon skill levels, rage meter
@@ -27,6 +31,10 @@ export function CastleHud({ net }: { net: MatchNetAdapter }) {
   const bossBox = useRef<HTMLDivElement>(null);
   const rage = useRef<HTMLDivElement>(null);
   const score = useRef<HTMLSpanElement>(null);
+  const hp = useRef<HTMLDivElement>(null);
+  const hpText = useRef<HTMLSpanElement>(null);
+  const revive = useRef<HTMLDivElement>(null);
+  const downSince = useRef(0);
   const [slow, setSlow] = useState<Slow>(EMPTY);
   const sig = useRef('');
 
@@ -36,11 +44,21 @@ export function CastleHud({ net }: { net: MatchNetAdapter }) {
     const me = state?.players.get(net.localId);
     if (!castle || !me || !state) return;
     if (gate.current) gate.current.style.transform = `scaleX(${castle.gateMax > 0 ? castle.gate / castle.gateMax : 0})`;
-    let dragon: { hp: number; maxHp: number } | null = null;
+    let found: { hp: number; maxHp: number; kind: string } | null = null;
     castle.monsters.forEach((m) => {
-      if (m.kind === 'DRAGON' && m.state !== 'DIE') dragon = { hp: m.hp, maxHp: m.maxHp };
+      if (isBoss(m.kind) && m.state !== 'DIE') found = { hp: m.hp, maxHp: m.maxHp, kind: m.kind };
     });
-    const d = dragon as { hp: number; maxHp: number } | null;
+    const d = found as { hp: number; maxHp: number; kind: string } | null;
+    const ratio = Math.max(0, Math.min(1, me.hp / PLAYER_HP.max));
+    if (hp.current) {
+      hp.current.style.transform = `scaleX(${ratio})`;
+      hp.current.classList.toggle('is-low', ratio < 0.35);
+    }
+    if (hpText.current) hpText.current.textContent = `${me.hp}/${PLAYER_HP.max}`;
+    if (revive.current) revive.current.style.transform = `scaleX(${me.revive})`;
+    if (me.downed && downSince.current === 0) downSince.current = state.gameTime;
+    if (!me.downed) downSince.current = 0;
+    const downLeft = me.downed ? Math.max(0, Math.ceil(PLAYER_HP.autoReviveSeconds - (state.gameTime - downSince.current))) : 0;
     if (bossBox.current) bossBox.current.style.display = d ? '' : 'none';
     if (d && boss.current) boss.current.style.transform = `scaleX(${d.hp / (d.maxHp || 1)})`;
     if (rage.current) rage.current.style.transform = `scaleX(${me.rage})`;
@@ -50,10 +68,11 @@ export function CastleHud({ net }: { net: MatchNetAdapter }) {
       : `${isBossWave(castle.wave) ? `${vi.castleBoss} · ` : ''}${vi.castleWave} ${castle.wave}/${castle.waves}`;
     const breakLeft = castle.breakUntil > 0 ? Math.max(0, Math.ceil(castle.breakUntil - state.gameTime)) : 0;
     const weapon: WeaponId = isWeaponId(me.weapon) ? me.weapon : 'FIST';
-    const next = `${waveText}|${weapon}|${me.weaponTier}|${me.perks}|${me.perkOffer}|${breakLeft}`;
+    const bossName = d ? BOSS_NAMES[d.kind as MonsterKind] ?? vi.castleDragon : '';
+    const next = `${waveText}|${weapon}|${me.weaponTier}|${me.perks}|${me.perkOffer}|${breakLeft}|${bossName}|${me.downed}|${downLeft}`;
     if (next === sig.current) return;
     sig.current = next;
-    setSlow({ wave: waveText, weapon, tier: me.weaponTier, perks: me.perks, offer: me.perkOffer.split(',').filter(isPerkId), breakLeft });
+    setSlow({ wave: waveText, weapon, tier: me.weaponTier, perks: me.perks, offer: me.perkOffer.split(',').filter(isPerkId), breakLeft, boss: bossName, downed: me.downed, downLeft });
   });
 
   // Keys 1/2/3 pick a card (the pointer is usually locked, so clicking the HUD is not possible).
@@ -77,11 +96,23 @@ export function CastleHud({ net }: { net: MatchNetAdapter }) {
       <div className="castle-top">
         <div className="hud-chip">{slow.wave} · <span ref={score} /></div>
         <div ref={bossBox} className="boss-bar" style={{ display: 'none' }}>
-          <span>{vi.castleDragon}</span>
+          <span>{slow.boss}</span>
           <div className="meter"><div ref={boss} className="meter-fill boss-fill" /></div>
         </div>
         {slow.breakLeft > 0 && <div className="hud-chip castle-break">{vi.castleNextWave} {slow.breakLeft}s</div>}
       </div>
+      {slow.downed && (
+        <div className="castle-down" role="status">
+          <strong>{vi.castleDowned}</strong>
+          <span>{vi.castleDownedHint} ({slow.downLeft}s)</span>
+          <div className="meter"><div ref={revive} className="meter-fill revive-fill" /></div>
+        </div>
+      )}
+      {slow.breakLeft > 0 && slow.wave !== '' && (
+        <div className="castle-element-pick">
+          <ElementPicker net={net} />
+        </div>
+      )}
       {slow.offer.length > 0 && (
         <div className="perk-pick" role="dialog" aria-label={vi.castlePickPerk}>
           <h3>{vi.castlePickPerk}</h3>
@@ -105,6 +136,10 @@ export function CastleHud({ net }: { net: MatchNetAdapter }) {
         </div>
       )}
       <div className="game-hud castle-hud">
+        <div className="castle-hp">
+          <span>{vi.castleHp} <span ref={hpText} /></span>
+          <div className="meter"><div ref={hp} className="meter-fill hp-fill" /></div>
+        </div>
         <div className="castle-gate">
           <span>{vi.castleGate}</span>
           <div className="meter"><div ref={gate} className="meter-fill gate-fill" /></div>

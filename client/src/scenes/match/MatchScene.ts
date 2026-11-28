@@ -158,6 +158,9 @@ class MatchScene implements GameScene {
 
   wantsPointerLock(): boolean {
     if (this.net.getPhase() !== 'ROUND_PLAYING' || !this.view?.step) return false;
+    // Thủ Thành break: free the mouse to click weapon cards / elements.
+    const castle = this.net.getState()?.castle;
+    if (castle && castle.breakUntil > 0) return false;
     const me = this.localPlayer();
     return !!me && me.alive && me.roundState === 'ACTIVE';
   }
@@ -387,7 +390,7 @@ class MatchScene implements GameScene {
       const actor = this.ensureActor(p, gen);
       actor.model.group.visible = this.participants.has(p.id);
       const pose: Pose =
-        p.roundState === 'OUT' ? 'fallen' : p.roundState === 'FINISHED' || (phase === 'MATCH_END' && p.id === winnerId) ? 'cheer' : 'normal';
+        p.roundState === 'OUT' || p.downed ? 'fallen' : p.roundState === 'FINISHED' || (phase === 'MATCH_END' && p.id === winnerId) ? 'cheer' : 'normal';
       actor.model.setPose(pose);
       // Somersault on the mid-air jump (the local player flips from its own prediction instead).
       if (p.airJumps > actor.airJumps && !(p.id === this.net.localId && this.local)) actor.model.flip();

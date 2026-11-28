@@ -48,6 +48,10 @@ export const PlayerState = schema(
     perks: t.string(),
     perkOffer: t.string(),
     rage: t.float32(),
+    /** Thủ Thành: health, knocked down (waiting for a revive) and revive progress 0–1. */
+    hp: t.uint8().default(100),
+    downed: t.boolean(),
+    revive: t.float32(),
     /** Game-specific speed multiplier (zombies run faster), 1 = normal. */
     moveMul: t.float32().default(1),
     /** Picked Kenney character id ('' = slot default). */
@@ -149,6 +153,9 @@ export const CastleState = schema(
     waves: t.uint8(),
     /** Game time the break before the next wave ends (0 while a wave is on). */
     breakUntil: t.float32(),
+    /** Sàn sụp tiles (PIT_SOLID / PIT_CRACKING / PIT_GONE) and the moat sharks. */
+    tiles: t.array('uint8'),
+    sharks: t.array(SharkFin),
     monsters: t.array(Monster),
     pickups: t.array(WeaponPickup),
   },

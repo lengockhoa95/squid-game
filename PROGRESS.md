@@ -190,6 +190,17 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
 - [x] Tầm đánh xa hơn (kiếm 3.4m, giáo 5m, cung 26m, súng 24m); vệt chém dạng dải cung đặc, đạn có đầu sáng + đuôi chấm sáng.
 - [x] Lâu đài nhiều tầng (tháp chính 4 tầng, tháp phụ), tường bao quanh sân thành và hai bên chiến trường.
 - [x] Mặt đất cỏ vẽ bằng code + con đường đất từ hang quái tới cổng.
+- [x] Map tái sử dụng các game khác:
+  - Hào nước có cá mập + 2 cầu gỗ (Vượt Biển Cá Mập).
+  - Sàn sụp gần hang quái: quái rơi chết, người rơi mất máu (Sàn sụp).
+  - Băng chuyền hai bên + bệ nhảy lên tường thành (Parkour).
+- [x] Ra vào cổng thành được (quái vẫn bị chặn), cầu thang đá lên tường, tường/tháp/tháp chính có va chạm.
+- [x] Boss xoay vòng: Vua Slime (nhảy dậm, tách slime con) → Minotaur (lấy đà rồi húc) → Rồng; đợt cuối luôn là Rồng.
+- [x] Máu người chơi: quái/cá mập/rơi hố làm mất máu, tự hồi máu.
+  - Hết máu thì gục; đồng đội đứng cạnh 2 giây để cứu, hoặc tự dậy ở lâu đài sau 15 giây (bị trừ điểm).
+- [x] Đổi nguyên tố giữa các đợt (chuột được thả ra để chọn).
+- [x] Thẻ mới: Lốc Kiếm, Đạn Nảy, Thương Xuyên Thấu. Quái đông hơn ~1.5 lần.
+- [x] Test: 181 unit/integration.
 
 ## Hạn chế đã biết
 

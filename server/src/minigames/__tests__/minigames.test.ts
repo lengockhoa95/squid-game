@@ -405,13 +405,17 @@ describe('Shark Swim', () => {
 });
 
 describe('Castle (Thủ Thành)', () => {
-  it('waves follow the host setting with a dragon boss every 5th wave', async () => {
+  it('waves follow the host setting with a boss every 5th wave', async () => {
     const { castleWave, isBossWave, castleWaveCount } = await import('@sp/shared');
     expect(castleWaveCount(15)).toBe(15);
     expect(castleWaveCount(7)).toBe(10); // unknown values fall back to the default
     expect(isBossWave(5) && isBossWave(10) && !isBossWave(4)).toBe(true);
-    expect(castleWave(5, 4).some((s) => s.kind === 'DRAGON')).toBe(true);
-    expect(castleWave(3, 4).some((s) => s.kind === 'DRAGON')).toBe(false);
+    const { isBoss } = await import('@sp/shared');
+    // Bosses rotate (Vua Slime → Minotaur → Rồng …); the final wave is always the dragon.
+    expect(castleWave(5, 4, 15)[0]!.kind).toBe('SLIME_KING');
+    expect(castleWave(10, 4, 15)[0]!.kind).toBe('MINOTAUR');
+    expect(castleWave(10, 4, 10)[0]!.kind).toBe('DRAGON');
+    expect(castleWave(3, 4).some((s) => isBoss(s.kind))).toBe(false);
     expect(castleWave(9, 4)[0]!.hpMul).toBeGreaterThan(castleWave(1, 4)[0]!.hpMul);
   });
 
@@ -510,5 +514,87 @@ describe('Castle (Thủ Thành)', () => {
     if (m.state !== 'DIE') expect(m.state).toBe('STUN');
     // Earth / water keep their normal effect (the game reacts to the pillar / puddle).
     expect(game.elementCast('EARTH', a.id, 0, 0, t)).toBeUndefined();
+  });
+
+  it('health: monsters hurt, at 0 you go down; a teammate standing next to you revives you', async () => {
+    const { Castle } = await import('../Castle/Logic.ts');
+    const { PLAYER_HP } = await import('@sp/shared');
+    const { ctx, players } = makeContext(2);
+    const game = new Castle();
+    game.initialize(ctx);
+    const [a, b] = players as [typeof players[0], typeof players[0]];
+    expect(a.state.hp).toBe(PLAYER_HP.max);
+    // Hurt a to 0 through the private helper (what monsters do on contact).
+    (game as unknown as { hurt(p: unknown, n: number, x: number, z: number, t: number, s: number, st: number): void }).hurt(a, 999, 0, 0, 1, 0, 0);
+    expect(a.state.downed).toBe(true);
+    // b stands next to a long enough: a gets back up.
+    b.sim.reset(a.sim.state.x + 0.5, a.sim.state.z, 0);
+    run(game, players, 1, PLAYER_HP.reviveSeconds + 0.3);
+    expect(a.state.downed).toBe(false);
+    expect(a.state.hp).toBe(PLAYER_HP.reviveHp);
+  });
+
+  it('map hazards: falling through a dropped tile hurts and respawns; the moat slows; pads launch onto the wall; the gate lets players through', async () => {
+    const { castleStep, createCastleWorld, applyPitTiles, pitTileBox, PIT_GONE, PIT_TILE_COUNT, MOAT, PADS, WALL_TOP, CASTLE, YARD } = await import('@sp/shared');
+    const { createCharacterState: createCharacter } = await import("@sp/shared");
+    const cw = createCastleWorld();
+    const step = castleStep(cw);
+    const tiles = new Array(PIT_TILE_COUNT).fill(0);
+    tiles[3] = PIT_GONE;
+    applyPitTiles(cw, tiles);
+    const box = pitTileBox(3);
+    const s = createCharacter((box.minX + box.maxX) / 2, (box.minZ + box.maxZ) / 2);
+    for (let i = 0; i < 60; i++) step(s, { dirX: 0, dirZ: 0, jump: false }, 1 / 60, 0);
+    expect(s.y).toBeLessThan(-1); // fell into the pit
+    // Moat: walking is slower than on the bank.
+    const wade = createCharacter(0, (MOAT.minZ + MOAT.maxZ) / 2);
+    const dry = createCharacter(0, 6);
+    for (let i = 0; i < 30; i++) {
+      step(wade, { dirX: 1, dirZ: 0, jump: false }, 1 / 60, 0);
+      step(dry, { dirX: 1, dirZ: 0, jump: false }, 1 / 60, 0);
+    }
+    expect(wade.x).toBeLessThan(dry.x * 0.75);
+    // Jump pad → standing on the wall walkway.
+    const pad = createCharacter(PADS[0]!.x, PADS[0]!.z);
+    let best = 0;
+    for (let i = 0; i < 120; i++) {
+      step(pad, { dirX: 0, dirZ: 0, jump: false }, 1 / 60, 0);
+      if (pad.grounded) best = Math.max(best, pad.y);
+    }
+    expect(best).toBeCloseTo(WALL_TOP, 1);
+    // Walk through the doorway into the castle grounds.
+    const walker = createCharacter(0, CASTLE.gateZ - 1);
+    for (let i = 0; i < 90; i++) step(walker, { dirX: 0, dirZ: 1, jump: false }, 1 / 60, 0);
+    expect(walker.z).toBeGreaterThan(CASTLE.gateZ + 3);
+    expect(walker.z).toBeLessThan(YARD.backZ);
+  });
+
+  it('weapon cards: Thương Xuyên Thấu hits a whole line, Đạn Nảy hops to a second monster', async () => {
+    const { Castle } = await import('../Castle/Logic.ts');
+    const { CASTLE } = await import('@sp/shared');
+    const { ctx, players, match } = makeContext(1);
+    const game = new Castle();
+    game.initialize(ctx);
+    let t = run(game, players, 0, CASTLE.prepSeconds + 4);
+    const p = players[0]!;
+    const alive = () => match.castle!.monsters.filter((m) => m.state !== 'DIE');
+    // Line two monsters up in front of the player (+z), 1.5 m and 3.5 m away.
+    const [m1, m2] = alive() as [typeof match.castle extends undefined ? never : NonNullable<typeof match.castle>['monsters'][number], NonNullable<typeof match.castle>['monsters'][number]];
+    p.sim.reset(0, -10, 0);
+    m1.x = 0; m1.z = -8.5; m2.x = 0; m2.z = -6.5;
+    m1.hp = m2.hp = 50;
+    p.state.perks = 'PIERCE:3';
+    game.handleAttack(p.id, t, 0);
+    expect(m1.hp).toBeLessThan(50);
+    expect(m2.hp).toBeLessThan(50); // fists alone would only reach 2.2 m
+    // Đạn Nảy: a gun shot at m1 also hits m2.
+    t += 1;
+    p.state.weapon = 'GUN';
+    p.state.perks = 'BOUNCE:1';
+    m1.x = 3; m1.z = -10; m2.x = 3; m2.z = -7;
+    m1.hp = m2.hp = 50;
+    game.handleAttack(p.id, t, Math.PI / 2);
+    expect(m1.hp).toBeLessThan(50);
+    expect(m2.hp).toBeLessThan(50);
   });
 });

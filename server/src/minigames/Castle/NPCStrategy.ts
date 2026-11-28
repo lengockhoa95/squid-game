@@ -30,6 +30,20 @@ export class CastleStrategy implements NpcStrategy {
       this.game.handlePick(bot.id, bot.difficulty === 'EASY' ? offer[Math.floor(Math.random() * offer.length)]! : pick);
     }
 
+    // Downed: nothing to do but wait.
+    if (bot.state.downed) return;
+    // A teammate is down nearby: go and revive them (careful bots more eagerly).
+    const helpRange = bot.difficulty === 'EASY' ? 6 : bot.difficulty === 'NORMAL' ? 12 : 20;
+    const fallen = view.downed.filter((d) => d.id !== bot.id).sort((a, b) => Math.hypot(a.x - s.x, a.z - s.z) - Math.hypot(b.x - s.x, b.z - s.z))[0];
+    if (fallen && Math.hypot(fallen.x - s.x, fallen.z - s.z) < helpRange) {
+      bot.steerTo(fallen.x, fallen.z);
+      if (Math.hypot(fallen.x - s.x, fallen.z - s.z) < 1) {
+        bot.intent.dirX = 0;
+        bot.intent.dirZ = 0;
+      }
+      return;
+    }
+
     // A better weapon nearby (or bare-handed): go get it.
     const better = view.pickups.filter((pk) => weapon.id === 'FIST' || pk.tier > bot.state.weaponTier);
     if (better.length > 0) {

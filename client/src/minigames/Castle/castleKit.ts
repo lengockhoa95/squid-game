@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { CASTLE, createCastleWorld } from '@sp/shared';
+import { CASTLE, CASTLE_LOW_WALLS } from '@sp/shared';
 
 /**
  * Kenney "Castle Kit" (CC0) pieces for the Thủ Thành map. Each piece is a 1×1 tile (walls 1.31
@@ -79,7 +79,8 @@ export function buildCastle(): { root: THREE.Group; gate: THREE.Object3D | null 
     add(piece('wall', x, 0, wallZ, TILE, Math.PI));
   }
   add(piece('wall-doorway', 0, 0, wallZ, [TILE * 2.2, TILE, TILE], Math.PI));
-  const gate = add(piece('gate', 0, 0, wallZ - 0.2, [TILE * 2.2, TILE * 1.4, TILE * 3.2], Math.PI / 2));
+  // Portcullis raised half-way: defenders walk in and out; monsters still have to break it.
+  const gate = add(piece('gate', 0, 1.7, wallZ - 0.2, [TILE * 2.2, TILE * 1.4, TILE * 3.2], Math.PI / 2));
   for (const sx of [-3, 3]) {
     add(piece('tower-square-base', sx, 0, wallZ, TILE));
     add(piece('tower-square-mid', sx, TILE * 1.01, wallZ, TILE));
@@ -91,7 +92,7 @@ export function buildCastle(): { root: THREE.Group; gate: THREE.Object3D | null 
     add(piece('tower-hexagon-mid', sx, TILE * 1.6 * 1.31, wallZ, TILE * 1.6));
     add(piece('tower-hexagon-roof', sx, TILE * 1.6 * 2.3, wallZ, TILE * 1.6));
   }
-  for (const sx of [-9, 9]) add(piece('flag-banner-long', sx, 0.2, wallZ - TILE / 2 - 0.05, [TILE, TILE * 0.9, TILE], Math.PI / 2));
+  for (const sx of [-13, 13]) add(piece('flag-banner-long', sx, 0.6, wallZ - TILE / 2 - 0.05, [1.2, 1.1, 1.2], Math.PI / 2));
   buildKeep(add, wallZ);
   // Stone walls along both sides of the battlefield, up to the monster lair: the whole map is walled in.
   for (const sx of [-h - 1, h + 1]) {
@@ -102,7 +103,7 @@ export function buildCastle(): { root: THREE.Group; gate: THREE.Object3D | null 
   add(piece('siege-catapult', -10, 0, wallZ + 5, 2.2, Math.PI));
   add(piece('siege-ballista', 10, 0, wallZ + 5, 2.2, Math.PI));
   // Courtyard low walls = the collision boxes (1 m high).
-  for (const b of createCastleWorld().boxes.slice(1)) {
+  for (const b of CASTLE_LOW_WALLS) {
     for (let x = b.minX + 0.5; x < b.maxX; x += 1) {
       add(piece('wall-half', x, 0, (b.minZ + b.maxZ) / 2, [1, b.top / 1.31, b.maxZ - b.minZ]));
     }

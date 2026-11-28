@@ -54,6 +54,8 @@ export interface ServerMinigame {
   elementTarget?(botId: string): { x: number; z: number } | null;
   /** In-round choice (Thủ Thành weapon card after a wave). */
   handlePick?(id: string, choice: string): void;
+  /** Element can be changed mid-round right now (Thủ Thành: between waves). */
+  allowElementPick?(): boolean;
   /** Overrides the catalog time limit (read after initialize). */
   readonly timeLimit?: number;
   /** Card "Mắt Thần" (bridge): reveal the breaking tile of the first `rows` rows to this player. */
