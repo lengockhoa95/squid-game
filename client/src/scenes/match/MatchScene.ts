@@ -84,6 +84,7 @@ class MatchScene implements GameScene {
     this.marker = new ClickMarker(this.resources);
     this.root.add(this.marker.mesh);
     this.effects = new ElementEffectsView(ctx.materials);
+    this.effects.localId = net.localId;
     // Attacks: play the swing/shot animation on whoever attacked.
     this.effects.onNewEffect = (e) => {
       if (e.kind !== 'SLASH' && e.kind !== 'SHOT') return;

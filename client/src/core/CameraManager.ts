@@ -3,6 +3,14 @@ import { rayBox, type Box } from '@sp/shared';
 
 const DEG = Math.PI / 180;
 
+/** Screen shake strength (metres of jitter); effects raise it, the camera lets it decay. */
+export const cameraShake = { amount: 0 };
+
+/** Add a shake (the strongest one wins). */
+export function shake(amount: number): void {
+  cameraShake.amount = Math.min(1.2, Math.max(cameraShake.amount, amount));
+}
+
 export const CAMERA_LIMITS = {
   /** Below the horizon: the camera dips low and looks up (aim at flyers). */
   pitchMin: -30 * DEG,
@@ -111,6 +119,14 @@ export class CameraManager {
     );
     this.avoidBlockers();
     this.camera.lookAt(this.focus.x, lookY, this.focus.z);
+    // Screen shake (hits, explosions): a quick random jitter that dies down.
+    if (cameraShake.amount > 0.002) {
+      const a = cameraShake.amount;
+      this.camera.position.x += (Math.random() - 0.5) * a;
+      this.camera.position.y += (Math.random() - 0.5) * a;
+      this.camera.rotation.z += (Math.random() - 0.5) * a * 0.04;
+      cameraShake.amount *= Math.exp(-9 * dt);
+    }
   }
 
   /** Solid boxes between the character and the camera pull the camera in (no seeing through walls). */

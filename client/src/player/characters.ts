@@ -17,7 +17,12 @@ import { FLIP_SECONDS, flipAngle, type CharacterBody, type Pose } from './Charac
 
 export const MINOTAUR_CHARACTER = 'character-zombie';
 /** Weapon models (Kenney, same folder) held in Thủ Thành. */
-export const WEAPON_MODELS = ['weapon-sword', 'weapon-spear', 'weapon-bow', 'weapon-shooter'] as const;
+export const WEAPON_MODELS = [
+  'weapon-sword', 'weapon-spear', 'weapon-bow', 'weapon-shooter',
+  // Other Kenney kits (CC0), each in its own folder with its own colormap.
+  '../weapons/survival/tool-hammer-upgraded', '../weapons/dungeon/weapon-sword',
+  '../weapons/blaster/blaster-e', '../weapons/blaster/blaster-l', '../weapons/blaster/blaster-o',
+] as const;
 
 const BASE = `${import.meta.env.BASE_URL ?? '/'}models/kenney/`;
 /** Kenney characters are ~0.67 m tall; scale them to our character size. */
@@ -90,11 +95,17 @@ export function createWeaponModel(model: string): THREE.Object3D | null {
 }
 
 /** How each weapon sits in the hand: tilt around x, size, and the model-space height of the grip. */
-const WEAPON_GRIP: Record<string, { rotX: number; scale: number; gripY: number }> = {
+const WEAPON_GRIP: Record<string, { rotX: number; scale: number; gripY: number; rotY?: number }> = {
   'weapon-sword': { rotX: 0.35, scale: 1.7, gripY: 0 },
   'weapon-spear': { rotX: Math.PI / 2 - 0.2, scale: 2, gripY: 0.25 },
   'weapon-bow': { rotX: 0, scale: 1.5, gripY: 0.24 },
   'weapon-shooter': { rotX: 0, scale: 1.6, gripY: 0.02 },
+  '../weapons/survival/tool-hammer-upgraded': { rotX: 0.35, scale: 3.4, gripY: 0.01 },
+  '../weapons/dungeon/weapon-sword': { rotX: 0.4, scale: 1.3, gripY: 0.03 },
+  // Blasters lie along +z with the grip near the origin.
+  '../weapons/blaster/blaster-e': { rotX: 0, scale: 0.75, gripY: 0, rotY: Math.PI },
+  '../weapons/blaster/blaster-l': { rotX: 0, scale: 0.95, gripY: 0, rotY: Math.PI },
+  '../weapons/blaster/blaster-o': { rotX: 0, scale: 1, gripY: 0, rotY: Math.PI },
 };
 
 class KenneyBody implements CharacterBody {
@@ -225,7 +236,7 @@ class KenneyBody implements CharacterBody {
     // gets its own grip: sword raised forward, spear level, bow upright, gun barrel forward.
     const g = WEAPON_GRIP[model] ?? WEAPON_GRIP['weapon-sword']!;
     // Oriented against the held-forward arm so the weapon points where the character faces.
-    const q = this.armHold.clone().invert().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(g.rotX, 0, 0)));
+    const q = this.armHold.clone().invert().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(g.rotX, g.rotY ?? 0, 0)));
     this.weapon.scale.setScalar(g.scale);
     this.weapon.quaternion.copy(q);
     // Kenney arms rest straight out sideways (T-pose, arm-local −x); the fist is ~0.25 from the

@@ -15,6 +15,7 @@ import { buildCastle, loadCastleKit } from './castleKit.ts';
 import { grassTexture, roadTexture } from './ground.ts';
 import { Particles } from '../../fx/Particles.ts';
 import { DamageNumbers } from '../../fx/DamageNumbers.ts';
+import { shake } from '../../core/CameraManager.ts';
 
 const DEG = Math.PI / 180;
 /** Where damage numbers start (above the head). */
@@ -225,11 +226,15 @@ class CastleView implements MinigameView {
                 : mon.state === 'CHARGE' ? 'charge'
                   : mon.state === 'LAND' || mon.state === 'STUN' ? 'idle' : 'move';
         e.model.play(anim);
-        e.model.update(dt);
+        // Frozen (Băng Giá): no animation at all.
+        if (mon.fx !== 'F') e.model.update(dt);
         const boss = isBoss(e.kind);
         const mid = { x: g.position.x, y: g.position.y + (boss ? 2 : 0.6), z: g.position.z };
         if (mon.hitAt !== e.lastHit) {
-          if (e.lastHit !== -1) this.fx.sparks(mid, mon.crit ? 0xffd23f : 0xff6a4f, mon.crit ? 9 : 5, 3);
+          if (e.lastHit !== -1) {
+            this.fx.sparks(mid, mon.crit ? 0xffd23f : 0xff6a4f, mon.crit ? 9 : 5, 3);
+            if (mon.crit) shake(0.07);
+          }
           e.lastHit = mon.hitAt;
           e.punch = mon.crit ? 0.28 : 0.18;
         }
@@ -239,16 +244,20 @@ class CastleView implements MinigameView {
         }
         e.prevHp = mon.hp;
         // Elites: bigger, tinted and glowing by affix; enraged bosses glow red.
-        const look = `${mon.elite}|${mon.enraged}`;
+        const look = `${mon.elite}|${mon.enraged}|${mon.fx}`;
         if (look !== e.look) {
           e.look = look;
           e.scale = mon.elite === 'GIANT' ? 1.8 : mon.elite ? 1.35 : 1;
           const color = ELITE_COLOR[mon.elite] ?? 0xff3b3b;
-          if (mon.elite) {
-            e.model.tint(color, 0.3);
-            e.model.glow(color, 0.35);
-          }
-          if (mon.enraged) e.model.glow(0xff2a1a, 0.6);
+          // Tint: ice when frozen / slowed, else the elite colour (or none).
+          if (mon.fx === 'F') e.model.tint(0xbfefff, 0.7);
+          else if (mon.fx === 'S') e.model.tint(0x8fe3ff, 0.3);
+          else e.model.tint(color, mon.elite ? 0.3 : 0);
+          e.model.glow(mon.enraged ? 0xff2a1a : mon.fx === 'B' ? 0xff6a1a : color, mon.enraged ? 0.6 : mon.fx === 'B' ? 0.45 : mon.elite ? 0.35 : 0);
+        }
+        // Burning: flames lick up from the monster.
+        if (mon.fx === 'B' && Math.random() < dt * 14) {
+          this.fx.sprite({ tex: 'flame_01', color: 0xff7a2f, pos: { x: g.position.x + (Math.random() - 0.5) * 0.6, y: g.position.y + 0.3, z: g.position.z + (Math.random() - 0.5) * 0.6 }, vel: { x: 0, y: 1.6, z: 0 }, life: 0.45, size: 0.6, size1: 0.2 });
         }
         if (mon.state === 'DIE' && !e.dead) {
           e.dead = true;
@@ -275,7 +284,9 @@ class CastleView implements MinigameView {
           const g = new THREE.Group();
           const model = isWeaponId(pk.weapon) ? createWeaponModel(WEAPONS[pk.weapon].model) : null;
           if (model) {
-            model.scale.setScalar(2.6);
+            // Same on-ground size whatever the model's units (blasters are long, the hammer tiny).
+            const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+            model.scale.setScalar(1.1 / Math.max(0.05, size.x, size.y, size.z));
             g.add(model);
           }
           // Rarity colour: ring for everything, a light beam for Huyền thoại / Truyền thuyết.

@@ -52,6 +52,9 @@ export const PlayerState = schema(
     hp: t.uint8().default(100),
     /** Móc câu: pulled toward (hookX, hookY, hookZ) until hookUntil (game time). */
     hookUntil: t.float32(),
+    /** Thủ Thành: kill combo and when it was last extended (game time). */
+    combo: t.uint16(),
+    comboAt: t.float32(),
     hookX: t.float32(),
     hookY: t.float32(),
     hookZ: t.float32(),
@@ -148,6 +151,8 @@ export const Monster = schema(
     hp: t.float32(), maxHp: t.float32(), state: t.string(), hitAt: t.float32(),
     /** Last hit was a critical (damage numbers), elite affix ('' = normal), boss enraged. */
     crit: t.boolean(), elite: t.string(), enraged: t.boolean(),
+    /** Status shown on the model: 'F' frozen, 'S' slowed (frost), 'B' burning, '' none. */
+    fx: t.string(),
   },
   'Monster',
 );
@@ -163,6 +168,10 @@ export const CastleState = schema(
     keepMax: t.float32(),
     /** Where this wave mainly comes from, e.g. "1,2" (side indices). */
     sides: t.string(),
+    /** Big centre banner (wave start, leader, boss, cleared, last stand) until bannerUntil. */
+    banner: t.string(),
+    bannerUntil: t.float32(),
+    lastStand: t.boolean(),
     /** Current wave (1-based; 0 = before the first) and total waves. */
     wave: t.uint8(),
     waves: t.uint8(),

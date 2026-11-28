@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
-  BOSS_NAMES, PERKS, SIDES, SIDE_NAMES, PERK_MAX, PLAYER_HP, RARITIES, WEAPONS, isBoss, isBossWave, isPerkId, isWeaponId, parsePerks, ultimatesFor, vi,
+  BOSS_NAMES, COMBO, PERKS, SIDES, SIDE_NAMES, PERK_MAX, PLAYER_HP, RARITIES, WEAPONS, isBoss, isBossWave, isPerkId, isWeaponId, parsePerks, ultimatesFor, vi,
   type MonsterKind, type PerkId, type WeaponId,
 } from '@sp/shared';
 import { ElementPicker } from '../../elements/ElementHud.tsx';
@@ -38,6 +38,10 @@ export function CastleHud({ net }: { net: MatchNetAdapter }) {
   const hpText = useRef<HTMLSpanElement>(null);
   const revive = useRef<HTMLDivElement>(null);
   const downSince = useRef(0);
+  const banner = useRef<HTMLDivElement>(null);
+  const combo = useRef<HTMLDivElement>(null);
+  const vignette = useRef<HTMLDivElement>(null);
+  const bannerText = useRef('');
   const [slow, setSlow] = useState<Slow>(EMPTY);
   const sig = useRef('');
 
@@ -73,6 +77,34 @@ export function CastleHud({ net }: { net: MatchNetAdapter }) {
     if (bossBox.current) bossBox.current.style.display = d ? '' : 'none';
     if (d && boss.current) boss.current.style.transform = `scaleX(${d.hp / (d.maxHp || 1)})`;
     if (rage.current) rage.current.style.transform = `scaleX(${me.rage})`;
+    // Centre banner (wave start, leader, boss, gate broken, cleared, last stand).
+    if (banner.current) {
+      const on = state.gameTime < castle.bannerUntil && castle.banner !== '';
+      if (castle.banner !== bannerText.current) {
+        bannerText.current = castle.banner;
+        banner.current.textContent = castle.banner;
+        banner.current.classList.remove('pop');
+        void banner.current.offsetWidth; // restart the pop animation
+        banner.current.classList.add('pop');
+      }
+      banner.current.style.opacity = on ? String(Math.min(1, (castle.bannerUntil - state.gameTime) * 2)) : '0';
+    }
+    // Kill combo with shout-outs at milestones.
+    if (combo.current) {
+      const live = me.combo >= 3 && state.gameTime - me.comboAt <= COMBO.window;
+      combo.current.style.opacity = live ? '1' : '0';
+      if (live) {
+        const shout = me.combo >= 50 ? 'HUYỀN THOẠI!' : me.combo >= 35 ? 'BẤT KHẢ CHIẾN BẠI!' : me.combo >= 20 ? 'HUỶ DIỆT!' : me.combo >= 10 ? 'QUÉT SẠCH!' : me.combo >= 5 ? 'LIÊN HOÀN!' : '';
+        const html = `<b>x${me.combo}</b> COMBO${shout ? `<span>${shout}</span>` : ''}`;
+        if (combo.current.innerHTML !== html) {
+          combo.current.innerHTML = html;
+          combo.current.classList.remove('pop');
+          void combo.current.offsetWidth;
+          combo.current.classList.add('pop');
+        }
+      }
+    }
+    vignette.current?.classList.toggle('is-on', castle.lastStand);
     if (score.current) score.current.textContent = `${me.score} ${vi.points}`;
     const waveText = castle.wave === 0
       ? `${vi.castleWave} 1/${castle.waves}`
@@ -105,6 +137,9 @@ export function CastleHud({ net }: { net: MatchNetAdapter }) {
   const w = WEAPONS[slow.weapon];
   return (
     <>
+      <div ref={vignette} className="laststand-vignette" />
+      <div ref={banner} className="castle-banner" />
+      <div ref={combo} className="castle-combo" />
       <div className="castle-top">
         <div className="hud-chip">{slow.wave} · <span ref={score} /></div>
         <div ref={bossBox} className="boss-bar" style={{ display: 'none' }}>

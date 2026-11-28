@@ -20,7 +20,14 @@ export const CASTLE = {
   gateRepair: 0.25,
 } as const;
 
-export type WeaponId = 'FIST' | 'SWORD' | 'SPEAR' | 'BOW' | 'GUN';
+export type WeaponId = 'FIST' | 'SWORD' | 'SPEAR' | 'BOW' | 'GUN' | 'HAMMER' | 'DAGGERS' | 'CROSSBOW' | 'SHOTGUN' | 'STAFF';
+
+/**
+ * Special behaviour: SMASH = ground slam (area, knock-up, breaks shields), ARMOR = sniper round
+ * (ignores shields/armour, pierces two), SPREAD = shotgun pellets in a cone, ORB = hand-cannon
+ * shell that explodes where it lands. Models: Kenney Survival / Mini Dungeon / Blaster kits (CC0).
+ */
+export type WeaponSpecial = 'SMASH' | 'ARMOR' | 'SPREAD' | 'ORB';
 
 export interface WeaponInfo {
   id: WeaponId;
@@ -34,6 +41,7 @@ export interface WeaponInfo {
   arc: number;
   ranged: boolean;
   cooldown: number;
+  special?: WeaponSpecial;
 }
 
 export const WEAPONS: Readonly<Record<WeaponId, WeaponInfo>> = {
@@ -42,9 +50,17 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponInfo>> = {
   SPEAR: { id: 'SPEAR', name: 'Giáo', model: 'weapon-spear', damage: 3.5, range: 5, arc: 0.55, ranged: false, cooldown: 0.55 },
   BOW: { id: 'BOW', name: 'Cung', model: 'weapon-bow', damage: 4, range: 26, arc: 0, ranged: true, cooldown: 0.9 },
   GUN: { id: 'GUN', name: 'Súng', model: 'weapon-shooter', damage: 1.6, range: 24, arc: 0, ranged: true, cooldown: 0.22 },
+  HAMMER: { id: 'HAMMER', name: 'Búa Tạ', model: '../weapons/survival/tool-hammer-upgraded', damage: 6, range: 2.8, arc: 1.6, ranged: false, cooldown: 1, special: 'SMASH' },
+  DAGGERS: { id: 'DAGGERS', name: 'Đoản Kiếm', model: '../weapons/dungeon/weapon-sword', damage: 1.3, range: 2.2, arc: 1.1, ranged: false, cooldown: 0.18 },
+  CROSSBOW: { id: 'CROSSBOW', name: 'Súng Tỉa', model: '../weapons/blaster/blaster-e', damage: 8, range: 30, arc: 0, ranged: true, cooldown: 1.25, special: 'ARMOR' },
+  SHOTGUN: { id: 'SHOTGUN', name: 'Súng Săn', model: '../weapons/blaster/blaster-l', damage: 1.5, range: 10, arc: 0.32, ranged: true, cooldown: 0.8, special: 'SPREAD' },
+  STAFF: { id: 'STAFF', name: 'Pháo Tay', model: '../weapons/blaster/blaster-o', damage: 4, range: 20, arc: 0, ranged: true, cooldown: 0.75, special: 'ORB' },
 };
 
-export const DROP_WEAPONS: readonly WeaponId[] = ['SWORD', 'SPEAR', 'BOW', 'GUN'];
+/** Weapon specials tuning. */
+export const WEAPON_FX = { smashRadius: 2.4, smashStun: 0.5, pellets: 6, orbRadius: 2.6, boltPierce: 2 } as const;
+
+export const DROP_WEAPONS: readonly WeaponId[] = ['SWORD', 'SPEAR', 'BOW', 'GUN', 'HAMMER', 'DAGGERS', 'CROSSBOW', 'SHOTGUN', 'STAFF'];
 
 export function isWeaponId(v: unknown): v is WeaponId {
   return typeof v === 'string' && v in WEAPONS;
@@ -204,8 +220,10 @@ export function rollRarity(wave: number, r: number): number {
 
 // --- Weapon skill cards (after each wave) -----------------------------------------------------
 
-export type PerkId = 'POWER' | 'HASTE' | 'REACH' | 'CRIT' | 'TORNADO' | 'BOUNCE' | 'PIERCE' | 'FORGE';
-export const PERK_IDS: readonly PerkId[] = ['POWER', 'HASTE', 'REACH', 'CRIT', 'TORNADO', 'BOUNCE', 'PIERCE', 'FORGE'];
+export type PerkId =
+  | 'POWER' | 'HASTE' | 'REACH' | 'CRIT' | 'TORNADO' | 'BOUNCE' | 'PIERCE'
+  | 'VAMP' | 'FROST' | 'BURN' | 'STORM' | 'BLAST' | 'FORGE';
+export const PERK_IDS: readonly PerkId[] = ['POWER', 'HASTE', 'REACH', 'CRIT', 'TORNADO', 'BOUNCE', 'PIERCE', 'VAMP', 'FROST', 'BURN', 'STORM', 'BLAST', 'FORGE'];
 export const PERK_MAX = 3;
 
 export interface PerkInfo {
@@ -225,6 +243,11 @@ export const PERKS: Readonly<Record<PerkId, PerkInfo>> = {
   TORNADO: { id: 'TORNADO', name: 'Lốc Kiếm', color: '#7bffb0', desc: 'Đòn cận chiến thả lốc xoáy bay thẳng, cuốn quái (cấp cao: thả thường hơn)' },
   BOUNCE: { id: 'BOUNCE', name: 'Đạn Nảy', color: '#ffa94d', desc: 'Đạn/tên trúng quái nảy sang thêm 1 con mỗi cấp' },
   PIERCE: { id: 'PIERCE', name: 'Thương Xuyên Thấu', color: '#ff7bd5', desc: 'Đòn cận chiến đâm xuyên một đường dài, trúng mọi quái trên đường' },
+  VAMP: { id: 'VAMP', name: 'Hút Máu', color: '#ff4f6d', desc: 'Mỗi đòn trúng hồi máu (cấp 3: hồi cả đồng đội gần)' },
+  FROST: { id: 'FROST', name: 'Băng Giá', color: '#8fe3ff', desc: 'Đòn đánh làm quái chậm; trúng 3 lần thì đóng băng' },
+  BURN: { id: 'BURN', name: 'Lửa Thiêu', color: '#ff8a2f', desc: 'Đòn đánh đốt cháy quái mất máu theo thời gian' },
+  STORM: { id: 'STORM', name: 'Sấm Truyền', color: '#ffe14a', desc: 'Cứ vài đòn lại gọi sét đánh xuống mục tiêu' },
+  BLAST: { id: 'BLAST', name: 'Bùng Nổ', color: '#ff5a2f', desc: 'Quái bạn giết nổ tung, gây sát thương lan' },
   FORGE: { id: 'FORGE', name: 'Rèn Vũ Khí', color: '#ffb020', desc: 'Nâng vũ khí đang cầm lên 1 bậc (tối đa Huyền thoại)' },
 };
 
@@ -247,7 +270,9 @@ export function formatPerks(p: Partial<Record<PerkId, number>>): string {
 }
 
 /** Each weapon's own ultimate when it is Truyền thuyết. */
-export const WEAPON_ULT: Readonly<Record<WeaponId, PerkId>> = { FIST: 'POWER', SWORD: 'POWER', SPEAR: 'CRIT', BOW: 'REACH', GUN: 'HASTE' };
+export const WEAPON_ULT: Readonly<Record<WeaponId, PerkId>> = {
+  FIST: 'POWER', SWORD: 'POWER', SPEAR: 'CRIT', BOW: 'REACH', GUN: 'HASTE', HAMMER: 'POWER', DAGGERS: 'HASTE', CROSSBOW: 'CRIT', SHOTGUN: 'HASTE', STAFF: 'REACH',
+};
 
 /** Ultimates this player can fire (all maxed perk lines, plus the weapon's own at Truyền thuyết). */
 export function ultimatesFor(perks: Partial<Record<PerkId, number>>, weapon: WeaponId, tier: number): PerkId[] {
@@ -274,6 +299,26 @@ export const SKILL = {
   pierceReach: 0.35,
   pierceDamage: 0.15,
 } as const;
+
+/** Hút Máu / Băng Giá / Lửa Thiêu / Sấm Truyền / Bùng Nổ tuning (per level). */
+export const ELEMENTAL = {
+  vampPerHit: 1.2,
+  frostSlow: 0.25,
+  frostSeconds: 2.5,
+  freezeStacks: 3,
+  freezeSeconds: 1.3,
+  burnDpsMul: 0.5,
+  burnSeconds: 3,
+  stormEvery: 5,
+  stormDamage: 4,
+  blastRadius: 2,
+  blastDamage: 2.5,
+} as const;
+
+/** Combo: kills within this window keep it going; every 10 adds a points bonus. */
+export const COMBO = { window: 2.8, bonusPer10: 0.1 } as const;
+/** Last stand: when the keep falls below this, everyone fights harder. */
+export const LAST_STAND = { at: 0.25, damageMul: 1.3 } as const;
 
 export const ULT = {
   quakeRadius: 6,

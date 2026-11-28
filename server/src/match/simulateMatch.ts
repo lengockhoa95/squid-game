@@ -18,7 +18,7 @@ const MAX_TICKS = 60 * 60 * 15; // 15 simulated minutes: a match must end well b
 
 /** Run a full bots-only match headless at the fixed simulation step. Throws if it never ends. */
 
-const NON_CAST = new Set(['RESCUE', 'BUMP', 'SLASH', 'SHOT', 'BREATH', 'GATE_HIT', 'QUAKE', 'TORNADO', 'THRUST', 'HOOK', 'MSHOT', 'EXPLODE', 'GATE_BREAK', 'ENRAGE']);
+const NON_CAST = new Set(['RESCUE', 'BUMP', 'SLASH', 'SHOT', 'BREATH', 'GATE_HIT', 'QUAKE', 'TORNADO', 'THRUST', 'HOOK', 'MSHOT', 'EXPLODE', 'GATE_BREAK', 'ENRAGE', 'ORB', 'SMASH']);
 export function simulateMatch(
   seed: number,
   difficulties: readonly Difficulty[],

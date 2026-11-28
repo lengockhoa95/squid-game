@@ -8,6 +8,7 @@ import { createCharacterBody } from '../player/characters.ts';
 import { NameTag } from '../player/NameTag.ts';
 import { audio } from '../audio/AudioManager.ts';
 import { Particles } from '../fx/Particles.ts';
+import { shake } from '../core/CameraManager.ts';
 
 interface Drawn {
   object: THREE.Object3D;
@@ -82,6 +83,9 @@ export class ElementEffectsView {
       else if (e.kind === 'PUDDLE') this.field.puddles.push({ x: e.x, y: e.y, z: e.z, until: e.until, owner: e.owner });
     });
   }
+
+  /** The local player's id (their own shots shake the screen). */
+  localId = '';
 
   update(dt: number, state: MatchState, gameTime: number, actorPosition: (id: string) => THREE.Vector3 | null): void {
     this.actorPos = actorPosition;
@@ -205,6 +209,8 @@ export class ElementEffectsView {
       }
       case 'SLASH':
       case 'SHOT':
+      case 'ORB':
+      case 'SMASH':
       case 'MSHOT':
       case 'EXPLODE':
       case 'GATE_BREAK':
@@ -350,6 +356,8 @@ export class ElementEffectsView {
       case 'SHOT': {
         const weapon = state.players.get(e.owner)?.weapon ?? '';
         const bow = weapon === 'BOW';
+        const sniper = weapon === 'CROSSBOW';
+        const shotgun = weapon === 'SHOTGUN';
         const yaw = Math.atan2(e.x2 - e.x, e.z2 - e.z);
         // 3D shots carry absolute start/end heights (y1, y2); older flashes use the floor height.
         const has3d = e.y1 !== 0 || e.y2 !== 0;
@@ -361,9 +369,11 @@ export class ElementEffectsView {
         }
         const hit = from.distanceTo(to) > 0.5;
         // Slower and wider than real bullets so every shot is easy to follow.
-        fx.streak('trace_01', bow ? 0xe8fff0 : 0xffe040, from, to, bow ? 30 : 45, bow ? 3.5 : 4.5, bow ? 1.1 : 1.3, () => {
-          if (hit) fx.sparks(to, bow ? 0xc8ffd0 : 0xffc23f, 7, 3.5);
-        }, bow ? 1 : 1.2);
+        const color = sniper ? 0x6ff7ff : shotgun ? 0xff9a3f : bow ? 0xe8fff0 : 0xffe040;
+        fx.streak('trace_01', color, from, to, sniper ? 90 : bow ? 30 : 45, sniper ? 9 : shotgun ? 2 : bow ? 3.5 : 4.5, sniper ? 0.9 : shotgun ? 0.7 : bow ? 1.1 : 1.3, () => {
+          if (hit) fx.sparks(to, color, sniper ? 10 : 7, 3.5);
+        }, sniper ? 1.4 : shotgun ? 0.6 : bow ? 1 : 1.2);
+        if (e.owner === this.localId && (sniper || shotgun)) shake(sniper ? 0.12 : 0.08);
         break;
       }
       case 'SLASH': {
@@ -398,6 +408,7 @@ export class ElementEffectsView {
         break;
       }
       case 'EXPLODE': {
+        shake(0.3);
         // Fireball + smoke + shock ring.
         const c = { x: e.x, y: e.y + 0.6, z: e.z };
         fx.sprite({ tex: 'light_01', color: 0xffc23f, pos: c, life: 0.35, size: 6, size1: 2 });
@@ -414,7 +425,31 @@ export class ElementEffectsView {
         fx.decal('scorch_01', 0x2a1a10, { x: e.x, y: e.y + 0.06, z: e.z }, Math.random() * 6, 0, 4, 4.5, 2, false, 0.75);
         break;
       }
+      case 'ORB': {
+        // Pháo Tay: a glowing shell arcs to the target and bursts.
+        const from = this.tmpA.set(e.x, e.y1 || e.y + 1, e.z).clone();
+        const to = this.tmpB.set(e.x2, e.y2 || e.y + 0.5, e.z2).clone();
+        fx.streak('trace_01', 0xff8a2f, from, to, 34, 2.5, 1.1, () => {
+          fx.sprite({ tex: 'light_01', color: 0xffc23f, pos: to, life: 0.3, size: 5, size1: 1.5 });
+          for (let k = 0; k < 10; k++) {
+            const a = (k / 10) * Math.PI * 2;
+            fx.sprite({ tex: 'flame_01', color: 0xff7a2f, pos: to, vel: { x: Math.cos(a) * 5, y: 2 + Math.random() * 2, z: Math.sin(a) * 5 }, life: 0.45, size: 1, size1: 2.2, spin: 3 });
+          }
+          fx.smoke(to, 2, 4);
+          if (e.owner === this.localId) shake(0.18);
+        }, 1.3);
+        break;
+      }
+      case 'SMASH':
+        // Búa Tạ: a shock ring, dust and stones.
+        fx.decal('circle_01', 0xffe0a0, { x: e.x, y: e.y + 0.1, z: e.z }, 0, 0, 0.6, 6, 0.4);
+        fx.decal('scorch_01', 0x3a2a1a, { x: e.x, y: e.y + 0.05, z: e.z }, Math.random() * 6, 0, 2.6, 3.2, 1.6, false, 0.6);
+        fx.smoke({ x: e.x, y: e.y + 0.3, z: e.z }, 1.8, 6);
+        fx.sparks({ x: e.x, y: e.y + 0.3, z: e.z }, 0xc9a27e, 10, 5);
+        shake(e.owner === this.localId ? 0.35 : 0.1);
+        break;
       case 'GATE_BREAK': {
+        shake(0.5);
         const c = { x: e.x, y: 1.4, z: e.z };
         fx.smoke(c, 4, 12);
         fx.sparks(c, 0xffb040, 16, 6);

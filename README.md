@@ -90,7 +90,7 @@ docker compose down
 
 Mỗi người chọn nhân vật trong màn chờ (20 nhân vật [Kenney Mini Characters](https://kenney.nl/assets/mini-characters-1), CC0 — cảm ơn Kenney); NPC tự lấy nhân vật chưa ai chọn. Tên người chơi hiện trên đầu nhân vật.
 
-Vũ khí, map lâu đài ([Castle Kit](https://kenney.nl/assets/castle-kit)) và hiệu ứng ([Particle Pack](https://kenney.nl/assets/particle-pack)): Kenney (CC0). Quái vật: [LowPoly Animated Monsters](https://quaternius.itch.io/lowpoly-animated-monsters) của Quaternius (CC0) — cảm ơn Quaternius.
+Vũ khí (Mini Characters, Survival Kit, Mini Dungeon, Blaster Kit), map lâu đài ([Castle Kit](https://kenney.nl/assets/castle-kit)) và hiệu ứng ([Particle Pack](https://kenney.nl/assets/particle-pack)): Kenney (CC0). Quái vật: [LowPoly Animated Monsters](https://quaternius.itch.io/lowpoly-animated-monsters) của Quaternius (CC0) — cảm ơn Quaternius.
 
 Host tick để bỏ bớt minigame và nguyên tố ngay trong màn chờ (mặc định bật tất cả, luôn còn ít nhất 1 game).
 

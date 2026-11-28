@@ -220,6 +220,16 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
 - [x] Bot tìm đường qua cổng và vòng quanh lâu đài, ngắm lên khi bắn quái bay.
 - [x] Test: 183 unit/integration.
 
+## Phase 18 — Đánh đã, thủ đã ✅
+
+- [x] Đợt quái có cao trào: rải rác → dồn dập → nghỉ → đợt cuối + Thủ lĩnh (tinh anh hạng nặng) xuất hiện.
+- [x] Quái chen chúc đông nghịt ở cổng (đứng sát nhau hơn).
+- [x] 5 thẻ mới: Hút Máu, Băng Giá (chậm → đóng băng), Lửa Thiêu (đốt theo thời gian), Sấm Truyền (gọi sét), Bùng Nổ (quái chết nổ lan).
+- [x] 5 vũ khí mới (model Kenney CC0: Survival Kit, Mini Dungeon, Blaster Kit):
+  - Búa Tạ (nện đất, choáng, phá khiên), Đoản Kiếm (cực nhanh), Súng Tỉa (xuyên giáp, xuyên 2 con), Súng Săn (6 viên hình nón), Pháo Tay (đạn nổ lan).
+- [x] Cảm giác đánh: rung màn hình (nổ, búa, cổng vỡ, chí mạng), băng rôn giữa màn hình, đếm combo + câu hô, tử thủ (tháp chính < 25%: +30% sát thương, viền đỏ).
+- [x] Quái hiện trạng thái: đóng băng (xanh, đứng im), bị chậm, bị đốt (bốc lửa).
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).

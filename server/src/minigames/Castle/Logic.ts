@@ -1,5 +1,5 @@
 import {
-  ARCHER_AI, BOMBER_AI, BOSS_HP_PER_PLAYER, CASTLE, DRAGON, DROP_WEAPONS, ELEMENT_FX, ELITE, ELITE_AFFIXES, ENRAGE, HOOK,
+  ARCHER_AI, BOMBER_AI, BOSS_HP_PER_PLAYER, BOSS_NAMES, COMBO, ELEMENTAL, ELITE_NAMES, LAST_STAND, SIDES, SIDE_NAMES, WEAPON_FX, WEAPONS, CASTLE, DRAGON, DROP_WEAPONS, ELEMENT_FX, ELITE, ELITE_AFFIXES, ENRAGE, HOOK,
   KEEP, MAP, MAX_TIER, MINOTAUR, MOAT, MONSTERS, MONSTER_HIT, PERK_IDS, PERK_MAX, PIT, PLAYER_HP, RAGE_DAMAGE, SHIELD_AI, SKILL,
   SLIME_KING, ULT,
   castleSpawn, castleStep, castleTimeLimit, castleWave, castleWaveCount, createCastleWorld, eliteChance, formatPerks, inMoat,
@@ -44,6 +44,29 @@ interface MonsterBrain {
   // Archer / bomber
   shootReady?: number;
   fuseAt?: number;
+  // Card effects: Băng Giá slow / freeze stacks, Lửa Thiêu burning.
+  frostStacks: number;
+  frostUntil: number;
+  frostMul: number;
+  burnUntil: number;
+  burnDps: number;
+  burnBy?: GamePlayer;
+  /** Thủ lĩnh (wave leader). */
+  leader?: boolean;
+}
+
+interface DamageOpts {
+  crit?: boolean;
+  fromX?: number;
+  fromZ?: number;
+  magic?: boolean;
+  ult?: boolean;
+  /** A weapon hit: card effects (vampire, frost, burn, storm) apply. */
+  weapon?: boolean;
+  /** Crossbow bolts ignore shields and armour. */
+  pierceArmor?: boolean;
+  /** Explosion from Bùng Nổ (no chain explosions from these kills). */
+  blast?: boolean;
 }
 
 /** Elements against monsters (Thủ Thành). */
@@ -112,6 +135,10 @@ export class Castle implements ServerMinigame {
   private cleared = false;
   private nextId = 1;
   private bossKills = 0;
+  private elapsed = 0;
+  private readonly storm = new Map<string, number>();
+  private leaderAt = 0;
+  private leaderWave = { side: 0, hpMul: 1 };
   private readonly tornadoes: Tornado[] = [];
   private readonly arrows: Arrow[] = [];
   private readonly swings = new Map<string, number>();
@@ -186,12 +213,17 @@ export class Castle implements ServerMinigame {
     const pitch = Math.max(-1.2, Math.min(1.4, aimPitch !== undefined && Number.isFinite(aimPitch) ? aimPitch : 0));
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
-    const fire = t < p.state.hasteUntil ? PVE.fireMul : 1;
+    const fire = (t < p.state.hasteUntil ? PVE.fireMul : 1) * (this.state.lastStand ? LAST_STAND.damageMul : 1);
     const roll = (): { dmg: number; crit: boolean } => {
       const crit = this.ctx.rng() < w.crit;
       return { dmg: (crit ? w.damage * 2 : w.damage) * fire, crit };
     };
     const eyeY = s.y + 1.0;
+    const special = WEAPONS[weapon].special;
+    if (special === 'SPREAD' || special === 'ORB' || special === 'SMASH') {
+      this.specialAttack(p, special, w, roll, yaw, pitch, t);
+      return;
+    }
     if (w.ranged) {
       // A 3D ray: aim up to hit the dragon in the sky.
       const cp = Math.cos(pitch);
@@ -209,12 +241,12 @@ export class Castle implements ServerMinigame {
         hits.push({ b, along });
       }
       hits.sort((a, b) => a.along - b.along);
-      const struck = w.pierce ? hits : hits.slice(0, 1);
+      const struck = w.pierce ? hits : hits.slice(0, special === 'ARMOR' ? WEAPON_FX.boltPierce : 1);
       const reach = w.pierce || struck.length === 0 ? w.range : struck[0]!.along;
       this.ctx.flash?.('SHOT', id, s.x, s.z, s.x + dx * reach, s.z + dz * reach, eyeY, eyeY + dy * reach);
       for (const h of struck) {
         const r = roll();
-        this.damage(h.b, r.dmg, p, t, { crit: r.crit, fromX: s.x, fromZ: s.z });
+        this.damage(h.b, r.dmg, p, t, { crit: r.crit, fromX: s.x, fromZ: s.z, weapon: true, pierceArmor: special === 'ARMOR' });
       }
       const bounces = perks.BOUNCE ?? 0;
       if (bounces > 0 && struck[0]) this.bounce(struck[0].b, bounces, w.damage * SKILL.bounceDamage * fire, p, t);
@@ -236,7 +268,7 @@ export class Castle implements ServerMinigame {
         if (Math.abs(dx * fz - dz * fx) > SKILL.pierceWidth + this.radius(b)) continue;
         hitNow.add(b);
         const r = roll();
-        this.damage(b, r.dmg * (1 + SKILL.pierceDamage * pierce + (pierce >= PERK_MAX ? 0.3 : 0)), p, t, { crit: r.crit, fromX: s.x, fromZ: s.z });
+        this.damage(b, r.dmg * (1 + SKILL.pierceDamage * pierce + (pierce >= PERK_MAX ? 0.3 : 0)), p, t, { crit: r.crit, fromX: s.x, fromZ: s.z, weapon: true });
       }
     }
     const tornado = perks.TORNADO ?? 0;
@@ -258,10 +290,87 @@ export class Castle implements ServerMinigame {
       const ang = Math.acos(Math.max(-1, Math.min(1, (dx * fx + dz * fz) / (d || 1))));
       if (d > this.radius(b) && ang > w.arc) continue;
       const r = roll();
-      this.damage(b, r.dmg, p, t, { crit: r.crit, fromX: s.x, fromZ: s.z });
+      this.damage(b, r.dmg, p, t, { crit: r.crit, fromX: s.x, fromZ: s.z, weapon: true });
       if (!isBoss(b.m.kind) && d > 0.01) {
         b.m.x += (dx / d) * 0.8;
         b.m.z += (dz / d) * 0.8;
+      }
+    }
+  }
+
+  /** Búa Tạ / Súng Săn / Gậy Phép. */
+  private specialAttack(p: GamePlayer, special: 'SPREAD' | 'ORB' | 'SMASH', w: { damage: number; range: number; arc: number }, roll: () => { dmg: number; crit: boolean }, yaw: number, pitch: number, t: number): void {
+    const s = p.sim.state;
+    const eyeY = s.y + 1;
+    const ray = (a: number, pt: number, range: number): { b: MonsterBrain | null; along: number; dx: number; dy: number; dz: number } => {
+      const cp = Math.cos(pt);
+      const dx = Math.sin(a) * cp;
+      const dy = Math.sin(pt);
+      const dz = Math.cos(a) * cp;
+      let best: MonsterBrain | null = null;
+      let bestT = range;
+      for (const b of this.alive()) {
+        const ox = b.m.x - s.x;
+        const oy = this.centerY(b) - eyeY;
+        const oz = b.m.z - s.z;
+        const along = ox * dx + oy * dy + oz * dz;
+        if (along < 0 || along > bestT) continue;
+        if (Math.hypot(ox - dx * along, oy - dy * along, oz - dz * along) > this.radius(b) + 0.45) continue;
+        best = b;
+        bestT = along;
+      }
+      return { b: best, along: bestT, dx, dy, dz };
+    };
+    if (special === 'SPREAD') {
+      // Súng Săn: a cone of pellets — devastating up close.
+      for (let i = 0; i < WEAPON_FX.pellets; i++) {
+        const a = yaw + (i / (WEAPON_FX.pellets - 1) - 0.5) * 2 * w.arc + (this.ctx.rng() - 0.5) * 0.08;
+        const pt = pitch + (this.ctx.rng() - 0.5) * 0.12;
+        const hit = ray(a, pt, w.range);
+        this.ctx.flash?.('SHOT', p.id, s.x, s.z, s.x + hit.dx * hit.along, s.z + hit.dz * hit.along, eyeY, eyeY + hit.dy * hit.along);
+        if (hit.b) {
+          const r = roll();
+          this.damage(hit.b, r.dmg, p, t, { crit: r.crit, fromX: s.x, fromZ: s.z, weapon: i === 0 });
+        }
+      }
+      return;
+    }
+    let cx: number;
+    let cz: number;
+    let cy: number;
+    let radius: number;
+    if (special === 'ORB') {
+      // Gậy Phép: an orb flies to the first monster (or the ground / max range) and bursts.
+      const hit = ray(yaw, pitch, w.range);
+      let along = hit.along;
+      if (!hit.b && hit.dy < -1e-3) along = Math.min(along, -eyeY / hit.dy);
+      cx = s.x + hit.dx * along;
+      cz = s.z + hit.dz * along;
+      cy = eyeY + hit.dy * along;
+      radius = WEAPON_FX.orbRadius;
+      this.ctx.flash?.('ORB', p.id, s.x, s.z, cx, cz, eyeY, cy);
+    } else {
+      // Búa Tạ: slam the ground in front — everything around is hurt, stunned and knocked up.
+      cx = s.x + Math.sin(yaw) * w.range * 0.6;
+      cz = s.z + Math.cos(yaw) * w.range * 0.6;
+      cy = s.y;
+      radius = WEAPON_FX.smashRadius;
+      this.ctx.flash?.('SLASH', p.id, s.x, s.z, s.x + Math.sin(yaw) * w.range, s.z + Math.cos(yaw) * w.range);
+      this.ctx.flash?.('SMASH', p.id, cx, cz);
+    }
+    let first = true;
+    for (const b of this.alive()) {
+      if (Math.hypot(b.m.x - cx, b.m.z - cz) > radius + this.radius(b) || Math.abs(this.centerY(b) - cy) > radius + 1.5) continue;
+      const r = roll();
+      this.damage(b, r.dmg, p, t, { crit: r.crit, fromX: s.x, fromZ: s.z, weapon: first, pierceArmor: special === 'SMASH' });
+      first = false;
+      if (special === 'SMASH' && !isBoss(b.m.kind)) {
+        b.stunUntil = Math.max(b.stunUntil, t + WEAPON_FX.smashStun);
+        const dx = b.m.x - cx;
+        const dz = b.m.z - cz;
+        const d = Math.hypot(dx, dz) || 1;
+        b.m.x += (dx / d) * 1.2;
+        b.m.z += (dz / d) * 1.2;
       }
     }
   }
@@ -391,7 +500,12 @@ export class Castle implements ServerMinigame {
   // --- tick ----------------------------------------------------------------------------------
 
   update(dt: number, t: number): void {
+    this.elapsed = t;
     this.waveFlow(t);
+    // Tử thủ: the keep is about to fall — everyone fights harder.
+    const stand = this.state.keep > 0 && this.state.keep < this.state.keepMax * LAST_STAND.at;
+    if (stand && !this.state.lastStand) this.banner('⚠ TỬ THỦ! Cả đội +30% sát thương', t, 3);
+    this.state.lastStand = stand;
     this.spawnPending(t);
     const active = this.ctx.players.filter((p) => p.state.roundState === 'ACTIVE');
     const standing = active.filter((p) => !p.state.downed);
@@ -399,6 +513,7 @@ export class Castle implements ServerMinigame {
     this.hazards.updatePit(t, this.mode === 'WAVE');
     this.hazards.updateSharks(dt, t, this.moatPrey(active, t));
     this.updateTornadoes(dt, t);
+    this.statusTick(dt, t);
     this.updateArrows(dt, t, standing);
     this.readElementField(t);
     for (const b of this.brains) {
@@ -523,17 +638,49 @@ export class Castle implements ServerMinigame {
       this.mode = 'WAVE';
       const main = this.pickSides(st.wave);
       st.sides = main.join(',');
+      const from = main.map((i) => SIDE_NAMES[SIDES[i]!]).join(' + ');
+      // Build the wave, then pace it like a song: a trickle, a flood, a pause, the leader's charge.
+      const list: Array<{ kind: MonsterKind; hpMul: number; side: number }> = [];
       let k = 0;
+      let boss: MonsterKind | null = null;
       for (const sp of castleWave(st.wave, this.ctx.players.length, this.waves)) {
+        if (isBoss(sp.kind)) boss = sp.kind;
         for (let i = 0; i < sp.count; i++) {
-          // Three in four come from the main sides, the rest from anywhere.
           const side = isBoss(sp.kind) || this.ctx.rng() < 0.75 ? main[k++ % main.length]! : Math.floor(this.ctx.rng() * 4);
-          this.pending.push({ at: t + i * 0.5 + this.ctx.rng() * 0.4, kind: sp.kind, hpMul: sp.hpMul, side });
+          list.push({ kind: sp.kind, hpMul: sp.hpMul, side });
         }
       }
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(this.ctx.rng() * (i + 1));
+        [list[i], list[j]] = [list[j]!, list[i]!];
+      }
+      const n = list.length;
+      let at = t + 1;
+      list.forEach((m, i) => {
+        const f = i / Math.max(1, n);
+        if (f < 0.3) at += 1.1; // trickle
+        else if (f < 0.8) at += 0.28; // flood
+        else at += i === Math.ceil(n * 0.8) ? 3.5 : 0.5; // breather, then the last push
+        this.pending.push({ at: isBoss(m.kind) ? t + 2 : at, ...m });
+      });
+      this.leaderAt = boss ? 0 : at + 1;
+      this.leaderWave = { side: main[0]!, hpMul: list[0]?.hpMul ?? 1 };
+      this.banner(boss ? `⚔ BOSS: ${(BOSS_NAMES[boss] ?? '').toUpperCase()} — từ phía ${from}` : `ĐỢT ${st.wave} — quái tràn từ phía ${from}!`, t, 3);
       return;
     }
-    if (this.pending.length > 0 || this.brains.some((b) => b.m.state !== 'DIE')) return;
+    // The wave leader (an elite heavy) arrives at the end with a fanfare.
+    if (this.leaderAt > 0 && t >= this.leaderAt) {
+      this.leaderAt = 0;
+      const kinds: MonsterKind[] = st.wave >= 3 ? ['SHIELD', 'SKELETON', 'SLIME'] : ['SKELETON', 'SLIME'];
+      const kind = kinds[Math.floor(this.ctx.rng() * kinds.length)]!;
+      const b = this.spawn(kind, t, this.leaderWave.hpMul * 2.5, this.leaderWave.side);
+      b.leader = true;
+      b.elite = b.elite || 'GIANT';
+      b.m.elite = b.elite;
+      b.m.maxHp = b.m.hp = Math.round(b.m.maxHp * (b.elite === 'GIANT' ? 1 : 2));
+      this.banner(`👑 Thủ lĩnh ${ELITE_NAMES[b.elite as keyof typeof ELITE_NAMES] ?? ''} xuất hiện!`, t, 2.5);
+    }
+    if (this.pending.length > 0 || this.leaderAt > 0 || this.brains.some((b) => b.m.state !== 'DIE')) return;
     if (st.wave >= this.waves) {
       this.cleared = true;
       return;
@@ -541,6 +688,7 @@ export class Castle implements ServerMinigame {
     this.mode = 'BREAK';
     st.breakUntil = t + CASTLE.breakSeconds;
     st.sides = '';
+    this.banner(`🏰 ĐỢT ${st.wave} — THỦ THÀNH THÀNH CÔNG!`, t, 3);
     for (let i = 0; i < 4; i++) st.gates[i] = Math.min(st.gateMax, (st.gates[i] ?? 0) + st.gateMax * CASTLE.gateRepair);
     st.keep = Math.min(st.keepMax, st.keep + st.keepMax * 0.1);
     this.arrows.length = 0;
@@ -620,6 +768,7 @@ export class Castle implements ServerMinigame {
     const b: MonsterBrain = {
       m, side, lane, inside: false, hitReady: t + 1, removeAt: 0, stunUntil: 0, confusedUntil: 0, wanderYaw: 0,
       elite, speedMul: elite === 'FAST' ? ELITE.fastMul : 1, shootReady: t + 1 + this.ctx.rng(),
+      frostStacks: 0, frostUntil: 0, frostMul: 1, burnUntil: 0, burnDps: 0,
     };
     if (kind === 'DRAGON') {
       b.phase = 'FLY';
@@ -649,7 +798,8 @@ export class Castle implements ServerMinigame {
   }
 
   private speed(b: MonsterBrain): number {
-    return MONSTERS[b.m.kind as MonsterKind].speed * b.speedMul * (b.m.enraged ? ENRAGE.speedMul : 1);
+    const frost = this.elapsed < b.frostUntil ? b.frostMul : 1;
+    return MONSTERS[b.m.kind as MonsterKind].speed * b.speedMul * frost * (b.m.enraged ? ENRAGE.speedMul : 1);
   }
 
   /** Can a ground monster reach this player (not up on a wall / tower)? */
@@ -717,6 +867,7 @@ export class Castle implements ServerMinigame {
     if (st.gates[side] === 0) {
       const g = sidePoint(side, MAP.wallOut, 0);
       this.ctx.flash?.('GATE_BREAK', '', g.x, g.z);
+      this.banner(`💥 CỔNG ${SIDE_NAMES[SIDES[side]!].toUpperCase()} ĐÃ VỠ!`, this.elapsed, 2.5);
     }
   }
 
@@ -1100,12 +1251,12 @@ export class Castle implements ServerMinigame {
    * Damage a monster. `fromX/Z` (weapon hits) lets shields block frontal hits; `magic` (elements,
    * skills) and `ult` skip that; ultimates do not refill rage.
    */
-  private damage(b: MonsterBrain, amount: number, by: GamePlayer, t: number, opts: { crit?: boolean; fromX?: number; fromZ?: number; magic?: boolean; ult?: boolean } = {}): void {
+  private damage(b: MonsterBrain, amount: number, by: GamePlayer, t: number, opts: DamageOpts = {}): void {
     const m = b.m;
     if (m.state === 'DIE') return;
     let dmg = amount;
-    if (b.elite === 'ARMOR') dmg *= ELITE.armorMul;
-    if (m.kind === 'SHIELD' && opts.fromX !== undefined && opts.fromZ !== undefined && !opts.magic && !opts.ult) {
+    if (b.elite === 'ARMOR' && !opts.pierceArmor) dmg *= ELITE.armorMul;
+    if (m.kind === 'SHIELD' && opts.fromX !== undefined && opts.fromZ !== undefined && !opts.magic && !opts.ult && !opts.pierceArmor) {
       // Hiệp sĩ khiên: blocks what comes from the front — go around!
       const ax = opts.fromX - m.x;
       const az = opts.fromZ - m.z;
@@ -1118,6 +1269,7 @@ export class Castle implements ServerMinigame {
     m.hitAt = t;
     m.crit = opts.crit === true;
     if (!opts.ult) by.state.rage = Math.min(1, by.state.rage + dealt / RAGE_DAMAGE);
+    if (opts.weapon) this.cardEffects(b, by, dealt, t);
     if (isBoss(m.kind)) this.addPoints(by.id, dealt * DRAGON.pointsPerHp);
     if (m.kind === 'SLIME_KING' && m.hp > 0) {
       const due = m.hp < m.maxHp / 3 ? 2 : m.hp < (m.maxHp * 2) / 3 ? 1 : 0;
@@ -1134,8 +1286,22 @@ export class Castle implements ServerMinigame {
     }
     if (m.hp > 0) return;
     m.state = 'DIE';
+    m.fx = '';
     b.removeAt = t + DIE_SECONDS;
     this.kills.set(by.id, (this.kills.get(by.id) ?? 0) + 1);
+    this.comboKill(by, t);
+    // Bùng Nổ: your kills blow up (not the ones a blast caused: no endless chains).
+    const blast = parsePerks(by.state.perks).BLAST ?? 0;
+    if (blast > 0 && !opts.blast) {
+      this.ctx.flash?.('EXPLODE', by.id, m.x, m.z);
+      const radius = ELEMENTAL.blastRadius + blast * 0.6;
+      for (const o of this.alive()) {
+        if (Math.hypot(o.m.x - m.x, o.m.z - m.z) > radius + this.radius(o)) continue;
+        this.damage(o, ELEMENTAL.blastDamage * blast, by, t, { magic: true, blast: true });
+      }
+    }
+    if (b.leader) this.banner(`👑 Đã hạ thủ lĩnh!`, t, 2);
+    if (isBoss(m.kind)) this.banner(`⚔ ĐÃ HẠ ${(BOSS_NAMES[m.kind as MonsterKind] ?? 'BOSS').toUpperCase()}!`, t, 3);
     if (m.kind === 'SLIME_KING') this.spawnMinions(b, 'SLIME', SLIME_KING.deathSplit, t);
     if (m.kind === 'BOMBER' || b.elite === 'EXPLODE') this.explode(b, t, false, by);
     if (isBoss(m.kind)) {
@@ -1152,6 +1318,79 @@ export class Castle implements ServerMinigame {
     this.addPoints(by.id, MONSTERS[m.kind as MonsterKind].points * (b.elite ? ELITE.pointsMul : 1));
     if (b.elite) this.drop(m.x, m.z, Math.max(1, rollRarity(this.state.wave + 4, this.ctx.rng())), t);
     else if (this.ctx.rng() < CASTLE.dropChance) this.drop(m.x, m.z, rollRarity(this.state.wave, this.ctx.rng()), t);
+  }
+
+  /** Hút Máu / Băng Giá / Lửa Thiêu / Sấm Truyền on a weapon hit. */
+  private cardEffects(b: MonsterBrain, by: GamePlayer, dealt: number, t: number): void {
+    const perks = parsePerks(by.state.perks);
+    const vamp = perks.VAMP ?? 0;
+    if (vamp > 0 && !by.state.downed) {
+      const heal = ELEMENTAL.vampPerHit * vamp;
+      const acc = (this.regen.get(by.id) ?? 0) + heal;
+      const whole = Math.floor(acc);
+      this.regen.set(by.id, acc - whole);
+      by.state.hp = Math.min(PLAYER_HP.max, by.state.hp + whole);
+      if (vamp >= PERK_MAX && whole > 0) {
+        for (const o of this.ctx.players) {
+          if (o === by || o.state.downed || Math.hypot(o.sim.state.x - by.sim.state.x, o.sim.state.z - by.sim.state.z) > 6) continue;
+          o.state.hp = Math.min(PLAYER_HP.max, o.state.hp + whole);
+        }
+      }
+    }
+    const frost = perks.FROST ?? 0;
+    if (frost > 0 && b.m.state !== 'DIE') {
+      b.frostMul = Math.max(0.25, 1 - ELEMENTAL.frostSlow * frost);
+      b.frostUntil = t + ELEMENTAL.frostSeconds;
+      b.frostStacks++;
+      if (b.frostStacks >= ELEMENTAL.freezeStacks) {
+        b.frostStacks = 0;
+        b.stunUntil = Math.max(b.stunUntil, t + ELEMENTAL.freezeSeconds * (isBoss(b.m.kind) ? 0.3 : 1));
+      }
+    }
+    const burn = perks.BURN ?? 0;
+    if (burn > 0 && b.m.state !== 'DIE') {
+      b.burnUntil = t + ELEMENTAL.burnSeconds;
+      b.burnDps = Math.max(b.burnDps, dealt * ELEMENTAL.burnDpsMul * burn);
+      b.burnBy = by;
+    }
+    const storm = perks.STORM ?? 0;
+    if (storm > 0) {
+      const n = (this.storm.get(by.id) ?? 0) + 1;
+      this.storm.set(by.id, n);
+      if (n % Math.max(2, ELEMENTAL.stormEvery - storm) === 0 && b.m.state !== 'DIE') {
+        this.ctx.flash?.('BOLT', by.id, b.m.x, b.m.z);
+        this.damage(b, ELEMENTAL.stormDamage * storm, by, t, { magic: true });
+        if (storm >= PERK_MAX) {
+          // Level 3: the lightning jumps to two more monsters.
+          for (const o of this.alive().filter((x) => x !== b).sort((x, y) => Math.hypot(x.m.x - b.m.x, x.m.z - b.m.z) - Math.hypot(y.m.x - b.m.x, y.m.z - b.m.z)).slice(0, 2)) {
+            this.ctx.flash?.('BOLT', by.id, o.m.x, o.m.z);
+            this.damage(o, ELEMENTAL.stormDamage * storm * 0.6, by, t, { magic: true });
+          }
+        }
+      }
+    }
+  }
+
+  /** Burning damage over time, frost / fire status on the models. */
+  private statusTick(dt: number, t: number): void {
+    for (const b of this.alive()) {
+      if (t < b.burnUntil && b.burnBy) this.damage(b, b.burnDps * dt, b.burnBy, t, { magic: true });
+      else b.burnDps = 0;
+      if (b.m.state === 'DIE') continue;
+      b.m.fx = t < b.stunUntil && b.frostUntil > t ? 'F' : t < b.burnUntil ? 'B' : t < b.frostUntil ? 'S' : '';
+    }
+  }
+
+  /** Kill combo: kills close together keep it going; every 10 is worth a bonus. */
+  private comboKill(p: GamePlayer, t: number): void {
+    p.state.combo = t - p.state.comboAt <= COMBO.window ? p.state.combo + 1 : 1;
+    p.state.comboAt = t;
+    if (p.state.combo >= 10) this.addPoints(p.id, Math.floor(p.state.combo / 10) * COMBO.bonusPer10 * 10);
+  }
+
+  private banner(text: string, t: number, seconds: number): void {
+    this.state.banner = text;
+    this.state.bannerUntil = t + seconds;
   }
 
   /** Dies without a killer (fell into the pit, eaten by a shark). */
@@ -1483,7 +1722,8 @@ export class Castle implements ServerMinigame {
         const dx = c.m.x - a.m.x;
         const dz = c.m.z - a.m.z;
         const d = Math.hypot(dx, dz);
-        const min = this.radius(a) + this.radius(c);
+        // Monsters crowd tightly (a mob piling up at the gate) but never fully overlap.
+        const min = (this.radius(a) + this.radius(c)) * 0.72;
         if (d >= min || d < 1e-4) continue;
         const push = (min - d) / 2;
         a.m.x -= (dx / d) * push;

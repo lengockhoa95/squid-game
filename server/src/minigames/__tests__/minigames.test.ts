@@ -434,6 +434,11 @@ describe('Castle (Thủ Thành)', () => {
     // Kill every monster by standing in front of it and attacking.
     for (let guard = 0; guard < 400 && (match.castle!.monsters.some((m) => m.state !== 'DIE') || match.castle!.breakUntil === 0); guard++) {
       const m = match.castle!.monsters.find((mm) => mm.state !== 'DIE');
+      // Keep the tester standing (monsters hit back hard now).
+      p.state.downed = false;
+      p.state.stunUntil = 0;
+      p.state.hp = 100;
+      p.state.weapon = ''; // fists (picked-up weapons have other cooldowns)
       if (m) {
         p.sim.reset(m.x, m.z - 1, 0); // facing +z, toward the monster
         const before = m.hp;
