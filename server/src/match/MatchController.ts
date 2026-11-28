@@ -140,12 +140,12 @@ export class MatchController {
   }
 
   /** Combat games: attack with the weapon in hand. */
-  attack(id: string): void {
+  attack(id: string, aimYaw?: number): void {
     if (this.phase !== 'ROUND_PLAYING' || !this.game?.handleAttack) return;
     const p = this.participant(id);
     if (!p || !p.state.alive || p.state.roundState !== 'ACTIVE') return;
     if (this.d.state.gameTime < p.state.stunUntil) return;
-    this.game.handleAttack(id, this.d.state.gameTime);
+    this.game.handleAttack(id, this.d.state.gameTime, aimYaw);
   }
 
   /** In-round pick (Thủ Thành weapon cards). */
@@ -260,6 +260,7 @@ export class MatchController {
         movement: game.step !== null,
         others: (botId) => this.participants.filter((p) => p.id !== botId && p.state.alive && p.state.roundState === 'ACTIVE'),
         cast: (botId, x, z) => void this.castElement(botId, x, z),
+        target: game.elementTarget ? (botId) => game.elementTarget!(botId) : undefined,
       });
     }
     if (game.step) {

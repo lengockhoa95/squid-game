@@ -53,7 +53,7 @@ export interface MatchNetAdapter {
   pickElement(element: ElementId): void;
   pickCard(card: CardId): void;
   /** Combat games: attack with the weapon in hand. */
-  sendAttack(): void;
+  sendAttack(aimYaw: number): void;
   /** Thủ Thành: pick a weapon card between waves. */
   pickPerk(perk: string): void;
   /** Estimated server game time (seconds) now, extrapolated from the last patch. */

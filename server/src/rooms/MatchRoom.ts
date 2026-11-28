@@ -159,9 +159,10 @@ export class MatchRoom extends Room {
       const perk = (msg as { perk?: unknown } | null)?.perk;
       if (isPerkId(perk)) this.controller.pickInGame(client.sessionId, perk);
     });
-    this.onMessage(MSG.ATTACK, (client) => {
+    this.onMessage(MSG.ATTACK, (client, msg: unknown) => {
       if (!this.allow(client, MSG.ATTACK)) return;
-      this.controller.attack(client.sessionId);
+      const yaw = (msg as { yaw?: unknown } | null)?.yaw;
+      this.controller.attack(client.sessionId, typeof yaw === 'number' && Number.isFinite(yaw) ? yaw : undefined);
     });
     this.onMessage(MSG.PICK_CARD, (client, msg: unknown) => {
       if (!this.allow(client, MSG.PICK_CARD)) return;

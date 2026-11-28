@@ -41,7 +41,9 @@ export function matchSceneLoader(net: MatchNetAdapter): SceneLoader {
   return async (ctx) => {
     // Everyone's picked character (bots included: they are in the state once the match starts).
     const { characterFor, SLOT_CHARACTERS } = await import('@sp/shared');
-    const names = new Set<string>([...SLOT_CHARACTERS, 'character-zombie']);
+    const { WEAPON_MODELS } = await import('../player/characters.ts');
+    // Weapons too (Thủ Thành): without them the hands stay empty.
+    const names = new Set<string>([...SLOT_CHARACTERS, 'character-zombie', ...WEAPON_MODELS]);
     net.forEachPlayer((p) => names.add(characterFor(p.character, p.slot)));
     const [mod] = await Promise.all([import('../scenes/match/MatchScene.ts'), loadCharacters([...names])]);
     return mod.createMatchScene(ctx, net);
@@ -81,7 +83,8 @@ export class GameEngine {
     this.render.onQualityChange((p) => this.scenes.active?.applyQuality(p));
     this.input = new InputManager(host, {
       onGroundPoint: (x, y) => this.handleGroundPoint(x, y),
-      onStop: () => this.scenes.active?.onStop(),
+      // Combat games: right click uses the element at the crosshair (left click attacks).
+      onStop: () => (this.scenes.active?.combatAim?.() ? this.castAtPointer() : this.scenes.active?.onStop()),
       onJump: () => this.scenes.active?.onJump(),
       onCameraRotate: (dx, dy) => this.camera.rotateByMouse(dx, dy),
       onZoom: (steps) => this.camera.zoom(steps),
@@ -133,8 +136,14 @@ export class GameEngine {
     this.scenes.active?.onJump();
   }
 
+  /** Touch "Đánh" button: attack where the camera looks. */
   attack(): void {
-    this.scenes.active?.onAttack?.();
+    this.scenes.active?.onAttack?.(this.aimYaw());
+  }
+
+  /** Horizontal direction the camera (crosshair) looks at, as a character yaw. */
+  private aimYaw(): number {
+    return this.camera.viewYaw + Math.PI;
   }
 
   /** Tap on the 3D view at client coordinates: same as a mouse click there. */
@@ -209,6 +218,12 @@ export class GameEngine {
   private handleGroundPoint(ndcX: number, ndcY: number): void {
     const scene = this.scenes.active;
     if (!scene) return;
+    if (scene.combatAim?.()) {
+      // Combat: left click attacks toward the crosshair (mouse look) or the clicked point.
+      if (this.input.locked) scene.onAttack?.(this.aimYaw());
+      else this.raycastGround(ndcX, ndcY, (hit) => scene.onAttack?.(null, hit), () => scene.onAttack?.(this.aimYaw()));
+      return;
+    }
     this.raycastGround(ndcX, ndcY, (hit) => scene.onGroundClick(hit));
   }
 

@@ -1,5 +1,5 @@
 import {
-  CASTLE, DRAGON, DROP_WEAPONS, MAX_TIER, MONSTERS, MONSTER_HIT, PERK_IDS, PERK_MAX, RAGE_DAMAGE, ULT,
+  CASTLE, DRAGON, DROP_WEAPONS, ELEMENT_FX, MAX_TIER, MONSTERS, MONSTER_HIT, PERK_IDS, PERK_MAX, RAGE_DAMAGE, ULT,
   castleSpawn, castleStep, castleTimeLimit, castleWave, castleWaveCount, createCastleWorld, formatPerks,
   isPerkId, isWeaponId, parsePerks, rollRarity, ultimatesFor, weaponStats,
   type GameAction, type MonsterKind, type PerkId, type StepFn, type WeaponId,
@@ -19,7 +19,26 @@ interface MonsterBrain {
   angle?: number;
   breathAt?: number;
   breathYaw?: number;
+  /** Element statuses: frozen by lightning / wandering in the dark. */
+  stunUntil: number;
+  confusedUntil: number;
+  wanderYaw: number;
 }
+
+/** Elements against monsters (Thủ Thành). */
+const PVE = {
+  thunderRadius: 3.5,
+  thunderDamage: 5,
+  thunderStun: 2,
+  windRadius: 5,
+  windPush: 4,
+  windDamage: 2,
+  swapRadius: 4,
+  darkConfuse: 3.5,
+  pillarDamage: 4,
+  puddleSlow: 0.35,
+  fireMul: 1.5,
+} as const;
 
 const DIE_SECONDS = 1.2;
 const DRAGON_CIRCLE = 10;
@@ -82,7 +101,7 @@ export class Castle implements ServerMinigame {
     // Movement + ATTACK messages.
   }
 
-  handleAttack(id: string, t: number): void {
+  handleAttack(id: string, t: number, aimYaw?: number): void {
     const p = this.ctx.players.find((pl) => pl.id === id);
     if (!p || p.state.roundState !== 'ACTIVE' || t < (this.attackReady.get(id) ?? 0)) return;
     const weapon: WeaponId = isWeaponId(p.state.weapon) ? p.state.weapon : 'FIST';
@@ -96,9 +115,13 @@ export class Castle implements ServerMinigame {
       for (const u of ults) this.ultimate(u, p, w.power, t);
     }
     const s = p.sim.state;
-    const fx = Math.sin(s.yaw);
-    const fz = Math.cos(s.yaw);
-    const roll = () => (this.ctx.rng() < w.crit ? w.damage * 2 : w.damage);
+    // Aim where the mouse/crosshair points (not where the character happens to face).
+    const yaw = aimYaw ?? s.yaw;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    // Lửa: burning weapon while hasted.
+    const fire = t < p.state.hasteUntil ? PVE.fireMul : 1;
+    const roll = () => (this.ctx.rng() < w.crit ? w.damage * 2 : w.damage) * fire;
     if (w.ranged) {
       // First monster along the shot line (all of them with a piercing shot).
       const hits: Array<{ b: MonsterBrain; along: number }> = [];
@@ -136,6 +159,70 @@ export class Castle implements ServerMinigame {
     }
   }
 
+  /** Elements in Thủ Thành hit monsters instead of other players. */
+  elementCast(element: string, casterId: string, x: number, z: number, t: number): boolean | undefined {
+    const p = this.ctx.players.find((pl) => pl.id === casterId);
+    if (!p) return false;
+    const me = p.sim.state;
+    const within = (cx: number, cz: number, r: number) =>
+      this.alive().filter((b) => Math.hypot(b.m.x - cx, b.m.z - cz) <= r + MONSTERS[b.m.kind as MonsterKind].radius);
+    switch (element) {
+      case 'THUNDER': {
+        // Lightning on every monster around the point (the dragon too, even flying).
+        const hit = within(x, z, PVE.thunderRadius);
+        if (hit.length === 0) this.ctx.flash?.('BOLT', casterId, x, z);
+        for (const b of hit) {
+          this.ctx.flash?.('BOLT', casterId, b.m.x, b.m.z);
+          this.damage(b, PVE.thunderDamage, p, t);
+          b.stunUntil = t + PVE.thunderStun * (b.m.kind === 'DRAGON' ? 0.5 : 1);
+        }
+        return true;
+      }
+      case 'WIND':
+        this.ctx.flash?.('WIND', casterId, me.x, me.z);
+        for (const b of within(me.x, me.z, PVE.windRadius)) {
+          this.damage(b, PVE.windDamage, p, t);
+          if (b.m.kind === 'DRAGON') continue;
+          const dx = b.m.x - me.x;
+          const dz = b.m.z - me.z;
+          const d = Math.hypot(dx, dz) || 1;
+          b.m.x += (dx / d) * PVE.windPush;
+          b.m.z += (dz / d) * PVE.windPush;
+          b.stunUntil = Math.max(b.stunUntil, t + 0.6);
+        }
+        return true;
+      case 'SWAP': {
+        // Hoán đổi: the monster nearest the cursor is sent back to the monster gate.
+        const target = within(x, z, PVE.swapRadius).filter((b) => b.m.kind !== 'DRAGON')
+          .sort((a, b) => Math.hypot(a.m.x - x, a.m.z - z) - Math.hypot(b.m.x - x, b.m.z - z))[0];
+        if (!target) return false;
+        this.ctx.flash?.('SWAP', casterId, target.m.x, target.m.z, target.m.x, CASTLE.spawnZ);
+        target.m.z = CASTLE.spawnZ;
+        return true;
+      }
+      case 'DARK':
+        // Bóng tối: monsters in the cloud lose their way (no gate damage, no hits).
+        this.ctx.flash?.('DARK', casterId, x, z);
+        for (const b of within(x, z, 5)) {
+          b.confusedUntil = t + PVE.darkConfuse * (b.m.kind === 'DRAGON' ? 0.5 : 1);
+          b.wanderYaw = this.ctx.rng() * Math.PI * 2;
+        }
+        return true;
+      default:
+        return undefined; // Đất / Nước / Lửa / Phân thân / Không gian: normal effect (monsters react to it)
+    }
+  }
+
+  /** Bots aim elements at the most urgent monster. */
+  elementTarget(botId: string): { x: number; z: number } | null {
+    const bot = this.ctx.players.find((pl) => pl.id === botId);
+    const alive = this.alive();
+    if (!bot || alive.length === 0) return null;
+    const s = bot.sim.state;
+    const best = alive.reduce((a, b) => (b.m.z - Math.hypot(b.m.x - s.x, b.m.z - s.z) * 0.5 > a.m.z - Math.hypot(a.m.x - s.x, a.m.z - s.z) * 0.5 ? b : a));
+    return { x: best.m.x, z: best.m.z };
+  }
+
   /** Weapon card pick between waves. */
   handlePick(id: string, choice: string): void {
     const p = this.ctx.players.find((pl) => pl.id === id);
@@ -155,11 +242,21 @@ export class Castle implements ServerMinigame {
     this.waveFlow(t);
     this.spawnPending(t);
     const active = this.ctx.players.filter((p) => p.state.roundState === 'ACTIVE');
+    this.readElementField(t);
     for (const b of this.brains) {
       if (b.m.state === 'DIE') continue;
+      if (t < b.stunUntil) {
+        b.m.state = 'STUN';
+        continue;
+      }
+      if (t < b.confusedUntil) {
+        this.wander(b, dt);
+        continue;
+      }
       if (b.m.kind === 'DRAGON') this.dragon(b, active, dt, t);
       else this.walker(b, active, dt, t);
     }
+    this.pillarBlock();
     this.separate();
     // Remove the dead after their death animation.
     for (let i = this.brains.length - 1; i >= 0; i--) {
@@ -356,7 +453,7 @@ export class Castle implements ServerMinigame {
     m.hp = m.maxHp;
     m.state = kind === 'DRAGON' ? 'FLY' : 'WALK';
     this.state.monsters.push(m);
-    const b: MonsterBrain = { m, hitReady: t + 1, removeAt: 0 };
+    const b: MonsterBrain = { m, hitReady: t + 1, removeAt: 0, stunUntil: 0, confusedUntil: 0, wanderYaw: 0 };
     if (kind === 'DRAGON') {
       b.phase = 'FLY';
       b.phaseUntil = t + DRAGON.flySeconds;
@@ -376,24 +473,32 @@ export class Castle implements ServerMinigame {
       tx = prey.sim.state.x;
       tz = prey.sim.state.z;
     }
+    // Phân thân: clones are juicier than real players (and distract walkers too).
+    const decoy = this.nearestClone(m.x, m.z, info.huntsPlayers ? 99 : 4);
+    const decoyFirst = decoy && (!prey || decoy.d < Math.hypot(prey.sim.state.x - m.x, prey.sim.state.z - m.z) + 3);
+    if (decoy && decoyFirst) {
+      tx = decoy.x;
+      tz = decoy.z;
+    }
     const dx = tx - m.x;
     const dz = tz - m.z;
     const d = Math.hypot(dx, dz);
-    const atGate = !info.huntsPlayers && m.z >= CASTLE.gateZ - info.radius - 0.05 && !prey;
+    const atGate = !info.huntsPlayers && m.z >= CASTLE.gateZ - info.radius - 0.05 && !prey && !decoyFirst;
     if (atGate) {
       m.state = 'ATTACK';
       this.state.gate = Math.max(0, this.state.gate - info.gateDps * dt);
       if (Math.floor(t * 2) !== Math.floor((t - dt) * 2)) this.ctx.flash?.('GATE_HIT', '', m.x, CASTLE.gateZ);
     } else if (d > 0.3) {
       m.state = 'WALK';
-      const step = Math.min(d, info.speed * dt);
+      const slow = !info.fly && this.puddles.some((pd) => Math.hypot(pd.x - m.x, pd.z - m.z) < ELEMENT_FX.puddleRadius) ? PVE.puddleSlow : 1;
+      const step = Math.min(d, info.speed * slow * dt);
       m.x += (dx / d) * step;
       m.z += (dz / d) * step;
       m.yaw = Math.atan2(dx, dz);
     }
     if (info.fly) m.y = info.fly + Math.sin(t * 4 + m.id) * 0.25;
     // Contact hit on players.
-    if (prey && t >= b.hitReady) {
+    if (prey && !decoyFirst && t >= b.hitReady) {
       const ps = prey.sim.state;
       const pd = Math.hypot(ps.x - m.x, ps.z - m.z);
       if (pd < info.radius + 0.6 && Math.abs(ps.y + 0.8 - m.y) < 1.6) {
@@ -580,6 +685,73 @@ export class Castle implements ServerMinigame {
     }
     const h = CASTLE.halfWidth - 0.5;
     for (const b of list) b.m.x = Math.max(-h, Math.min(h, b.m.x));
+  }
+
+  /** Pillars / puddles / clones from the element effects list (Đất, Nước, Phân thân). */
+  private pillars: Array<{ x: number; z: number }> = [];
+  private puddles: Array<{ x: number; z: number }> = [];
+  private clones: Array<{ x: number; z: number }> = [];
+  private readonly seenPillars = new Set<number>();
+
+  private readElementField(t: number): void {
+    this.pillars = [];
+    this.puddles = [];
+    this.clones = [];
+    this.ctx.match.effects.forEach((e) => {
+      if (e.kind === 'PUDDLE') this.puddles.push({ x: e.x, z: e.z });
+      else if (e.kind === 'CLONE') this.clones.push({ x: e.x, z: e.z });
+      else if (e.kind === 'PILLAR') {
+        this.pillars.push({ x: e.x, z: e.z });
+        if (this.seenPillars.has(e.id)) return;
+        // A new stone pillar bursts out of the ground: hurts and shoves monsters on top of it.
+        this.seenPillars.add(e.id);
+        const owner = this.ctx.players.find((p) => p.id === e.owner);
+        for (const b of this.alive()) {
+          if (b.m.y > 2.4 || Math.hypot(b.m.x - e.x, b.m.z - e.z) > ELEMENT_FX.pillarRadius + MONSTERS[b.m.kind as MonsterKind].radius + 0.6) continue;
+          if (owner) this.damage(b, PVE.pillarDamage, owner, t);
+          b.stunUntil = Math.max(b.stunUntil, t + 0.8);
+        }
+      }
+    });
+  }
+
+  /** Walking monsters cannot pass through stone pillars. */
+  private pillarBlock(): void {
+    for (const pl of this.pillars) {
+      for (const b of this.alive()) {
+        if (b.m.kind === 'DRAGON' || MONSTERS[b.m.kind as MonsterKind].fly) continue;
+        const dx = b.m.x - pl.x;
+        const dz = b.m.z - pl.z;
+        const d = Math.hypot(dx, dz);
+        const min = ELEMENT_FX.pillarRadius + MONSTERS[b.m.kind as MonsterKind].radius;
+        if (d >= min) continue;
+        const nx = d > 1e-3 ? dx / d : 1;
+        const nz = d > 1e-3 ? dz / d : 0;
+        b.m.x = pl.x + nx * min;
+        b.m.z = pl.z + nz * min;
+      }
+    }
+  }
+
+  private nearestClone(x: number, z: number, within: number): { x: number; z: number; d: number } | null {
+    let best: { x: number; z: number; d: number } | null = null;
+    for (const c of this.clones) {
+      const d = Math.hypot(c.x - x, c.z - z);
+      if (d < within && (!best || d < best.d)) best = { ...c, d };
+    }
+    return best;
+  }
+
+  /** Bóng tối: stumble around aimlessly. */
+  private wander(b: MonsterBrain, dt: number): void {
+    const m = b.m;
+    const info = MONSTERS[m.kind as MonsterKind];
+    b.wanderYaw += (Math.sin(m.id * 7.3 + m.x) * 2) * dt;
+    m.x += Math.sin(b.wanderYaw) * info.speed * 0.5 * dt;
+    m.z += Math.cos(b.wanderYaw) * info.speed * 0.5 * dt;
+    m.z = Math.max(CASTLE.spawnZ, Math.min(CASTLE.gateZ - info.radius - 0.5, m.z));
+    m.yaw = b.wanderYaw;
+    m.state = 'WALK';
   }
 
   private addPoints(id: string, n: number): void {

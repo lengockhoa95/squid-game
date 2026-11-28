@@ -20,6 +20,8 @@ import { elementUi } from '../../elements/elementUi.ts';
 const MAX_STEPS_PER_FRAME = 6;
 /** Other players are drawn this far in the past so there are always two snapshots to blend. */
 const RENDER_DELAY_MS = 100;
+/** How long a character keeps facing its attack direction. */
+const FACE_ATTACK_MS = 450;
 
 interface Actor {
   model: CharacterBody;
@@ -46,6 +48,7 @@ class MatchScene implements GameScene {
   private readonly marker: ClickMarker;
   private readonly predictor = new LocalPredictor();
   private readonly actors = new Map<string, Actor>();
+  private readonly facing = new Map<string, { yaw: number; until: number }>();
   private readonly cameraTarget = new THREE.Vector3();
   private readonly sample = createSample();
   private readonly batch: MoveBatch = { s: 0, i: [] };
@@ -81,7 +84,9 @@ class MatchScene implements GameScene {
     this.effects = new ElementEffectsView(ctx.materials);
     // Attacks: play the swing/shot animation on whoever attacked.
     this.effects.onNewEffect = (e) => {
-      if (e.kind === 'SLASH' || e.kind === 'SHOT') this.actors.get(e.owner)?.model.attack(e.kind === 'SHOT');
+      if (e.kind !== 'SLASH' && e.kind !== 'SHOT') return;
+      this.actors.get(e.owner)?.model.attack(e.kind === 'SHOT');
+      if (e.owner !== this.net.localId) this.faceToward(e.owner, Math.atan2(e.x2 - e.x, e.z2 - e.z));
     };
     this.root.add(this.effects.root);
     this.unsubscribe = net.onSnapshot(() => this.onSnapshot(performance.now()));
@@ -132,6 +137,16 @@ class MatchScene implements GameScene {
       const a = this.actors.get(id);
       return a && a.model.group.visible ? a.model.group.position : null;
     });
+    // Attack facing overrides the movement facing for a moment.
+    const nowMs = performance.now();
+    for (const [id, f] of this.facing) {
+      const a = this.actors.get(id);
+      if (!a || nowMs > f.until) {
+        this.facing.delete(id);
+        continue;
+      }
+      a.model.group.rotation.y = f.yaw;
+    }
     this.updateCameraTarget();
     if (this.view) {
       this.frame ??= { gameTime, state, focus: this.cameraTarget, localId: this.net.localId };
@@ -199,22 +214,36 @@ class MatchScene implements GameScene {
     this.castAt(hit);
   }
 
-  onAttack(): void {
-    const me = this.localPlayer();
+  combatAim(): boolean {
     const game = this.net.getState()?.currentGame as MinigameId | undefined;
-    if (!me || !me.alive || me.roundState !== 'ACTIVE' || this.net.getPhase() !== 'ROUND_PLAYING' || !game || !MINIGAMES[game]?.combat) return;
-    this.net.sendAttack();
+    return !!game && MINIGAMES[game]?.combat === true && this.net.getPhase() === 'ROUND_PLAYING';
+  }
+
+  onAttack(aimYaw: number | null, at?: ClickHit): void {
+    const me = this.localPlayer();
+    if (!me || !me.alive || me.roundState !== 'ACTIVE' || !this.combatAim()) return;
+    if (elementUi.get().aiming) {
+      // Element button armed: this click uses the element instead.
+      elementUi.set({ aiming: false });
+      this.castAt(at ?? null);
+      return;
+    }
+    let yaw = aimYaw;
+    const pos = this.actors.get(this.net.localId)?.model.group.position;
+    if (yaw === null && at && pos) yaw = Math.atan2(at.x - pos.x, at.z - pos.z);
+    if (yaw === null) return;
+    this.faceToward(this.net.localId, yaw); // turn at once, the server confirms with the slash/shot
+    this.net.sendAttack(yaw);
+  }
+
+  /** Show a character facing its attack direction for a moment (attacks can go any way). */
+  private faceToward(id: string, yaw: number): void {
+    this.facing.set(id, { yaw, until: performance.now() + FACE_ATTACK_MS });
   }
 
   onStop(): void {
     if (elementUi.get().aiming) {
       elementUi.set({ aiming: false }); // right click cancels aiming instead of stopping
-      return;
-    }
-    // Combat games: right click attacks.
-    const game = this.net.getState()?.currentGame as MinigameId | undefined;
-    if (game && MINIGAMES[game]?.combat && this.net.getPhase() === 'ROUND_PLAYING') {
-      this.onAttack();
       return;
     }
     this.local?.stop();

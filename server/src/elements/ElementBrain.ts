@@ -11,6 +11,8 @@ export interface ElementBotView {
   /** Active participants other than the bot. */
   others(botId: string): readonly GamePlayer[];
   cast(botId: string, x: number, z: number): void;
+  /** PvE games (Thủ Thành): aim elements at monsters instead of opponents. */
+  target?: (botId: string) => { x: number; z: number } | null;
 }
 
 /**
@@ -24,6 +26,27 @@ export function updateBotElement(bot: NPCBot, dt: number, t: number, view: Eleme
   bot.memory.elementThink = timer > 0 ? timer : THINK_SECONDS;
   if (timer > 0 || !bot.chance(CAST_CHANCE[bot.difficulty])) return;
 
+  if (view.target) {
+    // PvE: everything goes at the monsters.
+    const at = view.target(bot.id);
+    if (!at) return;
+    const me = bot.sim.state;
+    const d = dist(at, me);
+    switch (s.element as ElementId) {
+      case 'WIND':
+        if (d < ELEMENT_FX.windRadius) view.cast(bot.id, me.x, me.z);
+        break;
+      case 'FIRE':
+      case 'CLONE':
+        if (d < 8) view.cast(bot.id, me.x, me.z);
+        break;
+      case 'BLINK':
+        break;
+      default:
+        if (d < 13) view.cast(bot.id, at.x, at.z);
+    }
+    return;
+  }
   const others = view.others(bot.id);
   if (others.length === 0) return;
   if (!view.movement) {

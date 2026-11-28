@@ -159,6 +159,8 @@ export class ElementSystem {
   private castMovement(caster: GamePlayer, element: ElementId, rawX: number, rawZ: number, t: number): boolean {
     const me = caster.sim.state;
     const { x, z } = clampToRange(me.x, me.z, rawX, rawZ, ELEMENTS[element].range);
+    const handled = this.game?.elementCast?.(element, caster.id, x, z, t);
+    if (handled !== undefined) return handled;
     switch (element) {
       case 'EARTH':
         this.field.pillars.push({ x, y: me.y, z, until: t + ELEMENT_FX.pillarSeconds });

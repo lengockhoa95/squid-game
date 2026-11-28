@@ -44,7 +44,14 @@ export interface ServerMinigame {
   /** Non-movement games that support the SWAP element: exchange two players' progress. */
   swapPlayers?(a: string, b: string): boolean;
   /** Combat games: the player attacks with their weapon (facing direction). */
-  handleAttack?(id: string, gameTime: number): void;
+  handleAttack?(id: string, gameTime: number, aimYaw?: number): void;
+  /**
+   * PvE games: an element cast handled by the game (e.g. lightning on monsters). Return true/false
+   * when handled (cast used / rejected), undefined to fall back to the normal element effect.
+   */
+  elementCast?(element: string, casterId: string, x: number, z: number, t: number): boolean | undefined;
+  /** PvE games: where a bot should aim its element (null = nothing worth it). */
+  elementTarget?(botId: string): { x: number; z: number } | null;
   /** In-round choice (Thủ Thành weapon card after a wave). */
   handlePick?(id: string, choice: string): void;
   /** Overrides the catalog time limit (read after initialize). */

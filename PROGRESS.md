@@ -182,6 +182,10 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
   - Chiêu cuối bắn ra khi thanh Nộ đầy.
 - [x] Bot nhặt vũ khí tốt hơn, chọn thẻ, né lửa rồng.
 - [x] Test: 177 unit/integration.
+- [x] Sửa: vũ khí giờ hiện trên tay (trước đó chưa tải model trong trận) và cầm đúng tư thế.
+- [x] Chuột trái đánh theo tâm ngắm (quay lưng vẫn đánh được), chuột phải dùng nguyên tố.
+- [x] Nguyên tố đánh quái thay vì người: Lôi, Gió, Bóng tối, Hoán đổi, Đất, Nước, Lửa, Phân thân.
+- [x] Map dựng bằng Kenney Castle Kit; hiệu ứng đạn, chém, lửa rồng, tia lửa khi trúng bằng Kenney Particle Pack.
 
 ## Hạn chế đã biết
 

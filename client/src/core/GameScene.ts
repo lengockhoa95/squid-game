@@ -44,8 +44,10 @@ export interface GameScene {
   takeCameraPreset?(): CameraPreset | null;
   onStop(): void;
   onJump(): void;
-  /** Combat games: attack (touch "Đánh" button; right click goes through onStop). */
-  onAttack?(): void;
+  /** Combat games: attack toward `aimYaw` (crosshair) or toward a clicked ground point. */
+  onAttack?(aimYaw: number | null, at?: ClickHit): void;
+  /** Combat games: left click attacks, right click uses the element. */
+  combatAim?(): boolean;
   /** True while shooter-style mouse look makes sense (e.g. walking around in a round). */
   wantsPointerLock?(): boolean;
   /** Cast key pressed: `hit` is the ground point under the cursor (null if unknown). */

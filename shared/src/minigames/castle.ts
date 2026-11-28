@@ -289,5 +289,5 @@ export function castleStep(world: SimWorld): StepFn {
 }
 
 export function castleSpawn(slot: number): { x: number; z: number; yaw: number } {
-  return { x: -4.5 + slot * 3, z: CASTLE.gateZ - 3, yaw: Math.PI };
+  return { x: -4.5 + slot * 3, z: CASTLE.gateZ - 7, yaw: Math.PI };
 }

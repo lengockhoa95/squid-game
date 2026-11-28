@@ -86,11 +86,11 @@ docker compose down
 | Zombie Lây Lan | 1 người hoá zombie, chạm ai lây người đó (đổi luôn thành nhân vật zombie); hết giờ còn là người thì qua |
 | Leo Dây Nhện | Cầu ván lắc lư nối các bệ cao dần, gió giật ngang từng đợt |
 | Vượt Biển Cá Mập | Bơi (chậm hơn đi bộ) từ bãi biển sang đảo; cá mập tuần tra và lao tới đớp, nhảy đôi để né |
-| Thủ Thành | Giữ cổng thành trước các đợt quái (slime, xương, dơi), cứ 5 đợt có Rồng boss. Chuột phải để đánh. Quái rớt vũ khí (kiếm, giáo, cung, súng) 4 bậc: Thường, Hiếm, Huyền thoại, Truyền thuyết. Sau mỗi đợt chọn 1 trong 3 thẻ vũ khí (phím 1/2/3); thẻ cấp 3 hoặc vũ khí Truyền thuyết mở chiêu cuối khi đầy Nộ. Chủ phòng chọn số đợt (5/10/15/20) |
+| Thủ Thành | Giữ cổng thành trước các đợt quái (slime, xương, dơi), cứ 5 đợt có Rồng boss. Chuột trái để đánh theo tâm ngắm, chuột phải dùng nguyên tố (nguyên tố đánh quái: Lôi choáng, Gió thổi văng, Bóng tối làm quái lạc đường, Hoán đổi đẩy quái về hang…). Quái rớt vũ khí (kiếm, giáo, cung, súng) 4 bậc: Thường, Hiếm, Huyền thoại, Truyền thuyết. Sau mỗi đợt chọn 1 trong 3 thẻ vũ khí (phím 1/2/3); thẻ cấp 3 hoặc vũ khí Truyền thuyết mở chiêu cuối khi đầy Nộ. Chủ phòng chọn số đợt (5/10/15/20) |
 
 Mỗi người chọn nhân vật trong màn chờ (20 nhân vật [Kenney Mini Characters](https://kenney.nl/assets/mini-characters-1), CC0 — cảm ơn Kenney); NPC tự lấy nhân vật chưa ai chọn. Tên người chơi hiện trên đầu nhân vật.
 
-Vũ khí: Kenney (CC0). Quái vật: [LowPoly Animated Monsters](https://quaternius.itch.io/lowpoly-animated-monsters) của Quaternius (CC0) — cảm ơn Quaternius.
+Vũ khí, map lâu đài ([Castle Kit](https://kenney.nl/assets/castle-kit)) và hiệu ứng ([Particle Pack](https://kenney.nl/assets/particle-pack)): Kenney (CC0). Quái vật: [LowPoly Animated Monsters](https://quaternius.itch.io/lowpoly-animated-monsters) của Quaternius (CC0) — cảm ơn Quaternius.
 
 Host tick để bỏ bớt minigame và nguyên tố ngay trong màn chờ (mặc định bật tất cả, luôn còn ít nhất 1 game).
 

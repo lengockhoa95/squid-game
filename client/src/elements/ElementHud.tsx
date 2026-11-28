@@ -31,6 +31,7 @@ export function ElementPicker({ net }: { net: MatchNetAdapter }) {
   const mine = useMyElement();
   if (!enabled || !game || !alive) return null;
   const movement = MINIGAMES[game].movement;
+  const combat = MINIGAMES[game].combat === true;
   const list = elementsFor(game, movement).filter((id) => !off.includes(id));
   if (list.length === 0) return <div className="element-picker"><small className="muted">{vi.elementNoneHere}</small></div>;
   return (
@@ -45,7 +46,7 @@ export function ElementPicker({ net }: { net: MatchNetAdapter }) {
               type="button"
               className={`element-option ${mine === id ? 'is-picked' : ''}`}
               style={{ '--el': info.color } as CSSProperties}
-              title={movement ? info.desc : info.descAction ?? info.desc}
+              title={combat ? info.descPve : movement ? info.desc : info.descAction ?? info.desc}
               onClick={() => {
                 audio.play('click');
                 net.pickElement(id);
@@ -53,7 +54,7 @@ export function ElementPicker({ net }: { net: MatchNetAdapter }) {
             >
               <span className="element-glyph">{info.glyph}</span>
               <span className="element-name">{info.name}</span>
-              <small>{movement ? info.desc : info.descAction ?? info.desc}</small>
+              <small>{combat ? info.descPve : movement ? info.desc : info.descAction ?? info.desc}</small>
             </button>
           );
         })}
@@ -120,7 +121,7 @@ export function ElementBar({ net }: { net: MatchNetAdapter }) {
             <span className="element-name">{info.name}</span>
             <span ref={cd} className="element-cd">{vi.elementReady}</span>
           </button>
-          <small className="element-hint">{aiming ? vi.elementAiming : vi.elementHint}</small>
+          <small className="element-hint">{aiming ? vi.elementAiming : game !== '' && MINIGAMES[game].combat ? vi.elementHintCombat : vi.elementHint}</small>
         </div>
       )}
     </>

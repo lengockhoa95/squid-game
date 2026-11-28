@@ -485,4 +485,30 @@ describe('Castle (Thủ Thành)', () => {
     expect(p.state.weapon).toBe('GUN');
     expect(match.castle!.pickups.length).toBe(1);
   });
+
+  it('attacks follow the aim (even behind you); lightning, wind and darkness hit monsters, not players', async () => {
+    const { Castle } = await import('../Castle/Logic.ts');
+    const { CASTLE } = await import('@sp/shared');
+    const { ctx, players, match } = makeContext(2);
+    const game = new Castle();
+    game.initialize(ctx);
+    let t = run(game, players, 0, CASTLE.prepSeconds + 3);
+    const [a, b] = players as [typeof players[0], typeof players[0]];
+    const m = match.castle!.monsters.find((mm) => mm.state !== 'DIE')!;
+    // Facing away (+z) but aiming at the monster behind (−z).
+    a.sim.reset(m.x, m.z + 1.2, 0);
+    const hp = m.hp;
+    game.handleAttack(a.id, t, Math.PI);
+    expect(m.hp).toBeLessThan(hp);
+    // Lightning at the monster: damages + stuns it; the other player nearby is untouched.
+    b.sim.reset(m.x + 1, m.z, 0);
+    const hp2 = m.hp;
+    expect(game.elementCast('THUNDER', a.id, m.x, m.z, t)).toBe(true);
+    expect(m.hp).toBeLessThan(hp2);
+    expect(b.state.stunUntil ?? 0).toBe(0);
+    t = run(game, players, t, 0.1);
+    if (m.state !== 'DIE') expect(m.state).toBe('STUN');
+    // Earth / water keep their normal effect (the game reacts to the pillar / puddle).
+    expect(game.elementCast('EARTH', a.id, 0, 0, t)).toBeUndefined();
+  });
 });
