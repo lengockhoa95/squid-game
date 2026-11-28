@@ -73,6 +73,7 @@ export class NPCManager {
     dt: number,
     gameTime: number,
     act: (id: string, action: GameAction) => void,
+    attack: (id: string) => void = () => {},
   ): void {
     if (!strategy) return;
     for (const bot of this.bots.values()) {
@@ -87,6 +88,7 @@ export class NPCManager {
           bot.sim.enqueue(this.batch);
         },
         act: (action) => act(bot.id, action),
+        attack: () => attack(bot.id),
       };
       strategy.update(bot, io, dt, gameTime);
       if (movement) {

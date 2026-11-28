@@ -156,6 +156,14 @@ export class PlayerModel implements CharacterBody {
     this.flipT = 0;
   }
 
+  setWeapon(_model: string): void {
+    // The procedural fallback has no weapon models.
+  }
+
+  attack(_ranged: boolean): void {
+    // No attack animation on the procedural fallback.
+  }
+
   setPose(pose: Pose): void {
     this.anim ??= new AnimationController(this);
     this.anim.setPose(pose);

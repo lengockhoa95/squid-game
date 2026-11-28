@@ -11,6 +11,8 @@ export interface BotIO {
   move(intent: Readonly<MoveIntent>): void;
   /** Send a discrete game action. */
   act(action: GameAction): void;
+  /** Combat games: attack (same path as a human's right click). */
+  attack(): void;
 }
 
 /**

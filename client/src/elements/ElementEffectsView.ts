@@ -33,8 +33,10 @@ export class ElementEffectsView {
   private readonly marks = new Map<string, StatusMarks>();
   private readonly seen = new Set<number>();
   private readonly live = new Set<number>();
-  private readonly geo: Record<'pillar' | 'disc' | 'bolt' | 'ring' | 'cone' | 'torus', THREE.BufferGeometry>;
-  private readonly mat: Record<'pillar' | 'puddle' | 'bolt' | 'wind' | 'blink' | 'swap' | 'dark' | 'fire' | 'stun' | 'rescue', THREE.Material>;
+  private readonly geo: Record<'pillar' | 'disc' | 'bolt' | 'ring' | 'cone' | 'torus' | 'beam' | 'arc' | 'breath', THREE.BufferGeometry>;
+  private readonly mat: Record<'pillar' | 'puddle' | 'bolt' | 'wind' | 'blink' | 'swap' | 'dark' | 'fire' | 'stun' | 'rescue' | 'slash' | 'shot', THREE.Material>;
+  /** Called once for every effect that appears (e.g. play the attacker's swing animation). */
+  onNewEffect: ((e: ElementEffect) => void) | null = null;
 
   constructor(materials: MaterialLibrary) {
     this.materials = materials;
@@ -46,6 +48,12 @@ export class ElementEffectsView {
       ring: t(new THREE.RingGeometry(0.85, 1, 32).rotateX(-Math.PI / 2)),
       cone: t(new THREE.ConeGeometry(0.35, 0.9, 6)),
       torus: t(new THREE.TorusGeometry(0.4, 0.06, 4, 12).rotateX(Math.PI / 2)),
+      // Unit beam along +z starting at the origin (scaled to length).
+      beam: t(new THREE.BoxGeometry(1, 1, 1).translate(0, 0, 0.5)),
+      // Swing arc in front (+z), flat.
+      arc: t(new THREE.RingGeometry(0.7, 1, 20, 1, Math.PI / 2 - 1.1, 2.2).rotateX(-Math.PI / 2).rotateY(Math.PI)),
+      // Fire cone pointing along +z, tip at the origin, unit length.
+      breath: t(new THREE.ConeGeometry(0.5, 1, 10, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 0.5)),
     };
     const basic = (color: number, opacity: number) =>
       this.res.track(new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide }));
@@ -60,6 +68,8 @@ export class ElementEffectsView {
       fire: basic(0xff7a2f, 0.85),
       stun: basic(0xffe14a, 0.95),
       rescue: basic(0xff4f6d, 0.9),
+      slash: basic(0xffffff, 0.85),
+      shot: basic(0xfff27a, 0.9),
     };
   }
 
@@ -86,6 +96,7 @@ export class ElementEffectsView {
         if (!this.seen.has(e.id)) {
           this.seen.add(e.id);
           this.playCue(e.kind);
+          this.onNewEffect?.(e);
         }
       }
       this.animate(d, e, dt, gameTime);
@@ -175,6 +186,16 @@ export class ElementEffectsView {
         return { object: new THREE.Mesh(this.geo.disc, this.mat.dark), kind: e.kind };
       case 'RESCUE':
         return { object: new THREE.Mesh(this.geo.ring, this.mat.rescue), kind: e.kind };
+      case 'SLASH':
+        return { object: new THREE.Mesh(this.geo.arc, this.mat.slash), kind: e.kind };
+      case 'SHOT':
+        return { object: new THREE.Mesh(this.geo.beam, this.mat.shot), kind: e.kind };
+      case 'BREATH':
+        return { object: new THREE.Mesh(this.geo.breath, this.mat.fire), kind: e.kind };
+      case 'GATE_HIT':
+        return { object: new THREE.Mesh(this.geo.ring, this.mat.fire), kind: e.kind };
+      case 'QUAKE':
+        return { object: new THREE.Mesh(this.geo.ring, this.mat.fire), kind: e.kind };
       case 'FIRE':
       default:
         return { object: new THREE.Group(), kind: e.kind }; // FIRE is drawn as a status mark
@@ -241,6 +262,50 @@ export class ElementEffectsView {
         o.position.set(e.x, e.y + 0.05, e.z);
         break;
       }
+      case 'SLASH': {
+        const dx = e.x2 - e.x;
+        const dz = e.z2 - e.z;
+        const reach = Math.max(1, Math.hypot(dx, dz));
+        o.position.set(e.x, e.y + 0.7, e.z);
+        o.rotation.y = Math.atan2(dx, dz);
+        o.scale.setScalar(reach * (0.7 + 0.3 * Math.min(1, f * 4)));
+        o.visible = age < 0.25;
+        break;
+      }
+      case 'SHOT': {
+        const dx = e.x2 - e.x;
+        const dz = e.z2 - e.z;
+        o.position.set(e.x, e.y + 0.8, e.z);
+        o.rotation.y = Math.atan2(dx, dz);
+        const w = 0.08 * (1 - Math.min(1, f * 3));
+        o.scale.set(w, w, Math.max(0.1, Math.hypot(dx, dz)));
+        o.visible = age < 0.25;
+        break;
+      }
+      case 'BREATH': {
+        const dx = e.x2 - e.x;
+        const dz = e.z2 - e.z;
+        const len = Math.max(1, Math.hypot(dx, dz));
+        o.position.set(e.x, 1, e.z);
+        o.rotation.y = Math.atan2(dx, dz);
+        const grow = Math.min(1, f * 2.5);
+        o.scale.set(len * 0.55 * grow, len * 0.4 * grow, len * grow);
+        break;
+      }
+      case 'QUAKE': {
+        const r = 0.5 + 6 * Math.min(1, f * 2);
+        o.scale.set(r, 1, r);
+        o.position.set(e.x, e.y + 0.15, e.z);
+        o.visible = f < 0.6;
+        break;
+      }
+      case 'GATE_HIT': {
+        const r = 0.5 + 2 * f;
+        o.scale.set(r, 1, r);
+        o.position.set(e.x, 1.2, e.z - 0.5);
+        o.rotation.x = Math.PI / 2;
+        break;
+      }
       case 'SWAP':
       case 'BLINK': {
         const [a, b] = (o as THREE.Group).children as [THREE.Object3D, THREE.Object3D];
@@ -258,6 +323,11 @@ export class ElementEffectsView {
     if (kind === 'BOLT') audio.play('zap', 0.16);
     else if (kind === 'RESCUE') audio.play('pass', 0.2);
     else if (kind === 'PILLAR') audio.play('rumble', 0.2);
+    else if (kind === 'SLASH') audio.play('whoosh', 0.12);
+    else if (kind === 'SHOT') audio.play('zap', 0.08);
+    else if (kind === 'BREATH') audio.play('rumble', 0.25);
+    else if (kind === 'GATE_HIT') audio.play('rumble', 0.08);
+    else if (kind === 'QUAKE') audio.play('rumble', 0.35);
     else if (kind === 'WIND' || kind === 'BLINK' || kind === 'SWAP' || kind === 'BUMP') audio.play('whoosh', 0.16);
     else audio.play('cast', 0.12);
   }

@@ -403,3 +403,86 @@ describe('Shark Swim', () => {
     expect(game.finish().details.get('p0')).toContain('cá mập');
   });
 });
+
+describe('Castle (Thủ Thành)', () => {
+  it('waves follow the host setting with a dragon boss every 5th wave', async () => {
+    const { castleWave, isBossWave, castleWaveCount } = await import('@sp/shared');
+    expect(castleWaveCount(15)).toBe(15);
+    expect(castleWaveCount(7)).toBe(10); // unknown values fall back to the default
+    expect(isBossWave(5) && isBossWave(10) && !isBossWave(4)).toBe(true);
+    expect(castleWave(5, 4).some((s) => s.kind === 'DRAGON')).toBe(true);
+    expect(castleWave(3, 4).some((s) => s.kind === 'DRAGON')).toBe(false);
+    expect(castleWave(9, 4)[0]!.hpMul).toBeGreaterThan(castleWave(1, 4)[0]!.hpMul);
+  });
+
+  it('right click damages the monster in front; kills score; a cleared wave deals weapon cards', async () => {
+    const { Castle } = await import('../Castle/Logic.ts');
+    const { CASTLE } = await import('@sp/shared');
+    const { ctx, players, match } = makeContext(1);
+    match.castleWaves = 5;
+    const game = new Castle();
+    game.initialize(ctx);
+    expect(match.castle!.waves).toBe(5);
+    let t = run(game, players, 0, CASTLE.prepSeconds + 0.1);
+    expect(match.castle!.wave).toBe(1);
+    t = run(game, players, t, 3); // let the slimes spawn
+    const p = players[0]!;
+    // Kill every monster by standing in front of it and attacking.
+    for (let guard = 0; guard < 400 && (match.castle!.monsters.some((m) => m.state !== 'DIE') || match.castle!.breakUntil === 0); guard++) {
+      const m = match.castle!.monsters.find((mm) => mm.state !== 'DIE');
+      if (m) {
+        p.sim.reset(m.x, m.z - 1, 0); // facing +z, toward the monster
+        const before = m.hp;
+        game.handleAttack(p.id, t);
+        if (before > 0) expect(m.hp).toBeLessThan(before);
+      }
+      t = run(game, players, t, 0.5);
+    }
+    expect(p.state.score).toBeGreaterThan(0);
+    expect(match.castle!.breakUntil).toBeGreaterThan(t);
+    const offer = game.offerOf(p.id);
+    expect(offer.length).toBeGreaterThan(0);
+    game.handlePick(p.id, offer[0]!);
+    expect(p.state.perkOffer).toBe('');
+    expect(p.state.perks !== '' || p.state.weaponTier > 0).toBe(true);
+  });
+
+  it('weapon stats scale with rarity and cards; maxed lines unlock ultimates', async () => {
+    const { weaponStats, ultimatesFor, WEAPONS } = await import('@sp/shared');
+    const base = weaponStats('SWORD', 0, {});
+    expect(base.damage).toBe(WEAPONS.SWORD.damage);
+    expect(weaponStats('SWORD', 3, {}).damage).toBeGreaterThan(base.damage * 2);
+    expect(weaponStats('SWORD', 0, { HASTE: 3 }).cooldown).toBeLessThan(base.cooldown);
+    expect(ultimatesFor({ POWER: 2 }, 'SWORD', 0)).toEqual([]);
+    expect(ultimatesFor({ POWER: 3 }, 'SWORD', 0)).toEqual(['POWER']);
+    expect(ultimatesFor({}, 'BOW', 3)).toEqual(['REACH']); // Truyền thuyết weapons have their own
+  });
+
+  it('walking over a better weapon equips it, a worse one is left on the ground', async () => {
+    const { Castle } = await import('../Castle/Logic.ts');
+    const { WeaponPickup } = await import('@sp/shared/schema');
+    const { ctx, players, match } = makeContext(1);
+    const game = new Castle();
+    game.initialize(ctx);
+    const p = players[0]!;
+    const put = (id: number, weapon: string, tier: number, x: number) => {
+      const pk = new WeaponPickup();
+      pk.id = id;
+      pk.weapon = weapon;
+      pk.tier = tier;
+      pk.x = x;
+      pk.z = 0;
+      match.castle!.pickups.push(pk);
+    };
+    put(900, 'GUN', 2, 0);
+    p.sim.reset(0, 0, 0);
+    let t = run(game, players, 0, 0.1);
+    expect(p.state.weapon).toBe('GUN');
+    expect(p.state.weaponTier).toBe(2);
+    put(901, 'SWORD', 0, 4);
+    p.sim.reset(4, 0, 0);
+    t = run(game, players, t + 2, 0.1);
+    expect(p.state.weapon).toBe('GUN');
+    expect(match.castle!.pickups.length).toBe(1);
+  });
+});

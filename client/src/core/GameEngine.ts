@@ -133,6 +133,10 @@ export class GameEngine {
     this.scenes.active?.onJump();
   }
 
+  attack(): void {
+    this.scenes.active?.onAttack?.();
+  }
+
   /** Tap on the 3D view at client coordinates: same as a mouse click there. */
   tapAt(clientX: number, clientY: number): void {
     const rect = this.host.getBoundingClientRect();

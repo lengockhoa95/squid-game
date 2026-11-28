@@ -14,11 +14,14 @@ import { FLIP_SECONDS, flipAngle, type CharacterBody, type Pose } from './Charac
  */
 
 export const MINOTAUR_CHARACTER = 'character-zombie';
+/** Weapon models (Kenney, same folder) held in Thủ Thành. */
+export const WEAPON_MODELS = ['weapon-sword', 'weapon-spear', 'weapon-bow', 'weapon-shooter'] as const;
 
 const BASE = `${import.meta.env.BASE_URL ?? '/'}models/kenney/`;
 /** Kenney characters are ~0.67 m tall; scale them to our character size. */
 const SCALE = 1.7;
 const CROSSFADE = 0.15;
+const ATTACK_SECONDS = 0.4;
 /** Pivot height for somersaults (about the middle of the body). */
 const FLIP_PIVOT = 0.55;
 
@@ -29,7 +32,7 @@ const library = new Map<string, GLTF>();
 const loading = new Map<string, Promise<void>>();
 
 /** Load the given characters (default: one per slot + the minotaur). Resolves false if any failed. */
-export async function preloadCharacters(names: readonly string[] = [...SLOT_CHARACTERS, MINOTAUR_CHARACTER]): Promise<boolean> {
+export async function preloadCharacters(names: readonly string[] = [...SLOT_CHARACTERS, MINOTAUR_CHARACTER, ...WEAPON_MODELS]): Promise<boolean> {
   const loader = new GLTFLoader();
   const jobs = names.map((name) => {
     if (library.has(name)) return Promise.resolve();
@@ -76,7 +79,13 @@ export function createNamedBody(materials: MaterialLibrary, name: string): Chara
   return gltf ? new KenneyBody(gltf, materials) : null;
 }
 
-type Clip = 'idle' | 'walk' | 'sprint' | 'jump' | 'die' | 'emote-yes';
+type Clip = 'idle' | 'walk' | 'sprint' | 'jump' | 'die' | 'emote-yes' | 'attack-melee-right' | 'holding-right-shoot';
+
+/** A clone of a loaded weapon model (null if not loaded). */
+export function createWeaponModel(model: string): THREE.Object3D | null {
+  const gltf = library.get(model);
+  return gltf ? gltf.scene.clone(true) : null;
+}
 
 class KenneyBody implements CharacterBody {
   readonly group = new THREE.Group();
@@ -95,6 +104,10 @@ class KenneyBody implements CharacterBody {
   private disposed = false;
   private readonly spin = new THREE.Group();
   private flipT = -1;
+  private attackT = -1;
+  private attackClip: Clip = 'attack-melee-right';
+  private weapon: THREE.Object3D | null = null;
+  private weaponName = '';
 
   constructor(gltf: GLTF, materials: MaterialLibrary) {
     this.materials = materials;
@@ -110,11 +123,11 @@ class KenneyBody implements CharacterBody {
     this.armL = this.inner.getObjectByName('arm-left') ?? this.torso;
     this.armR = this.inner.getObjectByName('arm-right') ?? this.torso;
     this.mixer = new THREE.AnimationMixer(this.inner);
-    for (const name of ['idle', 'walk', 'sprint', 'jump', 'die', 'emote-yes'] as const) {
+    for (const name of ['idle', 'walk', 'sprint', 'jump', 'die', 'emote-yes', 'attack-melee-right', 'holding-right-shoot'] as const) {
       const clip = gltf.animations.find((a) => a.name === name);
       if (!clip) continue;
       const action = this.mixer.clipAction(clip);
-      if (name === 'jump' || name === 'die') {
+      if (name === 'jump' || name === 'die' || name === 'attack-melee-right' || name === 'holding-right-shoot') {
         action.setLoop(THREE.LoopOnce, 1);
         action.clampWhenFinished = true;
       }
@@ -128,6 +141,7 @@ class KenneyBody implements CharacterBody {
     let clip: Clip;
     if (this.pose === 'fallen') clip = 'die';
     else if (this.pose === 'cheer') clip = 'emote-yes';
+    else if (this.attackT >= 0) clip = this.attackClip;
     else if (!grounded) clip = 'jump';
     else if (horizontalSpeed > 4.8) clip = 'sprint';
     else if (horizontalSpeed > 0.4) clip = 'walk';
@@ -137,6 +151,10 @@ class KenneyBody implements CharacterBody {
     if (walk && clip === 'walk') walk.timeScale = Math.max(0.6, horizontalSpeed / 3);
     this.mixer.update(dt);
     this.look?.update(dt);
+    if (this.attackT >= 0) {
+      this.attackT += dt;
+      if (this.attackT >= ATTACK_SECONDS) this.attackT = -1;
+    }
     if (this.flipT >= 0) {
       this.flipT += dt;
       this.spin.rotation.x = flipAngle(this.flipT);
@@ -146,6 +164,24 @@ class KenneyBody implements CharacterBody {
 
   flip(): void {
     this.flipT = 0;
+  }
+
+  setWeapon(model: string): void {
+    if (model === this.weaponName) return;
+    this.weaponName = model;
+    this.weapon?.removeFromParent();
+    this.weapon = model ? createWeaponModel(model) : null;
+    if (!this.weapon) return;
+    // In the right hand: the arm hangs down (−y), weapons are modelled pointing up (+y).
+    this.weapon.position.set(0, -0.15, 0.02);
+    this.weapon.rotation.set(Math.PI / 2, 0, 0);
+    this.armR.add(this.weapon);
+  }
+
+  attack(ranged: boolean): void {
+    this.attackClip = ranged ? 'holding-right-shoot' : 'attack-melee-right';
+    this.attackT = 0;
+    this.current = null; // restart the clip even if it is already playing
   }
 
   setPose(pose: Pose): void {
@@ -181,9 +217,8 @@ class KenneyBody implements CharacterBody {
     if (clip === this.current) return;
     const next = this.actions.get(clip);
     if (!next) return;
-    const prev = this.current ? this.actions.get(this.current) : undefined;
+    for (const [name, a] of this.actions) if (name !== clip && a.isRunning()) a.fadeOut(CROSSFADE);
     next.reset().setEffectiveWeight(1).fadeIn(CROSSFADE).play();
-    prev?.fadeOut(CROSSFADE);
     this.current = clip;
   }
 }

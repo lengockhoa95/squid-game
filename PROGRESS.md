@@ -169,6 +169,20 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
   - Bot né theo dự đoán vị trí cá mập.
 - [x] Test: 173 unit/integration.
 
+## Phase 16 — Thủ Thành ✅
+
+- [x] Quái Quaternius (CC0, FBX): slime, xương, dơi, rồng, kèm thanh máu.
+- [x] Chuột phải (hoặc nút "Đánh" trên cảm ứng) để đánh theo hướng nhìn.
+  - Vũ khí Kenney cầm trên tay: kiếm, giáo (cận chiến), cung, súng (bắn xa).
+- [x] Vũ khí rơi có 4 bậc (Thường, Hiếm, Huyền thoại, Truyền thuyết); đợt sau rơi đồ xịn hơn.
+  - Boss rơi đồ Huyền thoại trở lên cho mỗi người.
+- [x] Đợt quái tự sinh, chủ phòng chọn 5/10/15/20 đợt; cứ 5 đợt có Rồng boss (bay, đáp xuống, phun lửa).
+- [x] Sau mỗi đợt chọn 1 trong 3 thẻ vũ khí: Sức Mạnh, Tốc Đánh, Tầm Xa, Chí Mạng, Rèn Vũ Khí.
+  - Thẻ cấp 3 mở chiêu cuối: Địa Chấn, Bão Đạn, Mưa Tên, Thiên Lôi; vũ khí Truyền thuyết có chiêu riêng.
+  - Chiêu cuối bắn ra khi thanh Nộ đầy.
+- [x] Bot nhặt vũ khí tốt hơn, chọn thẻ, né lửa rồng.
+- [x] Test: 177 unit/integration.
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).

@@ -1,6 +1,6 @@
 import {
   MINIGAMES, MSG, collideBodies,
-  type CardId, type ElementId, type GameAction, type MinigameId, type MoveBatch, type Phase, type StepFn,
+  type CardId, type EffectKind, type ElementId, type GameAction, type MinigameId, type MoveBatch, type Phase, type StepFn,
 } from '@sp/shared';
 import { RoundResultEntry, type MatchState, type PlayerState } from '@sp/shared/schema';
 import type { PlayerSim } from '../players/PlayerSim.ts';
@@ -139,6 +139,23 @@ export class MatchController {
     return this.elements.pick(id, element);
   }
 
+  /** Combat games: attack with the weapon in hand. */
+  attack(id: string): void {
+    if (this.phase !== 'ROUND_PLAYING' || !this.game?.handleAttack) return;
+    const p = this.participant(id);
+    if (!p || !p.state.alive || p.state.roundState !== 'ACTIVE') return;
+    if (this.d.state.gameTime < p.state.stunUntil) return;
+    this.game.handleAttack(id, this.d.state.gameTime);
+  }
+
+  /** In-round pick (Thủ Thành weapon cards). */
+  pickInGame(id: string, choice: string): void {
+    if (this.phase !== 'ROUND_PLAYING' || !this.game?.handlePick) return;
+    const p = this.participant(id);
+    if (!p || p.state.roundState !== 'ACTIVE') return;
+    this.game.handlePick(id, choice);
+  }
+
   pickCard(id: string, card: CardId): boolean {
     return this.cards.pick(this.d.state.players.get(id), card);
   }
@@ -198,6 +215,10 @@ export class MatchController {
       rng: this.d.rng,
       rttOf: (pid) => this.d.rttOf(pid),
       tryRescue: (pid) => this.rescue(pid),
+      flash: (kind, ownerId, x, z, x2, z2) => {
+        const owner = this.participants.find((pl) => pl.id === ownerId) ?? this.participants[0];
+        if (owner) this.elements.flash(kind as EffectKind, owner, x, z, this.d.state.gameTime, x2, z2);
+      },
     });
     if (this.game.step) for (const p of this.participants) syncPlayerFromSim(p.state, p.sim);
     this.cards.beginRound(this.participants.map((p) => p.state));
@@ -223,7 +244,7 @@ export class MatchController {
         if (!p.state.isBot) this.d.sendTo?.(p.id, MSG.BRIDGE_HINT, { rows: hints });
       }
     }
-    this.setPhase('ROUND_PLAYING', MINIGAMES[this.game.id].timeLimit);
+    this.setPhase('ROUND_PLAYING', this.game.timeLimit ?? MINIGAMES[this.game.id].timeLimit);
   }
 
   private tickPlaying(dt: number): void {
@@ -233,7 +254,7 @@ export class MatchController {
     s.gameTime += dt;
     s.timer = Math.max(0, s.timer - dt);
 
-    this.d.npcs.update(this.strategy, game.step !== null, dt, s.gameTime, (id, action) => this.handleAction(id, action));
+    this.d.npcs.update(this.strategy, game.step !== null, dt, s.gameTime, (id, action) => this.handleAction(id, action), (id) => this.attack(id));
     if (this.elements.enabled) {
       this.d.npcs.updateElements(dt, s.gameTime, {
         movement: game.step !== null,

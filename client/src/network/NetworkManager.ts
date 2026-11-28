@@ -118,6 +118,10 @@ class NetworkManager {
     this.room?.send(MSG.PICK_CHARACTER, { id });
   }
 
+  setCastleWaves(waves: number): void {
+    this.room?.send(MSG.CASTLE_WAVES, { waves });
+  }
+
   setGameEnabled(id: string, enabled: boolean): void {
     this.room?.send(MSG.GAME_TOGGLE, { id, enabled });
   }
@@ -144,6 +148,8 @@ class NetworkManager {
       sendCast: (x: number, z: number) => this.room?.send(MSG.CAST, { x, z }),
       pickElement: (element: ElementId) => this.room?.send(MSG.PICK_ELEMENT, { element }),
       pickCard: (card: CardId) => this.room?.send(MSG.PICK_CARD, { card }),
+      sendAttack: () => this.room?.send(MSG.ATTACK),
+      pickPerk: (perk: string) => this.room?.send(MSG.CASTLE_PERK, { perk }),
       gameTimeNow: () => {
         const phase = this.room?.state.phase;
         if (phase !== 'ROUND_PLAYING') return this.lastGameTime;
@@ -248,6 +254,7 @@ class NetworkManager {
       elementsEnabled: state.elementsEnabled,
       noElimination: state.noElimination,
       cardsEnabled: state.cardsEnabled,
+      castleWaves: state.castleWaves,
     });
     const games = [...state.disabledGames];
     const elements = [...state.disabledElements];

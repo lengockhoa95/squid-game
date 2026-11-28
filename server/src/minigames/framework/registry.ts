@@ -28,6 +28,8 @@ import { RopeClimb } from '../RopeClimb/Logic.ts';
 import { RopeStrategy } from '../RopeClimb/NPCStrategy.ts';
 import { SharkSwim } from '../SharkSwim/Logic.ts';
 import { SharkStrategy } from '../SharkSwim/NPCStrategy.ts';
+import { Castle } from '../Castle/Logic.ts';
+import { CastleStrategy } from '../Castle/NPCStrategy.ts';
 
 export interface MinigameBundle {
   game: ServerMinigame;
@@ -48,6 +50,10 @@ export const MINIGAME_FACTORIES: Partial<Record<MinigameId, MinigameFactory>> = 
   },
   OBSTACLE_RACE: () => ({ game: new ObstacleRace(), strategy: new RaceStrategy() }),
   ICE_RACE: () => ({ game: new IceRace(), strategy: new IceStrategy() }),
+  CASTLE: () => {
+    const game = new Castle();
+    return { game, strategy: new CastleStrategy(game) };
+  },
   SHARK_SWIM: () => {
     const game = new SharkSwim();
     return { game, strategy: new SharkStrategy(game) };

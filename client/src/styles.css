@@ -822,6 +822,7 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
 }
 .touch-btn:active { background: rgba(61, 245, 200, 0.55); }
 .touch-jump { right: 28px; bottom: 112px; }
+.touch-attack { right: 120px; bottom: 60px; background: rgba(255, 79, 109, 0.55); }
 @media (pointer: coarse) {
   .element-cast { padding: 12px 18px 12px 12px; }
   .element-cast .element-glyph { min-width: 48px; height: 48px; font-size: 16px; }
@@ -851,3 +852,32 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
 .zombie-role { padding: 8px 18px; border-radius: 999px; font-weight: 900; font-size: 18px; background: rgba(61, 245, 200, 0.85); color: #04221b; }
 .zombie-role.is-zombie { background: rgba(110, 200, 80, 0.92); color: #102008; animation: pulse 0.6s ease-in-out infinite alternate; }
 .game-hud-top { bottom: auto; top: 104px; }
+.castle-top { position: absolute; top: 104px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(460px, calc(100% - 24px)); pointer-events: none; }
+.boss-bar, .castle-gate { width: 100%; display: flex; flex-direction: column; gap: 3px; font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+.boss-bar span { color: #ff7b5a; }
+.boss-fill { background: linear-gradient(90deg, #ff3b3b, #ff9a3b); transform: scaleX(1); }
+.gate-fill { background: linear-gradient(90deg, #c77d3a, #ffd23f); transform: scaleX(1); }
+.castle-break { background: rgba(255, 210, 63, 0.9); color: #2a1d00; }
+.castle-hud { gap: 6px; }
+.castle-weapon { display: flex; gap: 8px; align-items: center; font-weight: 800; }
+.castle-weapon .weapon-name { color: var(--rarity); text-shadow: 0 1px 2px #000a; }
+.castle-weapon .weapon-rarity { padding: 2px 8px; border-radius: 999px; background: var(--rarity); color: #14121c; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+.perk-chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.perk-chip { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--perk); color: var(--perk); background: rgba(10, 10, 20, 0.6); font-size: 11px; font-weight: 800; }
+.perk-chip.is-max { background: var(--perk); color: #14121c; }
+.castle-rage { width: min(320px, 100%); display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 800; }
+.castle-rage.is-locked { opacity: 0.6; }
+.castle-rage small { font-weight: 600; opacity: 0.85; }
+.rage-fill { background: linear-gradient(90deg, #ff4f6d, #ffd23f); transform: scaleX(0); }
+.perk-pick { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100% - 24px)); text-align: center; pointer-events: auto; }
+.perk-pick h3 { margin: 0 0 10px; font-size: 20px; text-shadow: 0 2px 6px #000c; }
+.perk-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.perk-card { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 14px 12px; border-radius: 14px; border: 2px solid var(--perk); background: rgba(16, 14, 28, 0.92); color: #fff; text-align: left; cursor: pointer; font: inherit; }
+.perk-card:hover { transform: translateY(-2px); box-shadow: 0 0 0 3px color-mix(in srgb, var(--perk) 40%, transparent); }
+.perk-card strong { color: var(--perk); font-size: 17px; }
+.perk-key { position: absolute; top: 8px; right: 10px; width: 22px; height: 22px; border-radius: 6px; background: var(--perk); color: #14121c; font-weight: 900; display: grid; place-items: center; font-size: 13px; }
+.perk-level { font-size: 12px; font-weight: 800; opacity: 0.9; }
+.perk-desc { font-size: 13px; }
+.perk-ult { font-size: 12px; opacity: 0.7; }
+.perk-ult.is-next { opacity: 1; color: #ffd23f; font-weight: 700; }
+.castle-waves { margin-top: 10px; gap: 10px; flex-wrap: wrap; }

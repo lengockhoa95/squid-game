@@ -34,6 +34,7 @@ export interface NetPlayer {
   readonly airJumps: number;
   readonly character: string;
   readonly moveMul: number;
+  readonly weapon: string;
 }
 
 /** What networked scenes/HUDs need from the session — keeps them SDK-agnostic. */
@@ -51,6 +52,10 @@ export interface MatchNetAdapter {
   sendCast(x: number, z: number): void;
   pickElement(element: ElementId): void;
   pickCard(card: CardId): void;
+  /** Combat games: attack with the weapon in hand. */
+  sendAttack(): void;
+  /** Thủ Thành: pick a weapon card between waves. */
+  pickPerk(perk: string): void;
   /** Estimated server game time (seconds) now, extrapolated from the last patch. */
   gameTimeNow(): number;
 }

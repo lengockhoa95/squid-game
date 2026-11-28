@@ -17,6 +17,8 @@ export interface SimulatedMatch {
 const MAX_TICKS = 60 * 60 * 15; // 15 simulated minutes: a match must end well before this
 
 /** Run a full bots-only match headless at the fixed simulation step. Throws if it never ends. */
+
+const NON_CAST = new Set(['RESCUE', 'BUMP', 'SLASH', 'SHOT', 'BREATH', 'GATE_HIT', 'QUAKE']);
 export function simulateMatch(
   seed: number,
   difficulties: readonly Difficulty[],
@@ -54,7 +56,8 @@ export function simulateMatch(
     for (const e of state.effects) {
       if (e.id > lastEffect) {
         lastEffect = e.id;
-        if (e.kind !== 'RESCUE' && e.kind !== 'BUMP') casts++; // card effects, not element casts
+        // Card / combat effects are not element casts (Thủ Thành's Thiên Lôi ultimate also draws bolts).
+        if (!NON_CAST.has(e.kind) && !(e.kind === 'BOLT' && state.currentGame === 'CASTLE')) casts++;
       }
     }
     phasesSeen.add(state.phase);

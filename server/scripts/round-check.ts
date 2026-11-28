@@ -17,6 +17,7 @@ for (let seed = 1; seed <= rounds; seed++) {
   state.noElimination = true;
   state.elementsEnabled = process.env.ELEMENTS !== '0';
   state.cardsEnabled = process.env.CARDS !== '0';
+  if (process.env.WAVES) state.castleWaves = Number(process.env.WAVES);
   const sims = new Map<string, PlayerSim>();
   const npcs = new NPCManager(seed * 31);
   NPCManager.planBots(MAX_PLAYERS, diffs, new Set(), rng).forEach((spec, slot) => {
@@ -26,6 +27,6 @@ for (let seed = 1; seed <= rounds; seed++) {
   const c = new MatchController({ state, sims, npcs, rng, rttOf: () => 0, onMatchOver: () => {} }, [game]);
   c.begin();
   let ticks = 0;
-  while (state.phase !== 'ROUND_RESULT' && ticks++ < 60 * 400) c.update(SIM_DT);
-  console.log(`seed ${seed}: ${state.results.map((r) => `${r.nickname}: ${r.detail}`).join(' | ')}`);
+  while (state.phase !== 'ROUND_RESULT' && ticks++ < 60 * 1300) c.update(SIM_DT);
+  console.log(`seed ${seed} (${state.gameTime.toFixed(0)}s${state.castle ? '' : ''}): ${state.results.map((r) => `${r.nickname}: ${r.detail}`).join(' | ')}`);
 }

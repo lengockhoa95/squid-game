@@ -1,5 +1,7 @@
 import { useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
-import { vi } from '@sp/shared';
+import { MINIGAMES, vi } from '@sp/shared';
+import { sessionStore } from '../../network/sessionStore.ts';
+import { useStore } from '../../store/UIStore.ts';
 import type { GameEngine } from '../../core/GameEngine.ts';
 import { touchStore } from '../../store/touch.ts';
 
@@ -17,6 +19,13 @@ export function TouchControls({ engine }: { engine: RefObject<GameEngine | null>
   const knob = useRef<HTMLDivElement>(null);
   const stick = useRef<{ id: number; x: number; y: number } | null>(null);
   const look = useRef<{ id: number; x: number; y: number; startX: number; startY: number; t: number } | null>(null);
+  const game = useStore(sessionStore, (s) => s.currentGame);
+  const combat = game !== '' && MINIGAMES[game].combat === true;
+  const attackTimer = useRef<number | null>(null);
+  const stopAttack = () => {
+    if (attackTimer.current !== null) window.clearInterval(attackTimer.current);
+    attackTimer.current = null;
+  };
 
   /** A mouse/pen on a touch-capable laptop: go back to mouse controls. */
   const notTouch = (e: ReactPointerEvent): boolean => {
@@ -106,6 +115,24 @@ export function TouchControls({ engine }: { engine: RefObject<GameEngine | null>
       >
         {vi.touchJump}
       </button>
+      {combat && (
+        <button
+          type="button"
+          className="touch-btn touch-attack"
+          aria-label={vi.touchAttack}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            engine.current?.attack();
+            stopAttack();
+            attackTimer.current = window.setInterval(() => engine.current?.attack(), 150); // hold to keep attacking
+          }}
+          onPointerUp={stopAttack}
+          onPointerCancel={stopAttack}
+          onPointerLeave={stopAttack}
+        >
+          {vi.touchAttack}
+        </button>
+      )}
     </div>
   );
 }

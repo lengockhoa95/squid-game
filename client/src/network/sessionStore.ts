@@ -54,6 +54,7 @@ export interface SessionState {
   cardsEnabled: boolean;
   disabledGames: readonly string[];
   disabledElements: readonly string[];
+  castleWaves: number;
   /** Short room-wide announcement (e.g. a card awakening), cleared after a few seconds. */
   announce: string | null;
   results: readonly ResultRow[];
@@ -81,6 +82,7 @@ export const sessionStore = createStore<SessionState>({
   cardsEnabled: true,
   disabledGames: [],
   disabledElements: [],
+  castleWaves: 10,
   announce: null,
   results: [],
   players: [],

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  CARDS, ELEMENTS, INPUT_BATCH, TEAM_ZOMBIE, characterFor, parseCards, SLOT_LOOKS, effectStep, isElementId, type MinigameId, type MoveBatch, type QualityPreset, type StepFn,
+  CARDS, ELEMENTS, INPUT_BATCH, MINIGAMES, TEAM_ZOMBIE, WEAPONS, characterFor, isWeaponId, parseCards, SLOT_LOOKS, effectStep, isElementId, type MinigameId, type MoveBatch, type QualityPreset, type StepFn,
 } from '@sp/shared';
 import type { CameraPreset, ClickHit, FrameInput, GameScene, SceneContext } from '../../core/GameScene.ts';
 import { ResourceTracker } from '../../core/ResourceTracker.ts';
@@ -79,6 +79,10 @@ class MatchScene implements GameScene {
     this.marker = new ClickMarker(this.resources);
     this.root.add(this.marker.mesh);
     this.effects = new ElementEffectsView(ctx.materials);
+    // Attacks: play the swing/shot animation on whoever attacked.
+    this.effects.onNewEffect = (e) => {
+      if (e.kind === 'SLASH' || e.kind === 'SHOT') this.actors.get(e.owner)?.model.attack(e.kind === 'SHOT');
+    };
     this.root.add(this.effects.root);
     this.unsubscribe = net.onSnapshot(() => this.onSnapshot(performance.now()));
     this.onSnapshot(performance.now());
@@ -195,9 +199,22 @@ class MatchScene implements GameScene {
     this.castAt(hit);
   }
 
+  onAttack(): void {
+    const me = this.localPlayer();
+    const game = this.net.getState()?.currentGame as MinigameId | undefined;
+    if (!me || !me.alive || me.roundState !== 'ACTIVE' || this.net.getPhase() !== 'ROUND_PLAYING' || !game || !MINIGAMES[game]?.combat) return;
+    this.net.sendAttack();
+  }
+
   onStop(): void {
     if (elementUi.get().aiming) {
       elementUi.set({ aiming: false }); // right click cancels aiming instead of stopping
+      return;
+    }
+    // Combat games: right click attacks.
+    const game = this.net.getState()?.currentGame as MinigameId | undefined;
+    if (game && MINIGAMES[game]?.combat && this.net.getPhase() === 'ROUND_PLAYING') {
+      this.onAttack();
       return;
     }
     this.local?.stop();
@@ -348,6 +365,7 @@ class MatchScene implements GameScene {
       actor.airJumps = p.airJumps;
       actor.model.setElement(p.element);
       actor.model.setAura(this.awakenColor(p.cards));
+      actor.model.setWeapon(isWeaponId(p.weapon) ? WEAPONS[p.weapon].model : '');
       if (p.id === this.net.localId) this.syncLocal(p, actor, now);
       else actor.interp.push(now, p.x, p.y, p.z, p.yaw, Math.hypot(p.vx, p.vz), p.grounded);
     });

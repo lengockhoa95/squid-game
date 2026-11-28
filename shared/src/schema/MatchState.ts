@@ -41,6 +41,13 @@ export const PlayerState = schema(
     cards: t.string(),
     cardOffer: t.string(),
     lives: t.uint8(),
+    /** Thủ Thành: weapon in hand ('' = fists). */
+    weapon: t.string(),
+    /** Thủ Thành: weapon rarity 0–3, weapon skill levels ("POWER:2"), card offer ("A,B,C"), rage 0–1. */
+    weaponTier: t.uint8(),
+    perks: t.string(),
+    perkOffer: t.string(),
+    rage: t.float32(),
     /** Game-specific speed multiplier (zombies run faster), 1 = normal. */
     moveMul: t.float32().default(1),
     /** Picked Kenney character id ('' = slot default). */
@@ -122,6 +129,33 @@ export type SharkFin = InstanceType<typeof SharkFin>;
 export const SeaState = schema({ sharks: t.array(SharkFin) }, 'SeaState');
 export type SeaState = InstanceType<typeof SeaState>;
 
+/** Thủ Thành: a monster (server-driven). state: WALK | ATTACK | FLY | LAND | BREATH | DIE. */
+export const Monster = schema(
+  {
+    id: t.uint16(), kind: t.string(), x: t.float32(), y: t.float32(), z: t.float32(), yaw: t.float32(),
+    hp: t.float32(), maxHp: t.float32(), state: t.string(), hitAt: t.float32(),
+  },
+  'Monster',
+);
+export type Monster = InstanceType<typeof Monster>;
+export const WeaponPickup = schema({ id: t.uint16(), weapon: t.string(), tier: t.uint8(), x: t.float32(), z: t.float32() }, 'WeaponPickup');
+export type WeaponPickup = InstanceType<typeof WeaponPickup>;
+export const CastleState = schema(
+  {
+    gate: t.float32(),
+    gateMax: t.float32(),
+    /** Current wave (1-based; 0 = before the first) and total waves. */
+    wave: t.uint8(),
+    waves: t.uint8(),
+    /** Game time the break before the next wave ends (0 while a wave is on). */
+    breakUntil: t.float32(),
+    monsters: t.array(Monster),
+    pickups: t.array(WeaponPickup),
+  },
+  'CastleState',
+);
+export type CastleState = InstanceType<typeof CastleState>;
+
 export const MatchState = schema(
   {
     phase: t.string(),
@@ -148,6 +182,8 @@ export const MatchState = schema(
     /** Host's picks: minigames / elements taken out of the random pool (empty = everything on). */
     disabledGames: t.array('string'),
     disabledElements: t.array('string'),
+    /** Thủ Thành: number of waves (host setting). */
+    castleWaves: t.uint8().default(10),
     effects: t.array(ElementEffect),
     rlgl: t.ref(RlglState).optional(),
     bridge: t.ref(BridgeState).optional(),
@@ -156,6 +192,7 @@ export const MatchState = schema(
     doors: t.ref(DoorsState).optional(),
     paint: t.ref(PaintState).optional(),
     sea: t.ref(SeaState).optional(),
+    castle: t.ref(CastleState).optional(),
   },
   'MatchState',
 );

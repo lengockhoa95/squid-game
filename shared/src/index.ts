@@ -24,6 +24,7 @@ export * from './minigames/paint.ts';
 export * from './minigames/zombie.ts';
 export * from './minigames/rope.ts';
 export * from './minigames/shark.ts';
+export * from './minigames/castle.ts';
 export * from './protocol/constants.ts';
 export * from './protocol/messages.ts';
 export * from './validation/roomCode.ts';

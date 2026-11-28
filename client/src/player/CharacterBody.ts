@@ -17,6 +17,10 @@ export interface CharacterBody {
   setPose(pose: Pose): void;
   /** Play a forward somersault (the mid-air jump). */
   flip(): void;
+  /** Hold a weapon model in the right hand ('' = empty hands). */
+  setWeapon(model: string): void;
+  /** Play an attack (swing or shot). */
+  attack(ranged: boolean): void;
   setElement(element: string): void;
   setAura(css: string): void;
   dispose(): void;

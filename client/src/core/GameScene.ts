@@ -44,6 +44,8 @@ export interface GameScene {
   takeCameraPreset?(): CameraPreset | null;
   onStop(): void;
   onJump(): void;
+  /** Combat games: attack (touch "Đánh" button; right click goes through onStop). */
+  onAttack?(): void;
   /** True while shooter-style mouse look makes sense (e.g. walking around in a round). */
   wantsPointerLock?(): boolean;
   /** Cast key pressed: `hit` is the ground point under the cursor (null if unknown). */

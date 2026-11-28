@@ -17,6 +17,8 @@ export interface MinigameContext {
   rttOf(id: string): number;
   /** Card "Mạng Phụ": spend a life to cancel a failure. True = the player is saved. */
   tryRescue?(id: string): boolean;
+  /** Draw a short visual effect (slash, shot…) for everyone; (x2, z2) is an optional second point. */
+  flash?(kind: string, ownerId: string, x: number, z: number, x2?: number, z2?: number): void;
 }
 
 export interface RoundOutcome {
@@ -41,6 +43,12 @@ export interface ServerMinigame {
   readonly bounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
   /** Non-movement games that support the SWAP element: exchange two players' progress. */
   swapPlayers?(a: string, b: string): boolean;
+  /** Combat games: the player attacks with their weapon (facing direction). */
+  handleAttack?(id: string, gameTime: number): void;
+  /** In-round choice (Thủ Thành weapon card after a wave). */
+  handlePick?(id: string, choice: string): void;
+  /** Overrides the catalog time limit (read after initialize). */
+  readonly timeLimit?: number;
   /** Card "Mắt Thần" (bridge): reveal the breaking tile of the first `rows` rows to this player. */
   revealFor?(id: string, rows: number): Array<[row: number, side: number]>;
   initialize(ctx: MinigameContext): void;

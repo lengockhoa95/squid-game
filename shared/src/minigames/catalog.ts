@@ -1,6 +1,6 @@
-export type MinigameId = 'RLGL' | 'GLASS_BRIDGE' | 'OBSTACLE_RACE' | 'FLOOR_COLLAPSE' | 'TOWER_CLIMB' | 'MAZE' | 'PARKOUR' | 'ICE_RACE' | 'LUCKY_DOORS' | 'PAINT' | 'ZOMBIE' | 'ROPE_CLIMB' | 'SHARK_SWIM';
+export type MinigameId = 'RLGL' | 'GLASS_BRIDGE' | 'OBSTACLE_RACE' | 'FLOOR_COLLAPSE' | 'TOWER_CLIMB' | 'MAZE' | 'PARKOUR' | 'ICE_RACE' | 'LUCKY_DOORS' | 'PAINT' | 'ZOMBIE' | 'ROPE_CLIMB' | 'SHARK_SWIM' | 'CASTLE';
 
-export const MINIGAME_IDS: readonly MinigameId[] = ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE', 'TOWER_CLIMB', 'MAZE', 'PARKOUR', 'ICE_RACE', 'LUCKY_DOORS', 'PAINT', 'ZOMBIE', 'ROPE_CLIMB', 'SHARK_SWIM'];
+export const MINIGAME_IDS: readonly MinigameId[] = ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE', 'TOWER_CLIMB', 'MAZE', 'PARKOUR', 'ICE_RACE', 'LUCKY_DOORS', 'PAINT', 'ZOMBIE', 'ROPE_CLIMB', 'SHARK_SWIM', 'CASTLE'];
 
 export interface MinigameInfo {
   id: MinigameId;
@@ -12,6 +12,8 @@ export interface MinigameInfo {
   movement: boolean;
   /** Only playable with an even number of players (teams). */
   needsEvenPlayers: boolean;
+  /** Right click / "Đánh" attacks in this game. */
+  combat?: boolean;
 }
 
 export const MINIGAMES: Readonly<Record<MinigameId, MinigameInfo>> = {
@@ -183,5 +185,19 @@ export const MINIGAMES: Readonly<Record<MinigameId, MinigameInfo>> = {
     timeLimit: 100,
     movement: true,
     needsEvenPlayers: false,
+  },
+  CASTLE: {
+    id: 'CASTLE',
+    title: 'Thủ Thành',
+    rules: [
+      'Quái vật kéo tới phá cổng thành theo từng đợt: slime, bộ xương, dơi — cuối cùng là RỒNG!',
+      'Chuột phải (hoặc nút Đánh) để đánh. Quái chết có thể rơi kiếm, giáo, cung, súng — chạy qua để nhặt.',
+      'Rồng bay trên trời (chỉ cung/súng bắn tới), đáp xuống phun lửa — lúc đó mọi vũ khí đều đánh được.',
+      'Diệt quái để có điểm; người ít điểm nhất bị loại. Đừng để cổng thành sập!',
+    ],
+    timeLimit: 150,
+    movement: true,
+    needsEvenPlayers: false,
+    combat: true,
   },
 };

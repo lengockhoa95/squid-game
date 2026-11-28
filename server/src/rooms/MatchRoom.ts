@@ -2,7 +2,7 @@ import { Room, type Client } from '@colyseus/core';
 import {
   ERROR_CODES, IN_MATCH_PHASES, MAX_PLAYERS, MSG, PATCH_MS, PLAYGROUND_SPAWNS, RECONNECT_SECONDS, SIM_DT, SIM_HZ,
   DEFAULT_NPC_DIFFICULTIES, isDifficulty, parseCast, parseElementsToggle, parseGameAction, parseMoveBatch, parseNpcConfig,
-  CHARACTER_IDS, ELEMENT_IDS, MINIGAME_IDS, characterFor, isCharacterId, parseItemToggle, parsePickCard, parsePickElement, sanitizeNickname,
+  CASTLE_WAVE_OPTIONS, CHARACTER_IDS, isPerkId, ELEMENT_IDS, MINIGAME_IDS, characterFor, isCharacterId, parseItemToggle, parsePickCard, parsePickElement, sanitizeNickname,
   type ErrorCodeName, type JoinOptions, type MinigameId, type Phase,
 } from '@sp/shared';
 import { MatchState } from '@sp/shared/schema';
@@ -32,7 +32,10 @@ const RATE_LIMITS = {
   [MSG.PICK_CARD]: { perSecond: 4, burst: 4 },
   // Hosts click through checkbox lists quickly.
   [MSG.GAME_TOGGLE]: { perSecond: 10, burst: 16 },
+  [MSG.CASTLE_WAVES]: { perSecond: 5, burst: 8 },
+  [MSG.CASTLE_PERK]: { perSecond: 4, burst: 6 },
   [MSG.PICK_CHARACTER]: { perSecond: 6, burst: 6 },
+  [MSG.ATTACK]: { perSecond: 12, burst: 6 },
   [MSG.ELEMENT_TOGGLE]: { perSecond: 10, burst: 16 },
 };
 const KICK_AFTER_VIOLATIONS = 300;
@@ -145,6 +148,20 @@ export class MatchRoom extends Room {
       const id = (msg as { id?: unknown } | null)?.id;
       const p = this.state.players.get(client.sessionId);
       if (p && isCharacterId(id)) p.character = id;
+    });
+    this.onMessage(MSG.CASTLE_WAVES, (client, msg: unknown) => {
+      if (!this.hostLobbyAction(client, MSG.CASTLE_WAVES)) return;
+      const n = (msg as { waves?: unknown } | null)?.waves;
+      if (typeof n === 'number' && (CASTLE_WAVE_OPTIONS as readonly number[]).includes(n)) this.state.castleWaves = n;
+    });
+    this.onMessage(MSG.CASTLE_PERK, (client, msg: unknown) => {
+      if (!this.allow(client, MSG.CASTLE_PERK)) return;
+      const perk = (msg as { perk?: unknown } | null)?.perk;
+      if (isPerkId(perk)) this.controller.pickInGame(client.sessionId, perk);
+    });
+    this.onMessage(MSG.ATTACK, (client) => {
+      if (!this.allow(client, MSG.ATTACK)) return;
+      this.controller.attack(client.sessionId);
     });
     this.onMessage(MSG.PICK_CARD, (client, msg: unknown) => {
       if (!this.allow(client, MSG.PICK_CARD)) return;
@@ -289,6 +306,7 @@ export class MatchRoom extends Room {
       p.team = -1;
       p.score = 0;
       p.element = '';
+      p.weapon = '';
       p.cards = '';
       p.cardOffer = '';
       p.lives = 0;

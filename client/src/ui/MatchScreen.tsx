@@ -31,6 +31,7 @@ import { PaintHud } from '../minigames/Paint/Hud.tsx';
 import { ZombieHud } from '../minigames/Zombie/Hud.tsx';
 import { RopeHud } from '../minigames/RopeClimb/Hud.tsx';
 import { SharkHud } from '../minigames/SharkSwim/Hud.tsx';
+import { CastleHud } from '../minigames/Castle/Hud.tsx';
 
 const HUDS: Record<MinigameId, (props: { net: MatchNetAdapter }) => ReactNode> = {
   RLGL: RlglHud,
@@ -46,6 +47,7 @@ const HUDS: Record<MinigameId, (props: { net: MatchNetAdapter }) => ReactNode> =
   ZOMBIE: ZombieHud,
   ROPE_CLIMB: RopeHud,
   SHARK_SWIM: SharkHud,
+  CASTLE: CastleHud,
 };
 
 function PhaseLayer({ net }: { net: MatchNetAdapter }) {
