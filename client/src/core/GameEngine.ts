@@ -6,7 +6,7 @@ import { CROSSHAIR_NDC_Y, InputManager } from './InputManager.ts';
 import { MaterialLibrary } from './MaterialLibrary.ts';
 import { SceneManager, type SceneLoader } from './SceneManager.ts';
 import { keyboardToWorldDir } from './inputMath.ts';
-import type { ClickHit, FrameInput } from './GameScene.ts';
+import type { AimRay, ClickHit, FrameInput } from './GameScene.ts';
 import type { MatchNetAdapter } from '../network/types.ts';
 
 export interface EngineOptions {
@@ -91,6 +91,7 @@ export class GameEngine {
       onToggleDebug: () => this.opts.onToggleDebug(),
       onKeyPress: (code) => {
         if (code === 'KeyF') this.castAtPointer();
+        else if (code === 'KeyR') this.scenes.active?.onHook?.(this.aimRay());
         else this.scenes.active?.onKeyPress?.(code);
       },
     });
@@ -138,12 +139,23 @@ export class GameEngine {
 
   /** Touch "Đánh" button: attack where the camera looks. */
   attack(): void {
-    this.scenes.active?.onAttack?.(this.aimYaw());
+    this.scenes.active?.onAttack?.(this.aimRay());
   }
 
-  /** Horizontal direction the camera (crosshair) looks at, as a character yaw. */
-  private aimYaw(): number {
-    return this.camera.viewYaw + Math.PI;
+  /** Touch "Móc" button: grappling hook along the crosshair. */
+  hook(): void {
+    this.scenes.active?.onHook?.(this.aimRay());
+  }
+
+  /** Ray from the camera through the crosshair (mouse look / touch) or through the cursor. */
+  private aimRay(ndcX?: number, ndcY?: number): AimRay {
+    const p = this.input.pointer;
+    const x = ndcX ?? (this.input.locked || !p.valid ? 0 : p.x);
+    const y = ndcY ?? (this.input.locked || !p.valid ? CROSSHAIR_NDC_Y : p.y);
+    this.ndc.set(x, y);
+    this.raycaster.setFromCamera(this.ndc, this.camera.camera);
+    const r = this.raycaster.ray;
+    return { ox: r.origin.x, oy: r.origin.y, oz: r.origin.z, dx: r.direction.x, dy: r.direction.y, dz: r.direction.z };
   }
 
   /** Tap on the 3D view at client coordinates: same as a mouse click there. */
@@ -196,6 +208,7 @@ export class GameEngine {
     const preset = scene.takeCameraPreset?.();
     if (preset) this.camera.applyPreset(preset);
 
+    this.camera.blockers = scene.cameraBlockers?.() ?? [];
     this.camera.setAspect(this.render.aspect);
     this.camera.update(dt, scene.getCameraTarget(), scene.getAutoAlignYaw());
     this.render.render(scene.root, this.camera.camera);
@@ -220,8 +233,7 @@ export class GameEngine {
     if (!scene) return;
     if (scene.combatAim?.()) {
       // Combat: left click attacks toward the crosshair (mouse look) or the clicked point.
-      if (this.input.locked) scene.onAttack?.(this.aimYaw());
-      else this.raycastGround(ndcX, ndcY, (hit) => scene.onAttack?.(null, hit), () => scene.onAttack?.(this.aimYaw()));
+      scene.onAttack?.(this.input.locked ? this.aimRay() : this.aimRay(ndcX, ndcY));
       return;
     }
     this.raycastGround(ndcX, ndcY, (hit) => scene.onGroundClick(hit));

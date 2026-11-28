@@ -156,7 +156,7 @@ export class PlayerModel implements CharacterBody {
     this.flipT = 0;
   }
 
-  setWeapon(_model: string): void {
+  setWeapon(_model: string, _tier?: number): void {
     // The procedural fallback has no weapon models.
   }
 

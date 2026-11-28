@@ -1,18 +1,17 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { CASTLE, CASTLE_LOW_WALLS } from '@sp/shared';
+import { CASTLE_TOWER_TOP, CORNER, KEEP, KEEP_TOP, MAP, WALL_TOP, castleLowWalls, sidePoint } from '@sp/shared';
 
 /**
  * Kenney "Castle Kit" (CC0) pieces for the Thủ Thành map. Each piece is a 1×1 tile (walls 1.31
- * high) loaded once per page and cloned. Built as one group that replaces the placeholder boxes.
+ * high) loaded once per page and cloned. Sizes follow the collision world (walls 2.62 m with a
+ * walkway, corner towers and the keep terrace at 6 m, the keep roof at 10 m).
  */
 const BASE = `${import.meta.env.BASE_URL ?? '/'}models/castle/`;
 const PIECES = [
-  'wall', 'wall-corner', 'wall-doorway', 'wall-half', 'gate', 'tower-hexagon-base', 'tower-hexagon-mid', 'tower-hexagon-roof',
-  'tower-square-base', 'tower-square-mid', 'tower-square-top-roof', 'tower-square-arch', 'flag', 'flag-banner-long',
-  'tree-large', 'tree-small', 'rocks-large', 'rocks-small', 'siege-catapult', 'siege-ballista',
-  'tower-square-mid-windows', 'tower-square-mid-door', 'tower-square-top-roof-high-windows', 'tower-square-top-roof-high',
-  'tower-hexagon-top', 'wall-pillar', 'stairs-stone',
+  'wall', 'wall-doorway', 'wall-half', 'tower-square-base', 'tower-square-mid', 'tower-square-mid-windows',
+  'tower-square-mid-door', 'tower-square-arch', 'tower-top', 'flag', 'flag-banner-long', 'tree-large', 'tree-small',
+  'rocks-large', 'rocks-small', 'siege-catapult', 'siege-ballista',
 ] as const;
 type Piece = (typeof PIECES)[number];
 
@@ -39,7 +38,7 @@ export function loadCastleKit(): Promise<boolean> {
   return loading;
 }
 
-/** Wall tile size (m) on the map. */
+/** Wall tile size (m). */
 const TILE = 2;
 
 function piece(name: Piece, x: number, y: number, z: number, scale: number | [number, number, number], rotY = 0): THREE.Object3D | null {
@@ -53,127 +52,102 @@ function piece(name: Piece, x: number, y: number, z: number, scale: number | [nu
   return o;
 }
 
-/** Deterministic pseudo-random for decoration placement. */
 function hash(i: number): number {
   const s = Math.sin(i * 127.1 + 311.7) * 43758.5453;
   return s - Math.floor(s);
 }
 
+/** Yaw that turns a wall piece to run along side `side` (N/S walls run along x). */
+function wallYaw(side: number): number {
+  return side % 2 === 0 ? 0 : Math.PI / 2;
+}
+
+/** Stack a square tower: base + middle up to `top`, crenellations on top. */
+function tower(add: (o: THREE.Object3D | null) => void, x: number, z: number, size: number, top: number, mid: Piece = 'tower-square-mid'): void {
+  const baseH = top / 2;
+  add(piece('tower-square-base', x, 0, z, [size, baseH / 1.01, size]));
+  add(piece(mid, x, baseH, z, [size * 0.98, (top - baseH) / 1.01, size * 0.98]));
+  add(piece('tower-top', x, top, z, [size, size * 0.9, size]));
+}
+
 /**
- * The castle: crenellated wall with a doorway + wooden gate in the middle, square towers beside the
- * gate, hexagon towers at the corners, catapults behind the wall, low courtyard walls (same as the
- * collision world), the monster lair at the far end and trees/rocks around.
+ * The castle in the middle of the map: four walls with doorways (portcullis raised half-way),
+ * corner towers, the two-tier keep with a flag, plus the monster lairs, low cover walls and trees.
+ * Returns the four gates (index = side) so the view can shake / hide them as they break.
  */
-export function buildCastle(): { root: THREE.Group; gate: THREE.Object3D | null } {
+export function buildCastle(): { root: THREE.Group; gates: Array<THREE.Object3D | null> } {
   const root = new THREE.Group();
   const add = (o: THREE.Object3D | null) => {
     if (o) root.add(o);
-    return o;
   };
-  const h = CASTLE.halfWidth;
-  const wallZ = CASTLE.gateZ + 1.25;
-  // Wall line (players look at it from the courtyard side, −z).
-  for (let x = -h + TILE / 2; x < h; x += TILE) {
-    if (Math.abs(x) < TILE) continue; // doorway slot
-    if (Math.abs(Math.abs(x) - 3) < 0.5) continue; // gate towers
-    add(piece('wall', x, 0, wallZ, TILE, Math.PI));
-  }
-  add(piece('wall-doorway', 0, 0, wallZ, [TILE * 2.2, TILE, TILE], Math.PI));
-  // Portcullis raised half-way: defenders walk in and out; monsters still have to break it.
-  const gate = add(piece('gate', 0, 1.7, wallZ - 0.2, [TILE * 2.2, TILE * 1.4, TILE * 3.2], Math.PI / 2));
-  for (const sx of [-3, 3]) {
-    add(piece('tower-square-base', sx, 0, wallZ, TILE));
-    add(piece('tower-square-mid', sx, TILE * 1.01, wallZ, TILE));
-    add(piece('tower-square-top-roof', sx, TILE * 2.02, wallZ, TILE));
-    add(piece('flag', sx, TILE * 3, wallZ, TILE, Math.PI / 2));
-  }
-  for (const sx of [-h, h]) {
-    add(piece('tower-hexagon-base', sx, 0, wallZ, TILE * 1.6));
-    add(piece('tower-hexagon-mid', sx, TILE * 1.6 * 1.31, wallZ, TILE * 1.6));
-    add(piece('tower-hexagon-roof', sx, TILE * 1.6 * 2.3, wallZ, TILE * 1.6));
-  }
-  for (const sx of [-13, 13]) add(piece('flag-banner-long', sx, 0.6, wallZ - TILE / 2 - 0.05, [1.2, 1.1, 1.2], Math.PI / 2));
-  buildKeep(add, wallZ);
-  // Stone walls along both sides of the battlefield, up to the monster lair: the whole map is walled in.
-  for (const sx of [-h - 1, h + 1]) {
-    for (let z = CASTLE.spawnZ - 2; z < wallZ - TILE / 2; z += TILE) add(piece('wall', sx, 0, z, [TILE, 0.8 * TILE, TILE], Math.PI / 2));
-    for (let z = CASTLE.spawnZ + 8; z < wallZ - 4; z += 12) add(piece('wall-pillar', sx, 0, z, [TILE * 1.1, TILE * 1.05, TILE * 1.1]));
-  }
-  // Siege engines behind the wall (defenders' side).
-  add(piece('siege-catapult', -10, 0, wallZ + 5, 2.2, Math.PI));
-  add(piece('siege-ballista', 10, 0, wallZ + 5, 2.2, Math.PI));
-  // Courtyard low walls = the collision boxes (1 m high).
-  for (const b of CASTLE_LOW_WALLS) {
-    for (let x = b.minX + 0.5; x < b.maxX; x += 1) {
-      add(piece('wall-half', x, 0, (b.minZ + b.maxZ) / 2, [1, b.top / 1.31, b.maxZ - b.minZ]));
+  const wallR = (MAP.wallIn + MAP.wallOut) / 2;
+  const gates: Array<THREE.Object3D | null> = [];
+  for (let side = 0; side < 4; side++) {
+    const yaw = wallYaw(side);
+    // Wall tiles between the doorway and the corner towers.
+    for (let l = MAP.door + TILE / 2; l < CORNER.at - CORNER.half; l += TILE) {
+      for (const sign of [-1, 1]) {
+        const p = sidePoint(side, wallR, sign * l);
+        add(piece('wall', p.x, 0, p.z, [TILE, WALL_TOP / 1.31, MAP.wallOut - MAP.wallIn + 0.3], yaw));
+      }
+    }
+    const d = sidePoint(side, wallR, 0);
+    add(piece('wall-doorway', d.x, 0, d.z, [MAP.door * 2, WALL_TOP / 1.31, MAP.wallOut - MAP.wallIn + 0.3], yaw));
+    // Open doorway: gate health shows on the HUD compass (a portcullis would block the camera).
+    gates.push(null);
+    // Banners on the outer face, either side of the gate.
+    for (const l of [-4.5, 4.5]) {
+      const b = sidePoint(side, MAP.wallOut + 0.05, l);
+      add(piece('flag-banner-long', b.x, 0.3, b.z, [1, 1.1, 1], yaw + Math.PI / 2));
+    }
+    // Monster lair: a dark arch far out with a bit of wall.
+    const lair = sidePoint(side, MAP.lairR + 2, 0);
+    add(piece('tower-square-arch', lair.x, 0, lair.z, [5, 4, 3], yaw));
+    for (const l of [-5, 5]) {
+      const w = sidePoint(side, MAP.lairR + 2, l);
+      add(piece('wall', w.x, 0, w.z, [TILE * 1.5, 1.8, TILE], yaw));
     }
   }
-  // Monster lair: an arch with walls at the far end.
-  const lairZ = CASTLE.spawnZ - 2.5;
-  add(piece('tower-square-arch', 0, 0, lairZ, [TILE * 2.5, TILE * 2, TILE * 1.5]));
-  for (let x = -7; x <= 7; x += TILE) {
-    if (Math.abs(x) < 3) continue;
-    add(piece('wall', x, 0, lairZ, TILE));
+  // Corner towers (sun decks at 6 m) with a flag on two of them.
+  let k = 0;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const x = sx * CORNER.at;
+      const z = sz * CORNER.at;
+      tower(add, x, z, CORNER.half * 2, CASTLE_TOWER_TOP, 'tower-square-mid-windows');
+      if (k++ % 2 === 0) add(piece('flag', x, CASTLE_TOWER_TOP, z, 2.4, Math.PI / 2));
+    }
   }
-  // Trees and rocks outside the walls.
-  for (let i = 0; i < 26; i++) {
-    const side = i % 2 === 0 ? -1 : 1;
-    const x = side * (h + 4 + hash(i) * 6);
-    const z = CASTLE.spawnZ - 6 + (i / 26) * (CASTLE.gateZ - CASTLE.spawnZ + 10) + hash(i + 50) * 2;
+  // The keep: a wide terrace block (6 m) and the high block (10 m) with the castle flag.
+  tower(add, 0, 0, KEEP.lowHalf * 2, CASTLE_TOWER_TOP, 'tower-square-mid-windows');
+  add(piece('tower-square-mid-door', 0, CASTLE_TOWER_TOP, 0, [KEEP.highHalf * 2, (KEEP_TOP - CASTLE_TOWER_TOP) / 2 / 1.01, KEEP.highHalf * 2]));
+  add(piece('tower-square-mid-windows', 0, (CASTLE_TOWER_TOP + KEEP_TOP) / 2, 0, [KEEP.highHalf * 2, (KEEP_TOP - CASTLE_TOWER_TOP) / 2 / 1.01, KEEP.highHalf * 2]));
+  add(piece('tower-top', 0, KEEP_TOP, 0, [KEEP.highHalf * 2, 3, KEEP.highHalf * 2]));
+  add(piece('flag', 0, KEEP_TOP, 0, 4, Math.PI / 2));
+  // Low cover walls (same boxes as the collision world).
+  for (const b of castleLowWalls()) {
+    const alongX = b.maxX - b.minX > b.maxZ - b.minZ;
+    const len = alongX ? b.maxX - b.minX : b.maxZ - b.minZ;
+    for (let i = 0; i < len; i++) {
+      const x = alongX ? b.minX + 0.5 + i : (b.minX + b.maxX) / 2;
+      const z = alongX ? (b.minZ + b.maxZ) / 2 : b.minZ + 0.5 + i;
+      add(piece('wall-half', x, 0, z, [1, b.top / 1.31, 1], alongX ? 0 : Math.PI / 2));
+    }
+  }
+  // Siege engines on the battlefield corners (decoration).
+  add(piece('siege-catapult', 30, 0, 30, 2.4, -Math.PI / 4));
+  add(piece('siege-ballista', -30, 0, -30, 2.4, (Math.PI * 3) / 4));
+  // Trees and rocks all around, outside the battlefield.
+  for (let i = 0; i < 64; i++) {
+    const a = (i / 64) * Math.PI * 2 + hash(i) * 0.08;
+    const r = MAP.half + 3 + hash(i + 11) * 9;
     const kind: Piece = hash(i + 9) < 0.55 ? 'tree-large' : hash(i + 9) < 0.8 ? 'tree-small' : 'rocks-large';
-    add(piece(kind, x, 0, z, 2 + hash(i + 3) * 1.5, hash(i + 7) * Math.PI * 2));
+    add(piece(kind, Math.cos(a) * r, 0, Math.sin(a) * r, 2 + hash(i + 3) * 1.6, hash(i + 7) * Math.PI * 2));
   }
-  for (let i = 0; i < 8; i++) {
-    add(piece('rocks-small', (hash(i + 90) * 2 - 1) * (h - 2), 0, CASTLE.spawnZ + 3 + hash(i + 70) * 30, 1.5, hash(i) * 6));
+  for (let i = 0; i < 16; i++) {
+    const a = hash(i + 40) * Math.PI * 2;
+    const r = 23 + hash(i + 60) * 15;
+    add(piece('rocks-small', Math.cos(a) * r, 0, Math.sin(a) * r, 1.5, hash(i) * 6));
   }
-  return { root, gate };
-}
-
-type Add = (o: THREE.Object3D | null) => THREE.Object3D | null;
-
-/** Back of the castle grounds (behind the front wall). */
-const YARD_DEPTH = 26;
-
-/**
- * Behind the gate: a walled castle yard (side + back walls, hexagon towers at the corners) with a
- * four-storey keep in the middle, two side towers and a gatehouse tower row — tall enough to be
- * seen over the front wall from the battlefield.
- */
-function buildKeep(add: Add, wallZ: number): void {
-  const h = CASTLE.halfWidth;
-  const backZ = wallZ + YARD_DEPTH;
-  // Side walls and back wall of the yard.
-  for (const sx of [-h, h]) {
-    for (let z = wallZ + TILE; z < backZ; z += TILE) add(piece('wall', sx, 0, z, TILE, Math.PI / 2));
-  }
-  for (let x = -h + TILE / 2; x < h; x += TILE) add(piece('wall', x, 0, backZ, TILE));
-  for (const sx of [-h, h]) {
-    add(piece('tower-hexagon-base', sx, 0, backZ, TILE * 1.6));
-    add(piece('tower-hexagon-mid', sx, TILE * 1.6 * 1.31, backZ, TILE * 1.6));
-    add(piece('tower-hexagon-roof', sx, TILE * 1.6 * 2.3, backZ, TILE * 1.6));
-  }
-  // The keep: four storeys and a high roof.
-  const kz = wallZ + YARD_DEPTH * 0.55;
-  const K = 6;
-  const storeys: Piece[] = ['tower-square-mid-door', 'tower-square-mid-windows', 'tower-square-mid', 'tower-square-mid-windows'];
-  add(piece('tower-square-base', 0, 0, kz, K, Math.PI));
-  storeys.forEach((name, i) => add(piece(name, 0, K * 1.01 * (i + 1), kz, [K * 0.95, K, K * 0.95], Math.PI)));
-  add(piece('tower-square-top-roof-high-windows', 0, K * 1.01 * (storeys.length + 1), kz, K, Math.PI));
-  add(piece('flag', 0, K * 1.01 * (storeys.length + 1) + K * 1.6, kz, K * 0.6, Math.PI / 2));
-  // Two side towers (three storeys) flanking the keep, and smaller ones by the gate.
-  const S = 3.6;
-  for (const sx of [-8.5, 8.5]) {
-    add(piece('tower-square-base', sx, 0, kz + 1, S, Math.PI));
-    add(piece('tower-square-mid-windows', sx, S * 1.01, kz + 1, S, Math.PI));
-    add(piece('tower-square-mid', sx, S * 2.02, kz + 1, S, Math.PI));
-    add(piece('tower-square-top-roof-high', sx, S * 3.03, kz + 1, S, Math.PI));
-    add(piece('flag-banner-long', sx, S * 0.4, kz + 1 - S / 2 - 0.05, [S * 0.5, S * 0.8, S * 0.5], Math.PI / 2));
-  }
-  for (const sx of [-5, 5]) {
-    add(piece('tower-hexagon-base', sx, 0, wallZ + 6, TILE * 1.3));
-    add(piece('tower-hexagon-mid', sx, TILE * 1.3 * 1.31, wallZ + 6, TILE * 1.3));
-    add(piece('tower-hexagon-top', sx, TILE * 1.3 * 2.32, wallZ + 6, TILE * 1.3));
-  }
-  // Stairs up to the keep door.
-  add(piece('stairs-stone', 0, 0, kz - K / 2 - 1, [3, 1.2, 2], Math.PI));
+  return { root, gates };
 }

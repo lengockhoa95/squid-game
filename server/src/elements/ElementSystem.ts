@@ -42,12 +42,13 @@ export class ElementSystem {
   }
 
   /** A visual-only effect (e.g. a rescue sparkle). */
-  flash(kind: EffectKind, owner: GamePlayer, x: number, z: number, t: number, x2?: number, z2?: number): void {
+  flash(kind: EffectKind, owner: GamePlayer, x: number, z: number, t: number, x2?: number, z2?: number): ElementEffect {
     const e = this.addEffect(kind, owner, x, z, t, ELEMENT_FX.flashSeconds);
     if (x2 !== undefined && z2 !== undefined) {
       e.x2 = x2;
       e.z2 = z2;
     }
+    return e;
   }
 
   get enabled(): boolean {

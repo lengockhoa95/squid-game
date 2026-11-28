@@ -4,7 +4,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { MonsterKind } from '@sp/shared';
 import type { MaterialLibrary } from '../../core/MaterialLibrary.ts';
 import type { CharacterBody } from '../../player/CharacterBody.ts';
-import { MINOTAUR_CHARACTER, createNamedBody } from '../../player/characters.ts';
+import { MINOTAUR_CHARACTER, createNamedBody, createWeaponModel } from '../../player/characters.ts';
 
 /**
  * Quaternius "LowPoly Animated Monsters" (CC0) loaded from FBX once per page, then cloned.
@@ -73,6 +73,10 @@ export class MonsterModel {
   private bodyAnim: MonsterAnim = 'move';
   private readonly ownedMaterials: THREE.Material[] = [];
 
+  /** Elite / enraged tint target (lerped onto cloned materials). */
+  private tinted: THREE.MeshPhongMaterial[] = [];
+  private readonly baseColors: THREE.Color[] = [];
+
   constructor(kind: MonsterKind, fallbackMaterial: THREE.Material, materials?: MaterialLibrary) {
     if (kind === 'MINOTAUR' && materials) {
       const body = createNamedBody(materials, MINOTAUR_CHARACTER);
@@ -83,7 +87,11 @@ export class MonsterModel {
         return;
       }
     }
-    const fbx: FbxKind = kind === 'SLIME_KING' ? 'SLIME' : kind === 'MINOTAUR' ? 'SKELETON' : kind;
+    // New monster kinds reuse the Quaternius models with their own colours and props.
+    const fbx: FbxKind =
+      kind === 'SLIME_KING' || kind === 'BOMBER' ? 'SLIME'
+        : kind === 'MINOTAUR' || kind === 'ARCHER' || kind === 'SHIELD' ? 'SKELETON'
+          : kind;
     const height = kind === 'SLIME_KING' ? SLIME_KING_HEIGHT : kind === 'MINOTAUR' ? 4 : FILES[fbx].height;
     const loaded = library.get(fbx);
     if (!loaded) {
@@ -97,7 +105,11 @@ export class MonsterModel {
     const model = SkeletonUtils.clone(loaded.object);
     model.scale.setScalar((loaded.scale * height) / FILES[fbx].height);
     this.root.add(model);
+    this.ownMaterials(model);
     if (kind === 'SLIME_KING') this.crown(model, height);
+    if (kind === 'ARCHER') this.archer(model);
+    if (kind === 'SHIELD') this.shield(height);
+    if (kind === 'BOMBER') this.bomb(height);
     this.mixer = new THREE.AnimationMixer(model);
     for (const anim of ['move', 'attack', 'idle', 'die', 'breath'] as const) {
       const suffix = `_${CLIPS[fbx][anim]}`;
@@ -113,19 +125,83 @@ export class MonsterModel {
     this.play('move');
   }
 
-  /** Golden tint + a crown for the slime king. */
-  private crown(model: THREE.Object3D, height: number): void {
+  /** Own copies of the model's materials (tints per monster without touching the shared ones). */
+  private ownMaterials(model: THREE.Object3D): void {
     model.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((mt) => {
         const c = mt.clone() as THREE.MeshPhongMaterial;
-        if (c.color) c.color.lerp(new THREE.Color(0xffc23f), 0.55);
         this.ownedMaterials.push(c);
+        if (c.color) {
+          this.tinted.push(c);
+          this.baseColors.push(c.color.clone());
+        }
         return c;
       });
       mesh.material = Array.isArray(mesh.material) ? mats : mats[0]!;
     });
+  }
+
+  /** Shift every colour toward `color` by `amount` (0 = original). */
+  tint(color: number, amount: number): void {
+    const target = new THREE.Color(color);
+    this.tinted.forEach((m, i) => m.color.copy(this.baseColors[i]!).lerp(target, amount));
+  }
+
+  /** Glow (elites, enraged bosses): emissive colour. */
+  glow(color: number, amount: number): void {
+    for (const m of this.tinted) if (m.emissive) m.emissive.setHex(color).multiplyScalar(amount);
+  }
+
+  private archer(model: THREE.Object3D): void {
+    this.tint(0x4f7a3a, 0.45);
+    for (let i = 0; i < this.baseColors.length; i++) this.baseColors[i]!.copy(this.tinted[i]!.color);
+    const bow = createWeaponModel('weapon-bow');
+    if (!bow) return;
+    bow.scale.setScalar(2.2);
+    bow.position.set(0.45, 0.7, 0.25);
+    this.root.add(bow);
+    void model;
+  }
+
+  private shield(height: number): void {
+    this.tint(0x6a8cc8, 0.45);
+    for (let i = 0; i < this.baseColors.length; i++) this.baseColors[i]!.copy(this.tinted[i]!.color);
+    const steel = new THREE.MeshLambertMaterial({ color: 0x9fb3d6, emissive: 0x101828 });
+    const trim = new THREE.MeshLambertMaterial({ color: 0xffd23f });
+    this.ownedMaterials.push(steel, trim);
+    const geo = new THREE.BoxGeometry(0.9, 1.1, 0.12);
+    const boss = new THREE.CylinderGeometry(0.14, 0.14, 0.08, 10).rotateX(Math.PI / 2);
+    this.extraGeo.push(geo, boss);
+    const plate = new THREE.Mesh(geo, steel);
+    plate.position.set(0, height * 0.45, 0.45);
+    const knob = new THREE.Mesh(boss, trim);
+    knob.position.set(0, height * 0.45, 0.53);
+    this.root.add(plate, knob);
+  }
+
+  private bomb(height: number): void {
+    this.tint(0xd8452f, 0.5);
+    for (let i = 0; i < this.baseColors.length; i++) this.baseColors[i]!.copy(this.tinted[i]!.color);
+    const black = new THREE.MeshLambertMaterial({ color: 0x222228 });
+    const fuse = new THREE.MeshBasicMaterial({ color: 0xffb040 });
+    this.ownedMaterials.push(black, fuse);
+    const ball = new THREE.SphereGeometry(0.28, 10, 8);
+    const spark = new THREE.SphereGeometry(0.07, 6, 4);
+    this.extraGeo.push(ball, spark);
+    const b = new THREE.Mesh(ball, black);
+    b.position.y = height + 0.15;
+    const s = new THREE.Mesh(spark, fuse);
+    s.position.set(0.1, height + 0.48, 0);
+    this.root.add(b, s);
+  }
+
+  /** Golden tint + a crown for the slime king. */
+  private crown(model: THREE.Object3D, height: number): void {
+    this.tint(0xffc23f, 0.55);
+    for (let i = 0; i < this.baseColors.length; i++) this.baseColors[i]!.copy(this.tinted[i]!.color);
+    void model;
     const gold = new THREE.MeshLambertMaterial({ color: 0xffd23f, emissive: 0x553300 });
     this.ownedMaterials.push(gold);
     this.fallbackGeo = new THREE.CylinderGeometry(0.55, 0.45, 0.45, 6, 1, true);

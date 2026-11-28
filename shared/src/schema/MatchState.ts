@@ -50,6 +50,11 @@ export const PlayerState = schema(
     rage: t.float32(),
     /** Thủ Thành: health, knocked down (waiting for a revive) and revive progress 0–1. */
     hp: t.uint8().default(100),
+    /** Móc câu: pulled toward (hookX, hookY, hookZ) until hookUntil (game time). */
+    hookUntil: t.float32(),
+    hookX: t.float32(),
+    hookY: t.float32(),
+    hookZ: t.float32(),
     downed: t.boolean(),
     revive: t.float32(),
     /** Game-specific speed multiplier (zombies run faster), 1 = normal. */
@@ -91,6 +96,9 @@ export const ElementEffect = schema(
     x: t.float32(),
     z: t.float32(),
     x2: t.float32(),
+    /** 3D shots (Thủ Thành): absolute start/end heights; 0/0 = use y. */
+    y1: t.float32(),
+    y2: t.float32(),
     z2: t.float32(),
     y: t.float32(),
     yaw: t.float32(),
@@ -138,6 +146,8 @@ export const Monster = schema(
   {
     id: t.uint16(), kind: t.string(), x: t.float32(), y: t.float32(), z: t.float32(), yaw: t.float32(),
     hp: t.float32(), maxHp: t.float32(), state: t.string(), hitAt: t.float32(),
+    /** Last hit was a critical (damage numbers), elite affix ('' = normal), boss enraged. */
+    crit: t.boolean(), elite: t.string(), enraged: t.boolean(),
   },
   'Monster',
 );
@@ -146,8 +156,13 @@ export const WeaponPickup = schema({ id: t.uint16(), weapon: t.string(), tier: t
 export type WeaponPickup = InstanceType<typeof WeaponPickup>;
 export const CastleState = schema(
   {
-    gate: t.float32(),
+    /** Four gates (N, E, S, W) and the keep; the castle falls when the keep does. */
+    gates: t.array('float32'),
     gateMax: t.float32(),
+    keep: t.float32(),
+    keepMax: t.float32(),
+    /** Where this wave mainly comes from, e.g. "1,2" (side indices). */
+    sides: t.string(),
     /** Current wave (1-based; 0 = before the first) and total waves. */
     wave: t.uint8(),
     waves: t.uint8(),

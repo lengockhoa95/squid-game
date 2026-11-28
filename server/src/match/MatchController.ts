@@ -140,12 +140,20 @@ export class MatchController {
   }
 
   /** Combat games: attack with the weapon in hand. */
-  attack(id: string, aimYaw?: number): void {
+  attack(id: string, aimYaw?: number, aimPitch?: number): void {
     if (this.phase !== 'ROUND_PLAYING' || !this.game?.handleAttack) return;
     const p = this.participant(id);
     if (!p || !p.state.alive || p.state.roundState !== 'ACTIVE') return;
     if (this.d.state.gameTime < p.state.stunUntil) return;
-    this.game.handleAttack(id, this.d.state.gameTime, aimYaw);
+    this.game.handleAttack(id, this.d.state.gameTime, aimYaw, aimPitch);
+  }
+
+  /** Móc câu (Thủ Thành). */
+  hook(id: string, yaw: number, pitch: number): void {
+    if (this.phase !== 'ROUND_PLAYING' || !this.game?.handleHook) return;
+    const p = this.participant(id);
+    if (!p || !p.state.alive || p.state.roundState !== 'ACTIVE') return;
+    this.game.handleHook(id, this.d.state.gameTime, yaw, pitch);
   }
 
   /** In-round pick (Thủ Thành weapon cards). */
@@ -215,9 +223,13 @@ export class MatchController {
       rng: this.d.rng,
       rttOf: (pid) => this.d.rttOf(pid),
       tryRescue: (pid) => this.rescue(pid),
-      flash: (kind, ownerId, x, z, x2, z2) => {
+      flash: (kind, ownerId, x, z, x2, z2, y1, y2) => {
         const owner = this.participants.find((pl) => pl.id === ownerId) ?? this.participants[0];
-        if (owner) this.elements.flash(kind as EffectKind, owner, x, z, this.d.state.gameTime, x2, z2);
+        if (!owner) return;
+        const e = this.elements.flash(kind as EffectKind, owner, x, z, this.d.state.gameTime, x2, z2);
+        if (y1 !== undefined) e.y1 = y1;
+        if (y2 !== undefined) e.y2 = y2;
+        if (ownerId === '') e.owner = ''; // monster effects (no player animation)
       },
     });
     if (this.game.step) for (const p of this.participants) syncPlayerFromSim(p.state, p.sim);
@@ -254,7 +266,7 @@ export class MatchController {
     s.gameTime += dt;
     s.timer = Math.max(0, s.timer - dt);
 
-    this.d.npcs.update(this.strategy, game.step !== null, dt, s.gameTime, (id, action) => this.handleAction(id, action), (id) => this.attack(id));
+    this.d.npcs.update(this.strategy, game.step !== null, dt, s.gameTime, (id, action) => this.handleAction(id, action), (id, yaw, pitch) => this.attack(id, yaw, pitch));
     if (this.elements.enabled) {
       this.d.npcs.updateElements(dt, s.gameTime, {
         movement: game.step !== null,

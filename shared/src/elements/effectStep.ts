@@ -22,7 +22,15 @@ export interface ElementStatus {
   cards: string;
   /** Game-specific speed multiplier (e.g. zombies), 1 = normal. */
   moveMul?: number;
+  /** Móc câu (Thủ Thành): flying to (hookX, hookY, hookZ) until hookUntil. */
+  hookUntil?: number;
+  hookX?: number;
+  hookY?: number;
+  hookZ?: number;
 }
+
+/** Grappling hook pull speed (m/s). */
+export const HOOK_SPEED = 24;
 
 /** Everyone can jump once more in mid-air. */
 export const AIR_JUMPS = 1;
@@ -42,6 +50,28 @@ export function effectStep(base: StepFn, field: ElementField, status: ElementSta
   let cardsKey = '';
   let mods: CardMods = cardMods({});
   return (s, intent, dt, t) => {
+    if (status.hookUntil !== undefined && t < status.hookUntil) {
+      // Reeled in by the hook: fly straight to the anchor, then stand on it.
+      const dx = (status.hookX ?? s.x) - s.x;
+      const dy = (status.hookY ?? s.y) - s.y;
+      const dz = (status.hookZ ?? s.z) - s.z;
+      const d = Math.hypot(dx, dy, dz);
+      const step = HOOK_SPEED * dt;
+      s.vx = s.vy = s.vz = 0;
+      if (d <= step) {
+        s.x += dx;
+        s.y += dy;
+        s.z += dz;
+        s.grounded = true;
+        s.airJumps = 0;
+      } else {
+        s.x += (dx / d) * step;
+        s.y += (dy / d) * step;
+        s.z += (dz / d) * step;
+        s.grounded = false;
+      }
+      return;
+    }
     if (status.cards !== cardsKey) {
       cardsKey = status.cards;
       mods = cardMods(parseCards(cardsKey));

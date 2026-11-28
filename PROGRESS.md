@@ -202,6 +202,24 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
 - [x] Thẻ mới: Lốc Kiếm, Đạn Nảy, Thương Xuyên Thấu. Quái đông hơn ~1.5 lần.
 - [x] Test: 181 unit/integration.
 
+## Phase 17 — Thủ Thành bị bao vây 4 phía ✅
+
+- [x] Lâu đài ở giữa map, 4 cổng (Bắc/Đông/Nam/Tây), quái từ 4 hang.
+  - Mỗi đợt dồn mạnh 1–2 hướng, ưu tiên cổng yếu; HUD cảnh báo và có la bàn máu 4 cổng.
+  - Cổng vỡ thì quái tràn vào đánh tháp chính; tháp chính sập là thua.
+- [x] Lâu đài nhiều tầng: lối đi trên tường, sân thượng 4 tháp góc (6m), tháp chính 2 tầng (6m / 10m).
+  - Cầu thang đi bộ lên được; nhảy đôi; bệ nhảy; móc câu (phím R / nút Móc).
+  - Camera tự kéo lại khi bị tường che.
+- [x] Ngắm 3D: camera ngửa được, đạn và tên bay theo tâm ngắm cả lên xuống (bắn trúng rồng đang bay).
+- [x] Vũ khí phát sáng theo độ hiếm; Truyền thuyết để lại vệt sáng vàng khi vung.
+- [x] Số sát thương bay lên, chí mạng chữ vàng to.
+- [x] Quái mạnh và khôn hơn:
+  - Loại mới: Cung thủ (tên thật, né được, ưu tiên người trên tường), Hiệp sĩ khiên (chặn đòn chính diện), Yêu tinh ôm bom.
+  - Quái tinh anh (Tốc biến / Giáp sắt / Nổ tung / Khổng lồ); boss nổi điên ở 50% máu và gọi đệ tử.
+  - Đi qua cầu thay vì lội hào, né ô đang sụp, săn người đứng lẻ / máu thấp.
+- [x] Bot tìm đường qua cổng và vòng quanh lâu đài, ngắm lên khi bắn quái bay.
+- [x] Test: 183 unit/integration.
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).

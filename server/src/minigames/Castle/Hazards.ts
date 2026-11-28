@@ -1,11 +1,14 @@
 import {
-  CASTLE, MOAT, PIT, PIT_CRACKING, PIT_GONE, PIT_SOLID, PIT_TILE_COUNT, applyPitTiles, inMoat,
+  MOAT, PIT, PIT_CRACKING, PIT_GONE, PIT_SOLID, PIT_TILE_COUNT, applyPitTiles, inMoat, sideDir, sidePoint,
   type CastleWorld,
 } from '@sp/shared';
 import { type CastleState, SharkFin } from '@sp/shared/schema';
 
 interface SharkBrain {
   fin: SharkFin;
+  /** The moat side it patrols, and its lateral position / direction along that side. */
+  side: number;
+  l: number;
   dir: number;
   biteReady: number;
   lungeUntil: number;
@@ -42,14 +45,15 @@ export class CastleHazards {
       this.tileUntil.push(0);
     }
     applyPitTiles(cw, state.tiles);
-    const h = CASTLE.halfWidth;
-    for (let i = 0; i < MOAT.sharks; i++) {
+    // One shark per side of the ring.
+    for (let side = 0; side < 4; side++) {
       const fin = new SharkFin();
-      fin.x = i === 0 ? -h / 2 : h / 2;
-      fin.z = (MOAT.minZ + MOAT.maxZ) / 2;
-      fin.yaw = i === 0 ? Math.PI / 2 : -Math.PI / 2;
+      const l = side % 2 === 0 ? -10 : 10;
+      const p = sidePoint(side, (MOAT.rIn + MOAT.rOut) / 2, l);
+      fin.x = p.x;
+      fin.z = p.z;
       state.sharks.push(fin);
-      this.sharks.push({ fin, dir: i === 0 ? 1 : -1, biteReady: 0, lungeUntil: 0, targetX: 0, targetZ: 0 });
+      this.sharks.push({ fin, side, l, dir: side % 2 === 0 ? 1 : -1, biteReady: 0, lungeUntil: 0, targetX: 0, targetZ: 0 });
     }
   }
 
@@ -96,8 +100,8 @@ export class CastleHazards {
 
   /** Sharks patrol the moat; one in reach of someone wading lunges and bites. */
   updateSharks(dt: number, t: number, prey: readonly MoatPrey[]): void {
-    const h = CASTLE.halfWidth - 1;
-    const midZ = (MOAT.minZ + MOAT.maxZ) / 2;
+    const mid = (MOAT.rIn + MOAT.rOut) / 2;
+    const span = MOAT.rOut - 1;
     for (const sh of this.sharks) {
       const f = sh.fin;
       if (t < sh.lungeUntil) {
@@ -112,10 +116,14 @@ export class CastleHazards {
         }
       } else {
         f.lunge = false;
-        f.x += sh.dir * MOAT.sharkSpeed * dt;
-        f.z += (midZ - f.z) * Math.min(1, dt * 2);
-        if (f.x > h || f.x < -h) sh.dir = -sh.dir;
-        f.yaw = sh.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+        sh.l += sh.dir * MOAT.sharkSpeed * dt;
+        if (sh.l > span || sh.l < -span) sh.dir = -sh.dir;
+        const want = sidePoint(sh.side, mid, sh.l);
+        f.x += (want.x - f.x) * Math.min(1, dt * 3);
+        f.z += (want.z - f.z) * Math.min(1, dt * 3);
+        // Facing along the side (lateral axis = direction turned 90°).
+        const d = sideDir(sh.side);
+        f.yaw = Math.atan2(-d.z * sh.dir, d.x * sh.dir);
         // Someone wading close by: lunge.
         if (t >= sh.biteReady) {
           const target = prey.find((p) => inMoat(p.x, p.z) && Math.hypot(p.x - f.x, p.z - f.z) < 4);

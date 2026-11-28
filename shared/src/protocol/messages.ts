@@ -23,6 +23,7 @@ export const MSG = {
   GAME_TOGGLE: 'gameToggle',
   CASTLE_WAVES: 'castleWaves',
   CASTLE_PERK: 'castlePerk',
+  HOOK: 'hook',
   /** Lobby: pick your character {id}. */
   PICK_CHARACTER: 'pickCharacter',
   /** Combat games: attack with the weapon in hand (aimed where you face). */

@@ -1,3 +1,4 @@
+import type { Box } from '@sp/shared';
 import type * as THREE from 'three';
 import type { QualityPreset } from '@sp/shared';
 import type { MaterialLibrary } from './MaterialLibrary.ts';
@@ -11,6 +12,16 @@ export interface SceneContext {
 export interface FrameInput {
   keyDirX: number;
   keyDirZ: number;
+}
+
+/** A world-space ray from the camera (origin + normalized direction). */
+export interface AimRay {
+  ox: number;
+  oy: number;
+  oz: number;
+  dx: number;
+  dy: number;
+  dz: number;
 }
 
 export interface ClickHit {
@@ -44,8 +55,12 @@ export interface GameScene {
   takeCameraPreset?(): CameraPreset | null;
   onStop(): void;
   onJump(): void;
-  /** Combat games: attack toward `aimYaw` (crosshair) or toward a clicked ground point. */
-  onAttack?(aimYaw: number | null, at?: ClickHit): void;
+  /** Combat games: attack along the aim ray (from the camera through the crosshair / cursor). */
+  onAttack?(ray: AimRay): void;
+  /** Thủ Thành: fire the grappling hook along the aim ray. */
+  onHook?(ray: AimRay): void;
+  /** Boxes the camera must not pass through (walls, towers). */
+  cameraBlockers?(): readonly Box[];
   /** Combat games: left click attacks, right click uses the element. */
   combatAim?(): boolean;
   /** True while shooter-style mouse look makes sense (e.g. walking around in a round). */

@@ -12,7 +12,8 @@ export interface BotIO {
   /** Send a discrete game action. */
   act(action: GameAction): void;
   /** Combat games: attack (same path as a human's right click). */
-  attack(): void;
+  /** Combat games: attack toward (yaw, pitch), or the way the bot faces. */
+  attack(yaw?: number, pitch?: number): void;
 }
 
 /**

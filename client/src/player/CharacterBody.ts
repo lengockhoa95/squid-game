@@ -18,7 +18,8 @@ export interface CharacterBody {
   /** Play a forward somersault (the mid-air jump). */
   flip(): void;
   /** Hold a weapon model in the right hand ('' = empty hands). */
-  setWeapon(model: string): void;
+  /** Weapon in hand ('' = none); `tier` 0–3 makes it glow in its rarity colour. */
+  setWeapon(model: string, tier?: number): void;
   /** Play an attack (swing or shot). */
   attack(ranged: boolean): void;
   setElement(element: string): void;

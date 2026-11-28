@@ -1,5 +1,5 @@
 import type * as THREE from 'three';
-import type { GameAction, MinigameId, QualityPreset, StepFn } from '@sp/shared';
+import type { Box, GameAction, MinigameId, QualityPreset, StepFn } from '@sp/shared';
 import type { MatchState } from '@sp/shared/schema';
 import type { CameraPreset, ClickHit, SceneContext } from '../../core/GameScene.ts';
 import type { ResourceTracker } from '../../core/ResourceTracker.ts';
@@ -22,6 +22,8 @@ export interface MinigameView {
   readonly step: StepFn | null;
   readonly clickTargets: readonly THREE.Object3D[];
   readonly cameraPreset: CameraPreset;
+  /** Solid boxes the aim ray can hit (walls / towers: hook anchors, shot targets). */
+  readonly aimBoxes?: readonly Box[];
   /** Fixed camera focus for stationary games; null = follow the player. */
   cameraFocus(): Readonly<THREE.Vector3> | null;
   update(dt: number, frame: ViewFrame): void;

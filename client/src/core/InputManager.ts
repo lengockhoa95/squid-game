@@ -21,7 +21,7 @@ export const CROSSHAIR_NDC_Y = 0.3;
 
 const GAME_KEYS = new Set([
   ...FORWARD_KEYS, ...BACK_KEYS, ...LEFT_KEYS, ...RIGHT_KEYS,
-  'Space', 'KeyQ', 'KeyE', 'KeyX', 'KeyF', 'F3', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract',
+  'Space', 'KeyQ', 'KeyE', 'KeyX', 'KeyF', 'KeyR', 'F3', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract',
 ]);
 
 function isTypingTarget(target: EventTarget | null): boolean {

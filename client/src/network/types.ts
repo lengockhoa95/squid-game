@@ -36,6 +36,7 @@ export interface NetPlayer {
   readonly moveMul: number;
   readonly weapon: string;
   readonly downed: boolean;
+  readonly weaponTier: number;
 }
 
 /** What networked scenes/HUDs need from the session — keeps them SDK-agnostic. */
@@ -54,7 +55,9 @@ export interface MatchNetAdapter {
   pickElement(element: ElementId): void;
   pickCard(card: CardId): void;
   /** Combat games: attack with the weapon in hand. */
-  sendAttack(aimYaw: number): void;
+  sendAttack(aimYaw: number, aimPitch: number): void;
+  /** Thủ Thành: fire the grappling hook toward (yaw, pitch). */
+  sendHook(aimYaw: number, aimPitch: number): void;
   /** Thủ Thành: pick a weapon card between waves. */
   pickPerk(perk: string): void;
   /** Estimated server game time (seconds) now, extrapolated from the last patch. */

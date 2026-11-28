@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { SLOT_CHARACTERS, SLOT_LOOKS, characterFor } from '@sp/shared';
+import { RARITIES, SLOT_CHARACTERS, SLOT_LOOKS, characterFor } from '@sp/shared';
+import { fxTexture } from '../fx/Particles.ts';
+import { SwingTrail } from '../fx/SwingTrail.ts';
 import type { MaterialLibrary } from '../core/MaterialLibrary.ts';
 import { PlayerModel } from './PlayerModel.ts';
 import { ElementLook, type LookAnchors } from './ElementLook.ts';
@@ -115,6 +117,12 @@ class KenneyBody implements CharacterBody {
   private attackT = -1;
   private attackClip: Clip = 'attack-melee-right';
   private weapon: THREE.Object3D | null = null;
+  private readonly weaponMats: THREE.Material[] = [];
+  private weaponGlow: THREE.Sprite | null = null;
+  private weaponTop = 0.3;
+  private trail: SwingTrail | null = null;
+  private readonly tmpBase = new THREE.Vector3();
+  private readonly tmpTip = new THREE.Vector3();
   /** Right arm held forward (first frame of the "holding-right" clip): used while carrying a weapon. */
   private readonly armHold = new THREE.Quaternion();
   private weaponName = '';
@@ -165,6 +173,23 @@ class KenneyBody implements CharacterBody {
     // Carrying a weapon: the right arm stays raised forward (except while swinging / shooting).
     if (this.weapon && this.attackT < 0 && this.pose === 'normal') this.armR.quaternion.copy(this.armHold);
     this.look?.update(dt);
+    if (this.weaponGlow) this.weaponGlow.material.rotation += dt * 2;
+    if (this.trail && this.weapon) {
+      // The trail lives in world space (added to the scene root on first use).
+      if (!this.trail.mesh.parent) {
+        let top: THREE.Object3D = this.group;
+        while (top.parent) top = top.parent;
+        if (top !== this.group) top.add(this.trail.mesh);
+      }
+      if (this.attackT >= 0) {
+        this.weapon.updateWorldMatrix(true, false);
+        this.tmpBase.set(0, this.weaponTop * 0.25, 0);
+        this.tmpTip.set(0, this.weaponTop * 1.1, 0);
+        this.weapon.localToWorld(this.tmpBase);
+        this.weapon.localToWorld(this.tmpTip);
+        this.trail.push(this.tmpBase, this.tmpTip);
+      } else this.trail.update(dt);
+    }
     if (this.attackT >= 0) {
       this.attackT += dt;
       if (this.attackT >= ATTACK_SECONDS) this.attackT = -1;
@@ -180,13 +205,22 @@ class KenneyBody implements CharacterBody {
     this.flipT = 0;
   }
 
-  setWeapon(model: string): void {
-    if (model === this.weaponName) return;
+  setWeapon(model: string, tier = 0): void {
+    const key = `${model}|${tier}`;
+    if (key === this.weaponName) return;
     this.weapon?.removeFromParent();
+    for (const m of this.weaponMats) m.dispose();
+    this.weaponMats.length = 0;
+    this.weaponGlow?.material.dispose();
+    this.weaponGlow = null;
+    this.trail?.dispose();
+    this.trail = null;
     this.weapon = model ? createWeaponModel(model) : null;
     // Not loaded yet: keep trying on the next state update.
-    this.weaponName = model && !this.weapon ? '' : model;
+    this.weaponName = model && !this.weapon ? '' : key;
     if (!this.weapon) return;
+    this.weaponTop = new THREE.Box3().setFromObject(this.weapon).max.y;
+    this.glowWeapon(this.weapon, tier);
     // In the right fist. Kenney weapons stand up along +y; each one
     // gets its own grip: sword raised forward, spear level, bow upright, gun barrel forward.
     const g = WEAPON_GRIP[model] ?? WEAPON_GRIP['weapon-sword']!;
@@ -198,6 +232,30 @@ class KenneyBody implements CharacterBody {
     // shoulder. Move the grip point (model-space y) onto the fist.
     this.weapon.position.set(-0.25, 0, 0).sub(new THREE.Vector3(0, g.gripY * g.scale, 0).applyQuaternion(q));
     this.armR.add(this.weapon);
+  }
+
+  /** Rarity glow: emissive tint + a soft halo; Truyền thuyết also leaves a golden swing trail. */
+  private glowWeapon(weapon: THREE.Object3D, tier: number): void {
+    if (tier <= 0) return;
+    const color = new THREE.Color(RARITIES[Math.min(tier, RARITIES.length - 1)]!.color);
+    const strength = [0, 0.3, 0.5, 0.85][tier] ?? 0.85;
+    weapon.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((mt) => {
+        const c = mt.clone() as THREE.MeshStandardMaterial;
+        if (c.emissive) c.emissive.copy(color).multiplyScalar(strength);
+        this.weaponMats.push(c);
+        return c;
+      });
+      mesh.material = Array.isArray(mesh.material) ? mats : mats[0]!;
+    });
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: fxTexture('light_01'), color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.35 + tier * 0.15 }));
+    halo.scale.setScalar(0.25 + tier * 0.12);
+    halo.position.y = this.weaponTop * 0.6;
+    weapon.add(halo);
+    this.weaponGlow = halo;
+    if (tier >= 3) this.trail = new SwingTrail(0xffd23f);
   }
 
   attack(ranged: boolean): void {
@@ -224,6 +282,9 @@ class KenneyBody implements CharacterBody {
     if (this.disposed) return;
     this.disposed = true;
     this.look?.dispose();
+    this.trail?.dispose();
+    for (const m of this.weaponMats) m.dispose();
+    this.weaponGlow?.material.dispose();
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.inner);
     this.group.removeFromParent();

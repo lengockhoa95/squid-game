@@ -18,7 +18,7 @@ export interface MinigameContext {
   /** Card "Mạng Phụ": spend a life to cancel a failure. True = the player is saved. */
   tryRescue?(id: string): boolean;
   /** Draw a short visual effect (slash, shot…) for everyone; (x2, z2) is an optional second point. */
-  flash?(kind: string, ownerId: string, x: number, z: number, x2?: number, z2?: number): void;
+  flash?(kind: string, ownerId: string, x: number, z: number, x2?: number, z2?: number, y1?: number, y2?: number): void;
 }
 
 export interface RoundOutcome {
@@ -44,7 +44,9 @@ export interface ServerMinigame {
   /** Non-movement games that support the SWAP element: exchange two players' progress. */
   swapPlayers?(a: string, b: string): boolean;
   /** Combat games: the player attacks with their weapon (facing direction). */
-  handleAttack?(id: string, gameTime: number, aimYaw?: number): void;
+  handleAttack?(id: string, gameTime: number, aimYaw?: number, aimPitch?: number): void;
+  /** Móc câu: aim (yaw, pitch) at a ledge and get reeled up. */
+  handleHook?(id: string, gameTime: number, aimYaw: number, aimPitch: number): void;
   /**
    * PvE games: an element cast handled by the game (e.g. lightning on monsters). Return true/false
    * when handled (cast used / rejected), undefined to fall back to the normal element effect.

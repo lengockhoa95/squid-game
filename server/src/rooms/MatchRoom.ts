@@ -34,6 +34,7 @@ const RATE_LIMITS = {
   [MSG.GAME_TOGGLE]: { perSecond: 10, burst: 16 },
   [MSG.CASTLE_WAVES]: { perSecond: 5, burst: 8 },
   [MSG.CASTLE_PERK]: { perSecond: 4, burst: 6 },
+  [MSG.HOOK]: { perSecond: 4, burst: 4 },
   [MSG.PICK_CHARACTER]: { perSecond: 6, burst: 6 },
   [MSG.ATTACK]: { perSecond: 12, burst: 6 },
   [MSG.ELEMENT_TOGGLE]: { perSecond: 10, burst: 16 },
@@ -161,8 +162,15 @@ export class MatchRoom extends Room {
     });
     this.onMessage(MSG.ATTACK, (client, msg: unknown) => {
       if (!this.allow(client, MSG.ATTACK)) return;
-      const yaw = (msg as { yaw?: unknown } | null)?.yaw;
-      this.controller.attack(client.sessionId, typeof yaw === 'number' && Number.isFinite(yaw) ? yaw : undefined);
+      const m = msg as { yaw?: unknown; pitch?: unknown } | null;
+      const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+      this.controller.attack(client.sessionId, num(m?.yaw), num(m?.pitch));
+    });
+    this.onMessage(MSG.HOOK, (client, msg: unknown) => {
+      if (!this.allow(client, MSG.HOOK)) return;
+      const m = msg as { yaw?: unknown; pitch?: unknown } | null;
+      if (typeof m?.yaw !== 'number' || typeof m.pitch !== 'number' || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) return;
+      this.controller.hook(client.sessionId, m.yaw, m.pitch);
     });
     this.onMessage(MSG.PICK_CARD, (client, msg: unknown) => {
       if (!this.allow(client, MSG.PICK_CARD)) return;

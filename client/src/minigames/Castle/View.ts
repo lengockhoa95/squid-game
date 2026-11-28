@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  CASTLE, CASTLE_LOW_WALLS, MONSTERS, PIT, PLAYER_HP, RARITIES, WEAPONS, applyPitTiles, castleStep, createCastleWorld, isBoss, isWeaponId,
+  MAP, MOAT, MONSTERS, PIT, PLAYER_HP, castleStairs, sidePoint, RARITIES, WEAPONS, applyPitTiles, castleStep, createCastleWorld, isBoss, isWeaponId,
   type MonsterKind, type QualityPreset,
 } from '@sp/shared';
 import type { MatchState } from '@sp/shared/schema';
@@ -14,8 +14,13 @@ import { MonsterModel, loadMonsters, monstersLoaded, type MonsterAnim } from './
 import { buildCastle, loadCastleKit } from './castleKit.ts';
 import { grassTexture, roadTexture } from './ground.ts';
 import { Particles } from '../../fx/Particles.ts';
+import { DamageNumbers } from '../../fx/DamageNumbers.ts';
 
 const DEG = Math.PI / 180;
+/** Where damage numbers start (above the head). */
+const MONSTER_TOP: Record<string, number> = { SLIME: 1.1, SKELETON: 1.9, BAT: 1.2, ARCHER: 1.9, SHIELD: 1.9, BOMBER: 1.4, DRAGON: 4.2, MINOTAUR: 4.8, SLIME_KING: 3.4 };
+/** Elite affix colours. */
+const ELITE_COLOR: Record<string, number> = { FAST: 0xffd23f, ARMOR: 0x9fb3d6, EXPLODE: 0xff5a2f, GIANT: 0xc77dff };
 
 interface MonsterEntity {
   /** Positioned holder (HP bar lives here, unrotated); the model inside it turns with the monster. */
@@ -26,6 +31,10 @@ interface MonsterEntity {
   hpFg: THREE.Sprite;
   lastHit: number;
   dead: boolean;
+  /** Health last frame (damage numbers) and the elite / enraged look applied. */
+  prevHp: number;
+  scale: number;
+  look: string;
   punch: number;
   real: boolean;
 }
@@ -49,6 +58,8 @@ class CastleView implements MinigameView {
   /** Client copy of the collision world: pit tiles follow the synced state. */
   private readonly cw = createCastleWorld();
   readonly step = castleStep(this.cw);
+  /** Walls, towers, keep, stairs: the aim ray stops on them (hook anchors). */
+  readonly aimBoxes = this.cw.world.boxes.filter((b) => b.top > 0.5 && b.bottom === undefined);
   private tilesSig = '';
   private readonly hazards: CastleHazardsView;
   private readonly bars = new Map<string, PlayerBar>();
@@ -62,8 +73,6 @@ class CastleView implements MinigameView {
   readonly cameraPreset = { yaw: 0, pitch: 34 * DEG, distance: 12 };
   private readonly root: THREE.Object3D;
   private readonly lights: StageLights;
-  private readonly gate: THREE.Mesh;
-  private readonly gateMat: THREE.MeshLambertMaterial;
   private readonly monsters = new Map<number, MonsterEntity>();
   private readonly pickups = new Map<number, PickupEntity>();
   private readonly fallbackMat: THREE.Material;
@@ -75,8 +84,9 @@ class CastleView implements MinigameView {
   private readonly beamGeo: THREE.BufferGeometry;
   private loaded = false;
   private readonly fx = new Particles();
+  private readonly numbers = new DamageNumbers();
   private disposed = false;
-  private kitGate: THREE.Object3D | null = null;
+  private kitGates: Array<THREE.Object3D | null> = [];
   private time = 0;
 
   constructor(root: THREE.Object3D, scene: THREE.Scene, ctx: SceneContext, res: ResourceTracker) {
@@ -85,58 +95,63 @@ class CastleView implements MinigameView {
     this.lights = new StageLights(root, 22);
     const m = ctx.materials;
     const unit = res.track(new THREE.BoxGeometry(1, 1, 1));
-    const h = CASTLE.halfWidth;
-    // Textured grass (procedural) and a dirt road from the monster lair to the gate.
-    const minZ = CASTLE.spawnZ - 20;
-    const maxZ = CASTLE.gateZ + 40;
+    // Textured grass on every floor box of the collision world (the four pit bands are holes),
+    // plus a wide skirt beyond the battlefield.
     const grass = res.track(grassTexture());
-    grass.repeat.set(80 / 8, (maxZ - minZ) / 8);
+    grass.wrapS = grass.wrapT = THREE.RepeatWrapping;
     const groundMat = res.track(new THREE.MeshLambertMaterial({ map: grass }));
-    // Grass everywhere except the collapsing-floor band (that is tiles over an abyss).
-    const pitMaxZ = PIT.minZ + PIT.rows * PIT.tile;
+    const tileSet = new Set(this.cw.tiles);
     const groundPiece = (x0: number, x1: number, z0: number, z1: number) => {
-      const g = new THREE.Mesh(res.track(new THREE.PlaneGeometry(x1 - x0, z1 - z0).rotateX(-Math.PI / 2)), groundMat);
+      const geo = res.track(new THREE.PlaneGeometry(x1 - x0, z1 - z0).rotateX(-Math.PI / 2));
+      // World-space UVs so neighbouring pieces line up (one texture tile per 8 m).
+      const uv = geo.getAttribute('uv');
+      const pos = geo.getAttribute('position');
+      for (let k = 0; k < uv.count; k++) uv.setXY(k, (pos.getX(k) + (x0 + x1) / 2) / 8, (pos.getZ(k) + (z0 + z1) / 2) / 8);
+      const g = new THREE.Mesh(geo, groundMat);
       g.position.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
       g.receiveShadow = true;
       root.add(g);
       this.clickTargets.push(g);
     };
-    groundPiece(-40, 40, minZ, PIT.minZ);
-    groundPiece(-40, 40, pitMaxZ, maxZ);
-    groundPiece(-40, -h, PIT.minZ, pitMaxZ);
-    groundPiece(h, 40, PIT.minZ, pitMaxZ);
-    const roadPiece = (z0: number, z1: number) => {
-      const tex = res.track(roadTexture());
-      tex.repeat.set(1, (z1 - z0) / 8);
-      const mesh = new THREE.Mesh(res.track(new THREE.PlaneGeometry(9, z1 - z0).rotateX(-Math.PI / 2)), res.track(new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false })));
-      mesh.position.set(0, 0.02, (z0 + z1) / 2);
-      mesh.receiveShadow = true;
-      root.add(mesh);
-    };
-    roadPiece(CASTLE.spawnZ - 2, PIT.minZ);
-    roadPiece(pitMaxZ, CASTLE.gateZ + 1);
+    for (const b of this.cw.world.boxes) {
+      if (b.top === 0 && b.bottom === -1 && !tileSet.has(b)) groundPiece(b.minX, b.maxX, b.minZ, b.maxZ);
+    }
+    const H = MAP.half;
+    const F = H + 40;
+    groundPiece(-F, F, -F, -H);
+    groundPiece(-F, F, H, F);
+    groundPiece(-F, -H, -H, H);
+    groundPiece(H, F, -H, H);
+    // Dirt roads from each lair to its gate (cut by the moat and the pit band).
+    const pitOut = PIT.rIn + PIT.rows * PIT.tile;
+    for (let side = 0; side < 4; side++) {
+      for (const [r0, r1] of [[MAP.wallOut, MOAT.rIn], [MOAT.rOut, PIT.rIn], [pitOut, MAP.lairR + 1]] as const) {
+        const tex = res.track(roadTexture());
+        tex.repeat.set(1, (r1 - r0) / 8);
+        const a = sidePoint(side, (r0 + r1) / 2, 0);
+        const mesh = new THREE.Mesh(
+          res.track(new THREE.PlaneGeometry(7, r1 - r0).rotateX(-Math.PI / 2)),
+          res.track(new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false })),
+        );
+        mesh.position.set(a.x, 0.02, a.z);
+        mesh.rotation.y = side % 2 === 0 ? 0 : Math.PI / 2;
+        mesh.receiveShadow = true;
+        root.add(mesh);
+      }
+    }
     this.hazards = new CastleHazardsView(root, m, res);
     this.materials = m;
+    // Simple stone blocks (the collision boxes) until the Castle Kit models are loaded.
     const placeholders = new THREE.Group();
     root.add(placeholders);
-    // Castle wall (a low parapet so the camera behind the players can see over it), towers, gate.
     const stone = m.lambert(0x9a96a8);
-    placeholders.add(placeBox(new THREE.Mesh(unit, stone), -h, -2.2, CASTLE.gateZ + 0.5, CASTLE.gateZ + 2, 0, 1.5));
-    placeholders.add(placeBox(new THREE.Mesh(unit, stone), 2.2, h, CASTLE.gateZ + 0.5, CASTLE.gateZ + 2, 0, 1.5));
-    for (const x of [-h, h]) placeholders.add(placeBox(new THREE.Mesh(unit, m.lambert(0x857f96)), x - 1.5, x + 1.5, CASTLE.gateZ - 0.5, CASTLE.gateZ + 2.5, 0, 5));
-    for (const x of [-3, 3]) placeholders.add(placeBox(new THREE.Mesh(unit, m.lambert(0x857f96)), x - 0.8, x + 0.8, CASTLE.gateZ + 0.3, CASTLE.gateZ + 2.2, 0, 2.4));
-    this.gateMat = res.track(new THREE.MeshLambertMaterial({ color: 0x8b5a2b }));
-    this.gate = placeBox(new THREE.Mesh(unit, this.gateMat), -2.2, 2.2, CASTLE.gateZ + 0.6, CASTLE.gateZ + 1, 0, 1.8);
-    this.gate.castShadow = true;
-    placeholders.add(this.gate);
-    // Low walls (same as the collision world).
-    for (const b of CASTLE_LOW_WALLS) {
-      const wall = placeBox(new THREE.Mesh(unit, stone), b.minX, b.maxX, b.minZ, b.maxZ, 0, b.top);
-      wall.castShadow = true;
-      placeholders.add(wall);
+    const stairs = new Set(castleStairs().map((b) => `${b.minX},${b.minZ},${b.top}`));
+    for (const b of this.cw.world.boxes) {
+      if (b.bottom !== undefined || b.top <= 0.5 || stairs.has(`${b.minX},${b.minZ},${b.top}`)) continue;
+      const block = placeBox(new THREE.Mesh(unit, stone), b.minX, b.maxX, b.minZ, b.maxZ, 0, b.top);
+      block.castShadow = true;
+      placeholders.add(block);
     }
-    // Monster gate in the distance.
-    placeholders.add(placeBox(new THREE.Mesh(unit, m.lambert(0x3b2d4a)), -6, 6, CASTLE.spawnZ - 3, CASTLE.spawnZ - 2, 0, 4));
     this.fallbackMat = m.lambert(0x6ad36a);
     this.hpBgMat = res.track(new THREE.SpriteMaterial({ color: 0x222233, depthTest: false }));
     this.hpFgMat = res.track(new THREE.SpriteMaterial({ color: 0xff4f6d, depthTest: false }));
@@ -158,9 +173,9 @@ class CastleView implements MinigameView {
       if (kit.root.children.length === 0) return;
       placeholders.visible = false;
       root.add(kit.root);
-      this.kitGate = kit.gate;
+      this.kitGates = kit.gates;
     });
-    root.add(this.fx.root);
+    root.add(this.fx.root, this.numbers.root);
     this.applyQuality(ctx.quality);
   }
 
@@ -180,15 +195,13 @@ class CastleView implements MinigameView {
       }
       this.hazards.update(dt, castle);
       this.updateBars(dt, frame.state);
-      // Gate: wood → red as it breaks.
-      const ratio = castle.gateMax > 0 ? castle.gate / castle.gateMax : 1;
-      this.gateMat.color.setRGB(0.55 + (1 - ratio) * 0.45, 0.35 * ratio, 0.17 * ratio);
-      this.gate.visible = castle.gate > 0;
-      if (this.kitGate) {
-        // Kit gate: sinks and shakes as it breaks.
-        this.kitGate.visible = castle.gate > 0;
-        this.kitGate.position.x = ratio < 0.5 ? Math.sin(this.time * 30) * 0.04 * (1 - ratio) : 0;
-      }
+      // Gates shake when badly damaged and vanish when broken.
+      this.kitGates.forEach((g, i) => {
+        if (!g) return;
+        const ratio = castle.gateMax > 0 ? (castle.gates[i] ?? 0) / castle.gateMax : 1;
+        g.visible = ratio > 0;
+        g.position.y = 1.7 + (ratio < 0.4 ? Math.sin(this.time * 30 + i) * 0.05 : 0);
+      });
       // Monsters: create/update/remove by id; rebuild placeholders once real models load.
       const seen = new Set<number>();
       castle.monsters.forEach((mon) => {
@@ -216,19 +229,34 @@ class CastleView implements MinigameView {
         const boss = isBoss(e.kind);
         const mid = { x: g.position.x, y: g.position.y + (boss ? 2 : 0.6), z: g.position.z };
         if (mon.hitAt !== e.lastHit) {
-          if (e.lastHit !== -1) this.fx.sparks(mid, 0xff6a4f, 5, 3);
+          if (e.lastHit !== -1) this.fx.sparks(mid, mon.crit ? 0xffd23f : 0xff6a4f, mon.crit ? 9 : 5, 3);
           e.lastHit = mon.hitAt;
-          e.punch = 0.18;
+          e.punch = mon.crit ? 0.28 : 0.18;
+        }
+        if (mon.hp < e.prevHp) {
+          const h = (MONSTER_TOP[e.kind] ?? 1.5) * e.scale;
+          this.numbers.show(g.position.x, g.position.y + h, g.position.z, e.prevHp - mon.hp, mon.crit);
+        }
+        e.prevHp = mon.hp;
+        // Elites: bigger, tinted and glowing by affix; enraged bosses glow red.
+        const look = `${mon.elite}|${mon.enraged}`;
+        if (look !== e.look) {
+          e.look = look;
+          e.scale = mon.elite === 'GIANT' ? 1.8 : mon.elite ? 1.35 : 1;
+          const color = ELITE_COLOR[mon.elite] ?? 0xff3b3b;
+          if (mon.elite) {
+            e.model.tint(color, 0.3);
+            e.model.glow(color, 0.35);
+          }
+          if (mon.enraged) e.model.glow(0xff2a1a, 0.6);
         }
         if (mon.state === 'DIE' && !e.dead) {
           e.dead = true;
           this.fx.smoke(mid, boss ? 4 : 1.4, boss ? 10 : 4);
         }
         e.punch = Math.max(0, e.punch - dt);
-        e.model.root.scale.setScalar(1 + e.punch);
-        const top =
-          e.kind === 'DRAGON' ? 4.2 : e.kind === 'MINOTAUR' ? 4.6 : e.kind === 'SLIME_KING' ? 3.8
-            : MONSTERS[e.kind].fly > 0 ? 1.2 : e.kind === 'SKELETON' ? 2 : 1.3;
+        e.model.root.scale.setScalar(e.scale * (1 + e.punch));
+        const top = (MONSTER_TOP[e.kind] ?? 1.5) * e.scale + 0.1;
         const width = boss ? 3 : 1;
         const hp = Math.max(0, mon.hp / (mon.maxHp || 1));
         e.hpBg.position.set(0, top, 0);
@@ -278,6 +306,7 @@ class CastleView implements MinigameView {
       }
     }
     this.fx.update(dt);
+    this.numbers.update(dt);
     this.lights.follow(frame.focus);
   }
 
@@ -296,6 +325,7 @@ class CastleView implements MinigameView {
   dispose(): void {
     this.disposed = true;
     this.fx.dispose();
+    this.numbers.dispose();
     this.hazards.dispose();
     for (const b of this.bars.values()) {
       b.bg.removeFromParent();
@@ -321,7 +351,7 @@ class CastleView implements MinigameView {
     hpFg.renderOrder = 10;
     holder.add(hpBg, hpFg);
     this.root.add(holder);
-    const e: MonsterEntity = { holder, model, kind, hpBg, hpFg, lastHit: -1, dead: false, punch: 0, real: monstersLoaded() };
+    const e: MonsterEntity = { holder, model, kind, hpBg, hpFg, lastHit: -1, dead: false, punch: 0, real: monstersLoaded(), prevHp: Infinity, scale: 1, look: '' };
     this.monsters.set(id, e);
     return e;
   }

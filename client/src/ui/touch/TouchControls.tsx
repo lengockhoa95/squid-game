@@ -133,6 +133,19 @@ export function TouchControls({ engine }: { engine: RefObject<GameEngine | null>
           {vi.touchAttack}
         </button>
       )}
+      {combat && (
+        <button
+          type="button"
+          className="touch-btn touch-hook"
+          aria-label={vi.touchHook}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            engine.current?.hook();
+          }}
+        >
+          {vi.touchHook}
+        </button>
+      )}
     </div>
   );
 }

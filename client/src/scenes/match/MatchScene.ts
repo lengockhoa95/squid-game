@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import {
-  CARDS, ELEMENTS, INPUT_BATCH, MINIGAMES, TEAM_ZOMBIE, WEAPONS, characterFor, isWeaponId, parseCards, SLOT_LOOKS, effectStep, isElementId, type MinigameId, type MoveBatch, type QualityPreset, type StepFn,
+  CARDS, ELEMENTS, INPUT_BATCH, MINIGAMES, rayBox, TEAM_ZOMBIE, WEAPONS, characterFor, isWeaponId, parseCards, SLOT_LOOKS, effectStep, isElementId, type Box, type MinigameId, type MoveBatch, type QualityPreset, type StepFn,
 } from '@sp/shared';
-import type { CameraPreset, ClickHit, FrameInput, GameScene, SceneContext } from '../../core/GameScene.ts';
+import type { AimRay, CameraPreset, ClickHit, FrameInput, GameScene, SceneContext } from '../../core/GameScene.ts';
 import { ResourceTracker } from '../../core/ResourceTracker.ts';
 import type { CharacterBody, Pose } from '../../player/CharacterBody.ts';
 import { createCharacterBody } from '../../player/characters.ts';
@@ -20,6 +20,8 @@ import { elementUi } from '../../elements/elementUi.ts';
 const MAX_STEPS_PER_FRAME = 6;
 /** Other players are drawn this far in the past so there are always two snapshots to blend. */
 const RENDER_DELAY_MS = 100;
+/** Monster model heights (aiming at their centre). */
+const MONSTER_HEIGHT: Record<string, number> = { SLIME: 0.9, SKELETON: 1.6, BAT: 0.9, ARCHER: 1.6, SHIELD: 1.6, BOMBER: 0.9, DRAGON: 3.6, MINOTAUR: 4.5, SLIME_KING: 2.8 };
 /** How long a character keeps facing its attack direction. */
 const FACE_ATTACK_MS = 450;
 
@@ -217,26 +219,76 @@ class MatchScene implements GameScene {
     this.castAt(hit);
   }
 
+  cameraBlockers(): readonly Box[] {
+    return this.view?.aimBoxes ?? [];
+  }
+
   combatAim(): boolean {
     const game = this.net.getState()?.currentGame as MinigameId | undefined;
     return !!game && MINIGAMES[game]?.combat === true && this.net.getPhase() === 'ROUND_PLAYING';
   }
 
-  onAttack(aimYaw: number | null, at?: ClickHit): void {
+  onAttack(ray: AimRay): void {
     const me = this.localPlayer();
     if (!me || !me.alive || me.roundState !== 'ACTIVE' || !this.combatAim()) return;
     if (elementUi.get().aiming) {
       // Element button armed: this click uses the element instead.
       elementUi.set({ aiming: false });
-      this.castAt(at ?? null);
+      const t = ray.dy < -1e-3 ? -ray.oy / ray.dy : 20;
+      this.castAt({ x: ray.ox + ray.dx * t, y: 0, z: ray.oz + ray.dz * t, object: this.root, instanceId: undefined });
       return;
     }
-    let yaw = aimYaw;
+    const aim = this.aimFrom(ray, 1.0, true);
+    if (!aim) return;
+    this.faceToward(this.net.localId, aim.yaw); // turn at once, the server confirms with the slash/shot
+    this.net.sendAttack(aim.yaw, aim.pitch);
+  }
+
+  onHook(ray: AimRay): void {
+    const me = this.localPlayer();
+    if (!me || !me.alive || me.roundState !== 'ACTIVE' || me.downed || !this.combatAim()) return;
+    const aim = this.aimFrom(ray, 1.2, false);
+    if (aim) this.net.sendHook(aim.yaw, aim.pitch);
+  }
+
+  /**
+   * Third-person aiming: find what the camera ray points at (a monster, a wall, the ground or far
+   * away) and return the yaw / pitch from the character's chest to that point.
+   */
+  private aimFrom(ray: AimRay, chest: number, monsters: boolean): { yaw: number; pitch: number } | null {
     const pos = this.actors.get(this.net.localId)?.model.group.position;
-    if (yaw === null && at && pos) yaw = Math.atan2(at.x - pos.x, at.z - pos.z);
-    if (yaw === null) return;
-    this.faceToward(this.net.localId, yaw); // turn at once, the server confirms with the slash/shot
-    this.net.sendAttack(yaw);
+    if (!pos) return null;
+    const camDist = Math.hypot(pos.x - ray.ox, pos.y + chest - ray.oy, pos.z - ray.oz);
+    let best = camDist + 30;
+    const castle = this.net.getState()?.castle;
+    if (monsters && castle) {
+      castle.monsters.forEach((m) => {
+        if (m.state === 'DIE') return;
+        const scale = m.elite === 'GIANT' ? 1.8 : m.elite ? 1.35 : 1;
+        const cy = m.y + ((MONSTER_HEIGHT[m.kind] ?? 1.4) * scale) / 2;
+        const vx = m.x - ray.ox;
+        const vy = cy - ray.oy;
+        const vz = m.z - ray.oz;
+        const t = vx * ray.dx + vy * ray.dy + vz * ray.dz;
+        if (t < camDist * 0.6 || t >= best) return;
+        const perp = Math.hypot(vx - ray.dx * t, vy - ray.dy * t, vz - ray.dz * t);
+        if (perp < 0.8 * scale + (m.kind === 'DRAGON' || m.kind === 'MINOTAUR' || m.kind === 'SLIME_KING' ? 1.5 : 0.3)) best = t;
+      });
+    }
+    for (const b of this.view?.aimBoxes ?? []) {
+      const t = rayBox(ray.ox, ray.oy, ray.oz, ray.dx, ray.dy, ray.dz, b);
+      if (t !== null && t > camDist * 0.8 && t < best) best = t + 0.05;
+    }
+    if (ray.dy < -1e-3) {
+      const t = -ray.oy / ray.dy;
+      if (t > camDist * 0.8 && t < best) best = t;
+    }
+    const tx = ray.ox + ray.dx * best;
+    const ty = ray.oy + ray.dy * best;
+    const tz = ray.oz + ray.dz * best;
+    const hx = tx - pos.x;
+    const hz = tz - pos.z;
+    return { yaw: Math.atan2(hx, hz), pitch: Math.atan2(ty - (pos.y + chest), Math.hypot(hx, hz) || 1e-3) };
   }
 
   /** Show a character facing its attack direction for a moment (attacks can go any way). */
@@ -397,7 +449,7 @@ class MatchScene implements GameScene {
       actor.airJumps = p.airJumps;
       actor.model.setElement(p.element);
       actor.model.setAura(this.awakenColor(p.cards));
-      actor.model.setWeapon(isWeaponId(p.weapon) ? WEAPONS[p.weapon].model : '');
+      actor.model.setWeapon(isWeaponId(p.weapon) ? WEAPONS[p.weapon].model : '', p.weaponTier);
       if (p.id === this.net.localId) this.syncLocal(p, actor, now);
       else actor.interp.push(now, p.x, p.y, p.z, p.yaw, Math.hypot(p.vx, p.vz), p.grounded);
     });

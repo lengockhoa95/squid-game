@@ -534,39 +534,127 @@ describe('Castle (Thủ Thành)', () => {
     expect(a.state.hp).toBe(PLAYER_HP.reviveHp);
   });
 
-  it('map hazards: falling through a dropped tile hurts and respawns; the moat slows; pads launch onto the wall; the gate lets players through', async () => {
-    const { castleStep, createCastleWorld, applyPitTiles, pitTileBox, PIT_GONE, PIT_TILE_COUNT, MOAT, PADS, WALL_TOP, CASTLE, YARD } = await import('@sp/shared');
-    const { createCharacterState: createCharacter } = await import("@sp/shared");
+  it('map (4 sides): pit holes, the moat slows, pads and stairs lead up, doorways let players into the yard', async () => {
+    const sh = await import('@sp/shared');
+    const { castleStep, createCastleWorld, applyPitTiles, pitTileBox, PIT_GONE, PIT_TILE_COUNT, padPoint, sidePoint, WALL_TOP, CASTLE_TOWER_TOP, KEEP_TOP, KEEP } = sh;
+    const createCharacter = sh.createCharacterState;
     const cw = createCastleWorld();
     const step = castleStep(cw);
+    const walk = (s: ReturnType<typeof createCharacter>, dx: number, dz: number, sec: number) => {
+      for (let i = 0; i < Math.round(sec * 60); i++) step(s, { dirX: dx, dirZ: dz, jump: false }, 1 / 60, 0);
+    };
+    // Pit: a dropped tile is a hole.
     const tiles = new Array(PIT_TILE_COUNT).fill(0);
-    tiles[3] = PIT_GONE;
+    tiles[37] = PIT_GONE;
     applyPitTiles(cw, tiles);
-    const box = pitTileBox(3);
-    const s = createCharacter((box.minX + box.maxX) / 2, (box.minZ + box.maxZ) / 2);
-    for (let i = 0; i < 60; i++) step(s, { dirX: 0, dirZ: 0, jump: false }, 1 / 60, 0);
-    expect(s.y).toBeLessThan(-1); // fell into the pit
-    // Moat: walking is slower than on the bank.
-    const wade = createCharacter(0, (MOAT.minZ + MOAT.maxZ) / 2);
-    const dry = createCharacter(0, 6);
-    for (let i = 0; i < 30; i++) {
-      step(wade, { dirX: 1, dirZ: 0, jump: false }, 1 / 60, 0);
-      step(dry, { dirX: 1, dirZ: 0, jump: false }, 1 / 60, 0);
-    }
-    expect(wade.x).toBeLessThan(dry.x * 0.75);
-    // Jump pad → standing on the wall walkway.
-    const pad = createCharacter(PADS[0]!.x, PADS[0]!.z);
-    let best = 0;
-    for (let i = 0; i < 120; i++) {
+    const box = pitTileBox(37);
+    const faller = createCharacter((box.minX + box.maxX) / 2, (box.minZ + box.maxZ) / 2);
+    walk(faller, 0, 0, 1);
+    expect(faller.y).toBeLessThan(-1);
+    // Moat (north side, off the bridge) is slower than dry land.
+    const wade = createCharacter(sidePoint(0, 19, 8).x, sidePoint(0, 19, 8).z);
+    const dry = createCharacter(sidePoint(0, 30, 8).x, sidePoint(0, 30, 8).z);
+    const x0 = wade.x;
+    const x1 = dry.x;
+    walk(wade, 1, 0, 0.5);
+    walk(dry, 1, 0, 0.5);
+    expect(wade.x - x0).toBeLessThan((dry.x - x1) * 0.75);
+    // Jump pad → on the wall walkway.
+    const pad = createCharacter(padPoint(2).x, padPoint(2).z);
+    let top = 0;
+    for (let i = 0; i < 150; i++) {
       step(pad, { dirX: 0, dirZ: 0, jump: false }, 1 / 60, 0);
-      if (pad.grounded) best = Math.max(best, pad.y);
+      if (pad.grounded) top = Math.max(top, pad.y);
     }
-    expect(best).toBeCloseTo(WALL_TOP, 1);
-    // Walk through the doorway into the castle grounds.
-    const walker = createCharacter(0, CASTLE.gateZ - 1);
-    for (let i = 0; i < 90; i++) step(walker, { dirX: 0, dirZ: 1, jump: false }, 1 / 60, 0);
-    expect(walker.z).toBeGreaterThan(CASTLE.gateZ + 3);
-    expect(walker.z).toBeLessThan(YARD.backZ);
+    expect(top).toBeCloseTo(WALL_TOP, 1);
+    // South doorway: walk straight in from outside, stopped by the keep.
+    const walker = createCharacter(0, 18);
+    walk(walker, 0, -1, 3);
+    expect(walker.z).toBeLessThan(12);
+    expect(walker.z).toBeGreaterThan(KEEP.lowHalf);
+    // Yard stairs (north side, lateral −8.4…−6) up to the walkway, then on to the corner tower top.
+    const climber = createCharacter(sidePoint(0, 6.5, -7.2).x, sidePoint(0, 6.5, -7.2).z);
+    walk(climber, 0, -1, 0.95); // north = −z
+    expect(climber.y).toBeCloseTo(WALL_TOP, 1);
+    walk(climber, 1, 0, 3); // along the walkway toward +x, over the doorway, up the tower stairs
+    expect(climber.y).toBeCloseTo(CASTLE_TOWER_TOP, 1);
+    // Keep: east stairs up to the terrace, then the north flight to the roof.
+    const keeper = createCharacter(5.7, 4.8);
+    walk(keeper, 0, -1, 1.45);
+    expect(keeper.y).toBeCloseTo(CASTLE_TOWER_TOP, 1);
+    keeper.x = 4.95;
+    keeper.z = -4;
+    walk(keeper, -1, 0, 1.15); // up the roof flight
+    walk(keeper, 0, 1, 0.5);
+    expect(keeper.y).toBeCloseTo(KEEP_TOP, 1);
+  });
+
+  it('grappling hook reels you up onto the ledge you aim at; ranged shots aimed up hit a flyer', async () => {
+    const { Castle } = await import('../Castle/Logic.ts');
+    const { CASTLE, CASTLE_TOWER_TOP, HOOK } = await import('@sp/shared');
+    const { ctx, players, match } = makeContext(1);
+    const game = new Castle();
+    game.initialize(ctx);
+    const p = players[0]!;
+    // Standing in the yard south of the keep, aiming at its wall (north, slightly up).
+    p.sim.reset(0, 9, Math.PI);
+    game.handleHook(p.id, 1, Math.PI, 0.35);
+    expect(p.state.hookUntil).toBeGreaterThan(1);
+    // In a match the step is wrapped with effectStep (statuses, the hook pull).
+    const { effectStep, createElementField } = await import('@sp/shared');
+    const wrapped = effectStep(game.step!, createElementField(), p.state, p.id);
+    for (let i = 0; i < 72; i++) wrapped(p.sim.state, { dirX: 0, dirZ: 0, jump: false }, 1 / 60, 1 + i / 60);
+    expect(p.sim.state.y).toBeCloseTo(CASTLE_TOWER_TOP, 1);
+    // Cooldown.
+    const until = p.state.hookUntil;
+    game.handleHook(p.id, 2, Math.PI, 0.35);
+    expect(p.state.hookUntil).toBe(until);
+    expect(HOOK.cooldown).toBeGreaterThan(1);
+    // A bat flying high: a level shot misses, an upward shot hits.
+    let t = run(game, players, 2.2, CASTLE.prepSeconds + 3);
+    const m = match.castle!.monsters.find((mm) => mm.state !== 'DIE')!;
+    p.state.weapon = 'GUN';
+    p.sim.reset(m.x, m.z + 8, Math.PI);
+    m.y = 6;
+    const hp = m.hp;
+    game.handleAttack(p.id, t, Math.PI, 0);
+    expect(m.hp).toBe(hp);
+    t += 1;
+    m.y = 6;
+    game.handleAttack(p.id, t, Math.PI, Math.atan2(6 + 0.45 - 1, 8));
+    expect(m.hp).toBeLessThan(hp);
+  });
+
+  it('gates: monsters break a gate, then attack the keep; shields block frontal hits', async () => {
+    const { Castle } = await import('../Castle/Logic.ts');
+    const { CASTLE, MAP, sidePoint } = await import('@sp/shared');
+    const { ctx, players, match } = makeContext(1);
+    const game = new Castle();
+    game.initialize(ctx);
+    const p = players[0]!;
+    p.sim.reset(0, 0, 0);
+    p.sim.state.y = 30; // out of reach (no fighting): just watch
+    let t = run(game, players, 0, CASTLE.prepSeconds + 1);
+    const castle = match.castle!;
+    // Keep everything alive and close to gates.
+    t = run(game, players, t, 40);
+    expect(castle.gates.some((g) => g < CASTLE.gateHp)).toBe(true);
+    // Shield: hit from the front barely hurts, from behind fully.
+    const sh = (game as unknown as { spawn(k: string, t: number, hp: number, side: number, at?: { x: number; z: number }): { m: { hp: number; yaw: number; x: number; z: number } } }).spawn('SHIELD', t, 10, 0, sidePoint(0, 25, 0));
+    sh.m.yaw = 0; // facing +z (toward the castle from the north)
+    const hp = sh.m.hp;
+    p.sim.state.y = 0;
+    p.sim.reset(sh.m.x, sh.m.z + 1.5, Math.PI);
+    t += 1;
+    game.handleAttack(p.id, t, Math.PI, 0);
+    const front = hp - sh.m.hp;
+    p.sim.reset(sh.m.x, sh.m.z - 1.5, 0);
+    t += 1;
+    game.handleAttack(p.id, t, 0, 0);
+    const back = hp - front - sh.m.hp;
+    expect(front).toBeGreaterThan(0);
+    expect(back).toBeGreaterThan(front * 3);
+    void MAP;
   });
 
   it('weapon cards: Thương Xuyên Thấu hits a whole line, Đạn Nảy hops to a second monster', async () => {

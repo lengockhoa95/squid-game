@@ -86,4 +86,4 @@ export function isElementId(v: unknown): v is ElementId {
 }
 
 /** Kinds stored in MatchState.effects. */
-export type EffectKind = 'PILLAR' | 'PUDDLE' | 'CLONE' | 'BOLT' | 'WIND' | 'BLINK' | 'SWAP' | 'DARK' | 'FIRE' | 'RESCUE' | 'BUMP' | 'SLASH' | 'SHOT' | 'BREATH' | 'GATE_HIT' | 'QUAKE' | 'TORNADO' | 'THRUST';
+export type EffectKind = 'PILLAR' | 'PUDDLE' | 'CLONE' | 'BOLT' | 'WIND' | 'BLINK' | 'SWAP' | 'DARK' | 'FIRE' | 'RESCUE' | 'BUMP' | 'SLASH' | 'SHOT' | 'BREATH' | 'GATE_HIT' | 'QUAKE' | 'TORNADO' | 'THRUST' | 'HOOK' | 'MSHOT' | 'EXPLODE' | 'GATE_BREAK' | 'ENRAGE';

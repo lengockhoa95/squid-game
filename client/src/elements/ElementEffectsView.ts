@@ -38,6 +38,8 @@ export class ElementEffectsView {
   private readonly mat: Record<'pillar' | 'puddle' | 'bolt' | 'wind' | 'blink' | 'swap' | 'dark' | 'fire' | 'stun' | 'rescue', THREE.Material>;
   /** Called once for every effect that appears (e.g. play the attacker's swing animation). */
   onNewEffect: ((e: ElementEffect) => void) | null = null;
+  private actorPos: ((id: string) => THREE.Vector3 | null) | null = null;
+  private readonly ropeMat = new THREE.LineBasicMaterial({ color: 0xe8d9b8 });
   /** Kenney particle textures for combat effects. */
   readonly fx = new Particles();
   private readonly tmpA = new THREE.Vector3();
@@ -82,6 +84,7 @@ export class ElementEffectsView {
   }
 
   update(dt: number, state: MatchState, gameTime: number, actorPosition: (id: string) => THREE.Vector3 | null): void {
+    this.actorPos = actorPosition;
     const live = this.live;
     live.clear();
     state.effects.forEach((e) => {
@@ -103,6 +106,7 @@ export class ElementEffectsView {
     for (const [id, d] of this.drawn) {
       if (live.has(id)) continue;
       d.object.removeFromParent();
+      if (d.kind === 'HOOK') ((d.object as THREE.Group).children[0] as THREE.Line).geometry.dispose();
       d.clone?.tag?.dispose();
       d.clone?.model.dispose();
       this.drawn.delete(id);
@@ -135,6 +139,7 @@ export class ElementEffectsView {
 
   dispose(): void {
     this.fx.dispose();
+    this.ropeMat.dispose();
     for (const d of this.drawn.values()) {
       d.clone?.tag?.dispose();
       d.clone?.model.dispose();
@@ -187,8 +192,23 @@ export class ElementEffectsView {
         return { object: new THREE.Mesh(this.geo.disc, this.mat.dark), kind: e.kind };
       case 'RESCUE':
         return { object: new THREE.Mesh(this.geo.ring, this.mat.rescue), kind: e.kind };
+      case 'HOOK': {
+        // The rope: a line from the thrower's hand to the anchor, plus a little hook at the end.
+        const g = new THREE.Group();
+        const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+        const line = new THREE.Line(geo, this.ropeMat);
+        line.frustumCulled = false;
+        const head = new THREE.Mesh(this.geo.torus, this.mat.stun);
+        head.scale.setScalar(0.5);
+        g.add(line, head);
+        return { object: g, kind: e.kind };
+      }
       case 'SLASH':
       case 'SHOT':
+      case 'MSHOT':
+      case 'EXPLODE':
+      case 'GATE_BREAK':
+      case 'ENRAGE':
       case 'TORNADO':
       case 'THRUST':
       case 'BREATH':
@@ -261,6 +281,27 @@ export class ElementEffectsView {
         o.position.set(e.x, e.y + 0.05, e.z);
         break;
       }
+      case 'HOOK': {
+        const g = o as THREE.Group;
+        const line = g.children[0] as THREE.Line;
+        const head = g.children[1]!;
+        const from = this.actorPos?.(e.owner);
+        const pos = line.geometry.getAttribute('position') as THREE.BufferAttribute;
+        // Shoot out quickly, then stay attached while being reeled in.
+        const k = Math.min(1, age / 0.12);
+        const ox = from ? from.x : e.x;
+        const oy = from ? from.y + 1.2 : e.y1;
+        const oz = from ? from.z : e.z;
+        const hx = ox + (e.x2 - ox) * k;
+        const hy = oy + (e.y2 - oy) * k;
+        const hz = oz + (e.z2 - oz) * k;
+        pos.setXYZ(0, ox, oy, oz);
+        pos.setXYZ(1, hx, hy, hz);
+        pos.needsUpdate = true;
+        head.position.set(hx, hy, hz);
+        g.visible = f < 0.95;
+        break;
+      }
       case 'TORNADO': {
         // Lốc Kiếm: a spinning column of wind flying along its path.
         const p = Math.min(1, f);
@@ -310,8 +351,10 @@ export class ElementEffectsView {
         const weapon = state.players.get(e.owner)?.weapon ?? '';
         const bow = weapon === 'BOW';
         const yaw = Math.atan2(e.x2 - e.x, e.z2 - e.z);
-        const from = this.tmpA.set(e.x + Math.sin(yaw) * 0.5, e.y + 0.75, e.z + Math.cos(yaw) * 0.5).clone();
-        const to = this.tmpB.set(e.x2, e.y + 0.75, e.z2).clone();
+        // 3D shots carry absolute start/end heights (y1, y2); older flashes use the floor height.
+        const has3d = e.y1 !== 0 || e.y2 !== 0;
+        const from = this.tmpA.set(e.x + Math.sin(yaw) * 0.5, has3d ? e.y1 : e.y + 0.75, e.z + Math.cos(yaw) * 0.5).clone();
+        const to = this.tmpB.set(e.x2, has3d ? e.y2 : e.y + 0.75, e.z2).clone();
         if (!bow) {
           fx.sprite({ tex: 'muzzle_01', color: 0xffd23f, pos: from, life: 0.1, size: 1.4, size1: 0.6 });
           fx.sprite({ tex: 'light_01', color: 0xffb040, pos: from, life: 0.12, size: 1.6, size1: 0.4 });
@@ -342,11 +385,49 @@ export class ElementEffectsView {
       }
       case 'THRUST': {
         // Thương Xuyên Thấu: a long pink lance of light.
-        const from = this.tmpA.set(e.x, e.y + 0.8, e.z).clone();
-        const to = this.tmpB.set(e.x2, e.y + 0.8, e.z2).clone();
+        const from = this.tmpA.set(e.x, e.y1 || e.y + 0.8, e.z).clone();
+        const to = this.tmpB.set(e.x2, e.y2 || e.y + 0.8, e.z2).clone();
         fx.streak('trace_01', 0xff7bd5, from, to, 60, 6, 1.4, () => fx.sparks(to, 0xff9be0, 6, 3), 1.2);
         break;
       }
+      case 'MSHOT': {
+        // Monster arrow: red, real speed — you can see it coming and step aside.
+        const from = this.tmpA.set(e.x, e.y1, e.z).clone();
+        const to = this.tmpB.set(e.x2, e.y2, e.z2).clone();
+        fx.streak('trace_01', 0xff4f3f, from, to, 26, 2.2, 0.8, () => fx.sparks(to, 0xff6a4f, 4, 2.5), 0.7);
+        break;
+      }
+      case 'EXPLODE': {
+        // Fireball + smoke + shock ring.
+        const c = { x: e.x, y: e.y + 0.6, z: e.z };
+        fx.sprite({ tex: 'light_01', color: 0xffc23f, pos: c, life: 0.35, size: 6, size1: 2 });
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2;
+          const sp = 4 + Math.random() * 4;
+          fx.sprite({
+            tex: Math.random() < 0.5 ? 'flame_01' : 'fire_01', color: Math.random() < 0.5 ? 0xff7a2f : 0xffc23f, pos: c,
+            vel: { x: Math.cos(a) * sp, y: 1.5 + Math.random() * 3, z: Math.sin(a) * sp }, life: 0.5 + Math.random() * 0.3, size: 1.2, size1: 2.6, spin: 3,
+          });
+        }
+        fx.smoke(c, 3, 8);
+        fx.decal('circle_01', 0xffa040, { x: e.x, y: e.y + 0.12, z: e.z }, 0, 0, 1, 9, 0.45);
+        fx.decal('scorch_01', 0x2a1a10, { x: e.x, y: e.y + 0.06, z: e.z }, Math.random() * 6, 0, 4, 4.5, 2, false, 0.75);
+        break;
+      }
+      case 'GATE_BREAK': {
+        const c = { x: e.x, y: 1.4, z: e.z };
+        fx.smoke(c, 4, 12);
+        fx.sparks(c, 0xffb040, 16, 6);
+        fx.sprite({ tex: 'light_01', color: 0xff5a2f, pos: c, life: 0.5, size: 7, size1: 2 });
+        break;
+      }
+      case 'ENRAGE':
+        fx.decal('magic_01', 0xff2a1a, { x: e.x, y: e.y + 0.2, z: e.z }, 0, 0, 2, 10, 0.8);
+        fx.sprite({ tex: 'light_01', color: 0xff3b3b, pos: { x: e.x, y: e.y + 2.5, z: e.z }, life: 0.7, size: 4, size1: 9 });
+        break;
+      case 'HOOK':
+        fx.sprite({ tex: 'star_01', color: 0xd9f6ff, pos: { x: e.x2, y: e.y2, z: e.z2 }, life: 0.35, size: 1.2, size1: 0.3 });
+        break;
       case 'QUAKE':
         fx.decal('circle_01', 0xffa040, { x: e.x, y: e.y + 0.1, z: e.z }, 0, 0, 1, 13, 0.5);
         fx.decal('scorch_01', 0x2a1a10, { x: e.x, y: e.y + 0.05, z: e.z }, Math.random() * 6, 0, 5, 6, 1.5, false, 0.7);
@@ -388,6 +469,10 @@ export class ElementEffectsView {
     else if (kind === 'BREATH') audio.play('rumble', 0.25);
     else if (kind === 'GATE_HIT') audio.play('rumble', 0.08);
     else if (kind === 'QUAKE') audio.play('rumble', 0.35);
+    else if (kind === 'EXPLODE' || kind === 'GATE_BREAK') audio.play('rumble', 0.45);
+    else if (kind === 'ENRAGE') audio.play('rumble', 0.3);
+    else if (kind === 'HOOK') audio.play('whoosh', 0.2);
+    else if (kind === 'MSHOT') audio.play('whoosh', 0.06);
     else if (kind === 'WIND' || kind === 'BLINK' || kind === 'SWAP' || kind === 'BUMP') audio.play('whoosh', 0.16);
     else audio.play('cast', 0.12);
   }

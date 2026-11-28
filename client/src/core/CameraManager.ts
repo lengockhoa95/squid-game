@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import { rayBox, type Box } from '@sp/shared';
 
 const DEG = Math.PI / 180;
 
 export const CAMERA_LIMITS = {
-  pitchMin: 10 * DEG,
+  /** Below the horizon: the camera dips low and looks up (aim at flyers). */
+  pitchMin: -30 * DEG,
   pitchMax: 60 * DEG,
   distanceMin: 6,
   distanceMax: 14,
@@ -94,13 +96,45 @@ export class CameraManager {
     this.curPitch += (this.pitch - this.curPitch) * kRotate;
     this.curDistance += (this.distance - this.curDistance) * kRotate;
 
-    const horizontal = Math.cos(this.curPitch) * this.curDistance;
+    // Below the horizon: pull in close, stay above the ground and look up (aim at the sky).
+    let dist = this.curDistance;
+    let lookY = this.focus.y + 1.2;
+    if (this.curPitch < 0) {
+      dist *= Math.max(0.45, 1 + this.curPitch);
+      lookY += -this.curPitch * 6;
+    }
+    const horizontal = Math.cos(this.curPitch) * dist;
     this.camera.position.set(
       this.focus.x + Math.sin(this.curYaw) * horizontal,
-      this.focus.y + 1.2 + Math.sin(this.curPitch) * this.curDistance,
+      Math.max(this.focus.y + 0.35, this.focus.y + 1.2 + Math.sin(this.curPitch) * dist),
       this.focus.z + Math.cos(this.curYaw) * horizontal,
     );
-    this.camera.lookAt(this.focus.x, this.focus.y + 1.2, this.focus.z);
+    this.avoidBlockers();
+    this.camera.lookAt(this.focus.x, lookY, this.focus.z);
+  }
+
+  /** Solid boxes between the character and the camera pull the camera in (no seeing through walls). */
+  blockers: readonly Box[] = [];
+
+  private avoidBlockers(): void {
+    if (this.blockers.length === 0) return;
+    const ox = this.focus.x;
+    const oy = this.focus.y + 1.2;
+    const oz = this.focus.z;
+    const p = this.camera.position;
+    const dx = p.x - ox;
+    const dy = p.y - oy;
+    const dz = p.z - oz;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 1e-3) return;
+    let best = len;
+    for (const b of this.blockers) {
+      const t = rayBox(ox, oy, oz, dx / len, dy / len, dz / len, b);
+      if (t !== null && t > 0.2 && t < best) best = t;
+    }
+    if (best >= len) return;
+    const k = Math.max(1.2, best - 0.35) / len;
+    p.set(ox + dx * k, oy + dy * k, oz + dz * k);
   }
 
   /** Set yaw/pitch/distance (clamped) and blend to them; also suppresses auto-align briefly. */

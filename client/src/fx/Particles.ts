@@ -29,6 +29,11 @@ function material<M extends THREE.SpriteMaterial | THREE.MeshBasicMaterial>(m: M
   return m;
 }
 
+/** Shared particle texture (black background: use additively or as an alpha map). */
+export function fxTexture(name: FxTexture): THREE.Texture {
+  return texture(name);
+}
+
 function texture(name: FxTexture): THREE.Texture {
   let t = textures.get(name);
   if (!t) {

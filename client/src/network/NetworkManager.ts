@@ -148,7 +148,8 @@ class NetworkManager {
       sendCast: (x: number, z: number) => this.room?.send(MSG.CAST, { x, z }),
       pickElement: (element: ElementId) => this.room?.send(MSG.PICK_ELEMENT, { element }),
       pickCard: (card: CardId) => this.room?.send(MSG.PICK_CARD, { card }),
-      sendAttack: (yaw: number) => this.room?.send(MSG.ATTACK, { yaw }),
+      sendAttack: (yaw: number, pitch: number) => this.room?.send(MSG.ATTACK, { yaw, pitch }),
+      sendHook: (yaw: number, pitch: number) => this.room?.send(MSG.HOOK, { yaw, pitch }),
       pickPerk: (perk: string) => this.room?.send(MSG.CASTLE_PERK, { perk }),
       gameTimeNow: () => {
         const phase = this.room?.state.phase;

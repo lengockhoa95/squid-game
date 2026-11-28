@@ -823,6 +823,7 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
 .touch-btn:active { background: rgba(61, 245, 200, 0.55); }
 .touch-jump { right: 28px; bottom: 112px; }
 .touch-attack { right: 120px; bottom: 60px; background: rgba(255, 79, 109, 0.55); }
+.touch-hook { right: 120px; bottom: 150px; background: rgba(123, 255, 176, 0.45); }
 @media (pointer: coarse) {
   .element-cast { padding: 12px 18px 12px 12px; }
   .element-cast .element-glyph { min-width: 48px; height: 48px; font-size: 16px; }
@@ -889,3 +890,18 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; color: 
 .revive-fill { background: #7bffb0; transform: scaleX(0); }
 .castle-element-pick { position: absolute; left: 50%; bottom: 210px; transform: translateX(-50%); width: min(760px, calc(100% - 24px)); pointer-events: auto; }
 .castle-element-pick .element-picker { background: rgba(16, 14, 28, 0.85); border-radius: 14px; padding: 8px 10px; }
+.castle-defense { display: flex; align-items: center; gap: 12px; }
+.gate-compass { position: relative; width: 64px; height: 64px; flex: none; }
+.gate-pip { position: absolute; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; font-weight: 900; color: #14121c;
+  background: linear-gradient(0deg, #ffd23f calc(var(--hp, 1) * 100%), rgba(40, 36, 56, 0.9) calc(var(--hp, 1) * 100%)); border: 2px solid rgba(255, 255, 255, 0.5); }
+.gate-pip.is-broken { background: #ff3b3b; color: #fff; }
+.gate-pip.is-attacked { border-color: #ff5a4f; box-shadow: 0 0 8px #ff5a4f; animation: gate-blink 0.8s infinite alternate; }
+@keyframes gate-blink { to { box-shadow: 0 0 2px #ff5a4f; } }
+.gate-N { left: 21px; top: 0; }
+.gate-S { left: 21px; bottom: 0; }
+.gate-E { right: 0; top: 21px; }
+.gate-W { left: 0; top: 21px; }
+.gate-core { position: absolute; left: 26px; top: 26px; width: 12px; height: 12px; border-radius: 3px; background: #c9a27e; }
+.castle-keep { width: min(220px, 100%); display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 800; }
+.keep-fill { background: linear-gradient(90deg, #c77d3a, #ffd23f); transform: scaleX(1); }
+.castle-warn { background: rgba(255, 79, 109, 0.92); color: #fff; animation: gate-blink 0.6s infinite alternate; }
