@@ -5,7 +5,7 @@ import { SLOT_CHARACTERS, SLOT_LOOKS, characterFor } from '@sp/shared';
 import type { MaterialLibrary } from '../core/MaterialLibrary.ts';
 import { PlayerModel } from './PlayerModel.ts';
 import { ElementLook, type LookAnchors } from './ElementLook.ts';
-import type { CharacterBody, Pose } from './CharacterBody.ts';
+import { FLIP_SECONDS, flipAngle, type CharacterBody, type Pose } from './CharacterBody.ts';
 
 /**
  * Kenney "Mini Characters" (CC0, www.kenney.nl) — cute glTF characters with 32 animations.
@@ -19,6 +19,8 @@ const BASE = `${import.meta.env.BASE_URL ?? '/'}models/kenney/`;
 /** Kenney characters are ~0.67 m tall; scale them to our character size. */
 const SCALE = 1.7;
 const CROSSFADE = 0.15;
+/** Pivot height for somersaults (about the middle of the body). */
+const FLIP_PIVOT = 0.55;
 
 /** Element tattoo placement on the Kenney rig (bone-local units, before SCALE). */
 const KENNEY_ANCHORS: LookAnchors = { emblem: [0, 0.11, 0.14], bandY: -0.06, orbitY: 0.58, auraY: 0.02, unit: 0.6 };
@@ -91,12 +93,18 @@ class KenneyBody implements CharacterBody {
   private current: Clip | null = null;
   private pose: Pose = 'normal';
   private disposed = false;
+  private readonly spin = new THREE.Group();
+  private flipT = -1;
 
   constructor(gltf: GLTF, materials: MaterialLibrary) {
     this.materials = materials;
     this.inner = SkeletonUtils.clone(gltf.scene);
     this.inner.scale.setScalar(SCALE);
-    this.group.add(this.inner);
+    // group → spin (pivot mid-body, for flips) → inner (feet back at the group origin)
+    this.spin.position.y = FLIP_PIVOT;
+    this.inner.position.y = -FLIP_PIVOT;
+    this.spin.add(this.inner);
+    this.group.add(this.spin);
     this.head = this.inner.getObjectByName('head') ?? this.inner;
     this.torso = this.inner.getObjectByName('torso') ?? this.inner;
     this.armL = this.inner.getObjectByName('arm-left') ?? this.torso;
@@ -129,6 +137,15 @@ class KenneyBody implements CharacterBody {
     if (walk && clip === 'walk') walk.timeScale = Math.max(0.6, horizontalSpeed / 3);
     this.mixer.update(dt);
     this.look?.update(dt);
+    if (this.flipT >= 0) {
+      this.flipT += dt;
+      this.spin.rotation.x = flipAngle(this.flipT);
+      if (this.flipT >= FLIP_SECONDS) this.flipT = -1;
+    }
+  }
+
+  flip(): void {
+    this.flipT = 0;
   }
 
   setPose(pose: Pose): void {

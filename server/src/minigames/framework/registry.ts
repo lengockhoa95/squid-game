@@ -26,6 +26,8 @@ import { ZombieInfection } from '../Zombie/Logic.ts';
 import { ZombieStrategy } from '../Zombie/NPCStrategy.ts';
 import { RopeClimb } from '../RopeClimb/Logic.ts';
 import { RopeStrategy } from '../RopeClimb/NPCStrategy.ts';
+import { SharkSwim } from '../SharkSwim/Logic.ts';
+import { SharkStrategy } from '../SharkSwim/NPCStrategy.ts';
 
 export interface MinigameBundle {
   game: ServerMinigame;
@@ -46,6 +48,10 @@ export const MINIGAME_FACTORIES: Partial<Record<MinigameId, MinigameFactory>> = 
   },
   OBSTACLE_RACE: () => ({ game: new ObstacleRace(), strategy: new RaceStrategy() }),
   ICE_RACE: () => ({ game: new IceRace(), strategy: new IceStrategy() }),
+  SHARK_SWIM: () => {
+    const game = new SharkSwim();
+    return { game, strategy: new SharkStrategy(game) };
+  },
   ROPE_CLIMB: () => ({ game: new RopeClimb(), strategy: new RopeStrategy() }),
   ZOMBIE: () => {
     const game = new ZombieInfection();

@@ -10,8 +10,8 @@ export interface CharacterState {
   /** Facing angle in radians; 0 = +Z, PI/2 = +X. */
   yaw: number;
   grounded: boolean;
-  /** Double-jump already used since leaving the ground (card "Chân Thỏ" level 3). */
-  airJumped?: boolean;
+  /** Mid-air jumps used since leaving the ground (everyone has 1; "Chân Thỏ" level 3 adds one). */
+  airJumps?: number;
 }
 
 export interface MoveIntent {
@@ -45,7 +45,7 @@ export interface SimWorld {
 }
 
 export function createCharacterState(x: number, z: number): CharacterState {
-  return { x, y: 0, z, vx: 0, vy: 0, vz: 0, yaw: 0, grounded: true, airJumped: false };
+  return { x, y: 0, z, vx: 0, vy: 0, vz: 0, yaw: 0, grounded: true, airJumps: 0 };
 }
 
 const EPS = 1e-9;

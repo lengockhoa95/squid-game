@@ -381,3 +381,25 @@ describe('Rope Climb', () => {
     expect(players[0]!.sim.state.z).toBeCloseTo(c.z, 1);
   });
 });
+
+describe('Shark Swim', () => {
+  it('swimming is slower than walking; a shark next to a swimmer bites; reaching the island passes', async () => {
+    const { SharkSwim } = await import('../SharkSwim/Logic.ts');
+    const { SEA, SWIM_MOVEMENT, MOVEMENT } = await import('@sp/shared');
+    expect(SWIM_MOVEMENT.walkSpeed).toBeLessThan(MOVEMENT.walkSpeed);
+    const { ctx, players, match } = makeContext(2);
+    const game = new SharkSwim();
+    game.initialize(ctx);
+    expect(match.sea!.sharks.length).toBe(SEA.sharks);
+    const [a, b] = players as [typeof players[0], typeof players[0]];
+    const shark = match.sea!.sharks[0]!;
+    a.sim.reset(shark.x, shark.z, Math.PI);
+    a.sim.state.y = SEA.swimY;
+    run(game, players, 0, 0.05);
+    expect(a.state.roundState).toBe('OUT');
+    b.sim.reset(0, SEA.islandZ - 3, Math.PI);
+    run(game, players, 0.05, 0.1);
+    expect(b.state.roundState).toBe('FINISHED');
+    expect(game.finish().details.get('p0')).toContain('cá mập');
+  });
+});

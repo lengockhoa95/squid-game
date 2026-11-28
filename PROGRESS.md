@@ -159,6 +159,16 @@ Thiết kế: [docs/superpowers/specs/2026-11-27-collision-cards-design.md](docs
 - [x] Mỗi game có NPC riêng và đã cân bằng bằng `server/scripts/round-check.ts`.
 - [x] Test: 172 unit/integration; E2E chơi thử cả 5 game trên Chrome.
 
+## Phase 15 — Nhảy đôi, Vượt Biển Cá Mập ✅
+
+- [x] Ai cũng nhảy đôi được: lần 2 yếu hơn một chút và nhân vật lộn mèo một vòng.
+- [x] Thẻ Chân Thỏ thức tỉnh: nhảy 3 lần.
+- [x] **Vượt Biển Cá Mập:**
+  - Bơi chậm hơn đi bộ; bậc thềm để leo lên đảo.
+  - 6 cá mập tuần tra theo làn, lao tới đớp rồi nghỉ.
+  - Bot né theo dự đoán vị trí cá mập.
+- [x] Test: 173 unit/integration.
+
 ## Hạn chế đã biết
 
 - **FPS trên máy thật chưa đo** — xem [docs/perf/phase1-measurements.md](docs/perf/phase1-measurements.md).

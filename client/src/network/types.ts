@@ -31,7 +31,7 @@ export interface NetPlayer {
   readonly cards: string;
   readonly cardOffer: string;
   readonly lives: number;
-  readonly airJumped: boolean;
+  readonly airJumps: number;
   readonly character: string;
   readonly moveMul: number;
 }

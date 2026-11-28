@@ -13,7 +13,7 @@ const TABS: ReadonlyArray<[Tab, string]> = [
 
 const CONTROLS: ReadonlyArray<[action: string, keys: string, mouse: string]> = [
   ['Di chuyển', 'WASD / mũi tên', '—'],
-  ['Nhảy', 'Space', '—'],
+  ['Nhảy', 'Space · bấm thêm lần nữa trên không = nhảy đôi (lộn mèo)', '—'],
   ['Xoay camera', 'Q / E', 'Click vào màn hình để khoá chuột rồi rê chuột (như game bắn súng) · Esc để thả'],
   ['Zoom', '+ / −', 'Lăn con lăn'],
   ['Dùng nguyên tố', 'F', 'Click trái: dùng tại tâm ngắm (rê chuột lên/xuống để ngắm xa/gần)'],

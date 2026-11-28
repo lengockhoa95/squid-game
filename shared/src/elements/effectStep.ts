@@ -24,6 +24,11 @@ export interface ElementStatus {
   moveMul?: number;
 }
 
+/** Everyone can jump once more in mid-air. */
+export const AIR_JUMPS = 1;
+/** The air jump is a bit weaker than a ground jump. */
+const AIR_JUMP_POWER = 0.85;
+
 export function createElementField(): ElementField {
   return { pillars: [], puddles: [], bodies: [] };
 }
@@ -59,9 +64,9 @@ export function effectStep(base: StepFn, field: ElementField, status: ElementSta
       if (tmp.jump) {
         if (wasGrounded && !s.grounded && s.vy > 0) {
           s.vy *= mods.jumpMul; // higher normal jump
-        } else if (!wasGrounded && mods.doubleJump && !s.airJumped) {
-          s.vy = MOVEMENT.jumpVelocity * mods.jumpMul; // double jump
-          s.airJumped = true;
+        } else if (!wasGrounded && (s.airJumps ?? 0) < AIR_JUMPS + mods.extraAirJumps) {
+          s.vy = MOVEMENT.jumpVelocity * mods.jumpMul * AIR_JUMP_POWER; // double jump (with a flip on screen)
+          s.airJumps = (s.airJumps ?? 0) + 1;
         }
       }
       const speedMul = mods.speedMul * (status.moveMul || 1);
@@ -71,7 +76,7 @@ export function effectStep(base: StepFn, field: ElementField, status: ElementSta
       }
       resolvePillars(s, field, t);
       if (field.bodies.length > 0) pushOutOfBodies(s, field.bodies);
-      if (s.grounded) s.airJumped = false;
+      if (s.grounded) s.airJumps = 0;
       tmp.jump = false;
     }
   };

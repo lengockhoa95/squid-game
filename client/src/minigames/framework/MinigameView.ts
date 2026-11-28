@@ -48,4 +48,5 @@ export const VIEW_LOADERS: Readonly<Record<MinigameId, () => Promise<ViewFactory
   PAINT: () => import('../Paint/View.ts').then((m) => m.createView),
   ZOMBIE: () => import('../Zombie/View.ts').then((m) => m.createView),
   ROPE_CLIMB: () => import('../RopeClimb/View.ts').then((m) => m.createView),
+  SHARK_SWIM: () => import('../SharkSwim/View.ts').then((m) => m.createView),
 };

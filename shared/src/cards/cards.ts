@@ -16,8 +16,8 @@ export interface CardInfo {
 
 export const CARDS: Readonly<Record<CardId, CardInfo>> = {
   BUNNY: {
-    id: 'BUNNY', name: 'Chân Thỏ', glyph: 'T', color: '#ffb3d9', awaken: 'Nhảy đôi',
-    levels: ['Nhảy cao hơn 15%', 'Nhảy cao hơn 30%', 'Thức tỉnh: nhảy đôi giữa không trung'],
+    id: 'BUNNY', name: 'Chân Thỏ', glyph: 'T', color: '#ffb3d9', awaken: 'Nhảy ba',
+    levels: ['Nhảy cao hơn 15%', 'Nhảy cao hơn 30%', 'Thức tỉnh: nhảy 3 lần giữa không trung'],
   },
   SPEED: {
     id: 'SPEED', name: 'Giày Gió', glyph: 'GG', color: '#7df9ff', awaken: 'Siêu tốc',
@@ -80,7 +80,8 @@ const pick = <T>(table: readonly T[], level: number, none: T): T => (level <= 0 
 /** Every gameplay number a card changes, resolved from card levels (level 0 = neutral). */
 export interface CardMods {
   jumpMul: number;
-  doubleJump: boolean;
+  /** Extra mid-air jumps on top of everyone's double jump. */
+  extraAirJumps: number;
   speedMul: number;
   slowImmune: boolean;
   mass: number;
@@ -101,7 +102,7 @@ export function cardMods(levels: CardLevels): CardMods {
   const lv = (id: CardId) => cardLevel(levels, id);
   return {
     jumpMul: pick([1.15, 1.3, 1.3], lv('BUNNY'), 1),
-    doubleJump: lv('BUNNY') >= 3,
+    extraAirJumps: lv('BUNNY') >= 3 ? 1 : 0,
     speedMul: pick([1.08, 1.15, 1.25], lv('SPEED'), 1),
     slowImmune: lv('SPEED') >= 3,
     mass: pick([1.6, 2.5, 6], lv('TANK'), 1),

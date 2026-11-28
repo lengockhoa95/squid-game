@@ -92,7 +92,7 @@ export class PlayerSim {
     s.vx = s.vy = s.vz = 0;
     s.yaw = yaw;
     s.grounded = true;
-    s.airJumped = false;
+    s.airJumps = 0;
     this.head = 0;
     this.count = 0;
     this.credit = 0;

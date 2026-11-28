@@ -29,6 +29,8 @@ interface Actor {
   tag: NameTag | null;
   /** Character model currently shown. */
   character: string;
+  /** Last seen mid-air jump count (a rise = play a flip). */
+  airJumps: number;
 }
 
 /**
@@ -61,6 +63,7 @@ class MatchScene implements GameScene {
   private readonly effects: ElementEffectsView;
   private readonly auraCache = new Map<string, string>();
   private lastCastAt = 0;
+  private localAirJumps = 0;
   private seqInitialized = false;
   private generation = 0;
   private accumulator = 0;
@@ -102,6 +105,9 @@ class MatchScene implements GameScene {
       // Keep the prediction clock close to the server's estimate.
       if (Math.abs(this.stepTime - gameTime) > 0.25) this.stepTime = gameTime;
       local.renderUpdate(this.accumulator / FIXED_DT, dt);
+      const airJumps = local.state.airJumps ?? 0;
+      if (airJumps > this.localAirJumps) local.model.flip();
+      this.localAirJumps = airJumps;
       if (!local.isClickMoving) this.marker.hide();
     } else {
       this.accumulator = 0;
@@ -337,6 +343,9 @@ class MatchScene implements GameScene {
       const pose: Pose =
         p.roundState === 'OUT' ? 'fallen' : p.roundState === 'FINISHED' || (phase === 'MATCH_END' && p.id === winnerId) ? 'cheer' : 'normal';
       actor.model.setPose(pose);
+      // Somersault on the mid-air jump (the local player flips from its own prediction instead).
+      if (p.airJumps > actor.airJumps && !(p.id === this.net.localId && this.local)) actor.model.flip();
+      actor.airJumps = p.airJumps;
       actor.model.setElement(p.element);
       actor.model.setAura(this.awakenColor(p.cards));
       if (p.id === this.net.localId) this.syncLocal(p, actor, now);
@@ -388,7 +397,7 @@ class MatchScene implements GameScene {
         tag = new NameTag(p.nickname, look.color);
         tag.attach(model.group, model.tagHeight);
       }
-      a = { model, interp: new RemoteInterpolator(), generation: gen, tag, character };
+      a = { model, interp: new RemoteInterpolator(), generation: gen, tag, character, airJumps: 0 };
       this.actors.set(p.id, a);
     }
     a.generation = gen;

@@ -33,7 +33,8 @@ describe('cards', () => {
   it('resolves modifiers per level', () => {
     expect(cardMods({}).lives).toBe(0);
     expect(cardMods({ LIFE: 2 }).lives).toBe(2);
-    expect(cardMods({ BUNNY: 3 }).doubleJump).toBe(true);
+    expect(cardMods({ BUNNY: 3 }).extraAirJumps).toBe(1);
+    expect(cardMods({ BUNNY: 2 }).extraAirJumps).toBe(0);
     expect(cardMods({ EYE: 3 }).eyeRows).toBe(Number.POSITIVE_INFINITY);
     expect(cardMods({ TANK: 1 }).mass).toBeGreaterThan(1);
   });
@@ -43,23 +44,25 @@ const WORLD: SimWorld = { bounds: { minX: -50, maxX: 50, minZ: -50, maxZ: 50 }, 
 const base = staticWorldStep(WORLD);
 const DT = 1 / 60;
 
-function maxHeight(cards: string, jumpAgainAt = -1) {
+function maxHeight(cards: string, jumpsAt: number[] = []) {
   const s = createCharacterState(0, 0);
   const step = effectStep(base, createElementField(), { stunUntil: 0, hasteUntil: 0, cards }, 'me');
   let top = 0;
-  for (let i = 0; i < 120; i++) {
-    step(s, { dirX: 0, dirZ: 0, jump: i === 0 || i === jumpAgainAt }, DT, i * DT);
+  for (let i = 0; i < 150; i++) {
+    step(s, { dirX: 0, dirZ: 0, jump: i === 0 || jumpsAt.includes(i) }, DT, i * DT);
     top = Math.max(top, s.y);
   }
   return top;
 }
 
 describe('movement cards in the shared step', () => {
-  it('Chân Thỏ jumps higher, and level 3 double-jumps (once per air time)', () => {
-    const normal = maxHeight('');
-    expect(maxHeight('BUNNY:2')).toBeGreaterThan(normal * 1.5);
-    expect(maxHeight('BUNNY:2', 20)).toBeCloseTo(maxHeight('BUNNY:2'), 5); // no double jump below level 3
-    expect(maxHeight('BUNNY:3', 20)).toBeGreaterThan(maxHeight('BUNNY:3') * 1.4);
+  it('everyone can double jump (once per air time); Chân Thỏ jumps higher and level 3 jumps a third time', () => {
+    const single = maxHeight('');
+    const double = maxHeight('', [20]);
+    expect(double).toBeGreaterThan(single * 1.4);
+    expect(maxHeight('', [20, 40])).toBeCloseTo(double, 5); // no third jump without the card
+    expect(maxHeight('BUNNY:2')).toBeGreaterThan(single * 1.5);
+    expect(maxHeight('BUNNY:3', [20, 40])).toBeGreaterThan(maxHeight('BUNNY:3', [20]) * 1.15);
   });
 
   it('Giày Gió runs faster', () => {

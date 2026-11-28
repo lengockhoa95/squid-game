@@ -15,7 +15,19 @@ export interface CharacterBody {
   readonly tagHeight: number;
   animate(dt: number, horizontalSpeed: number, grounded: boolean): void;
   setPose(pose: Pose): void;
+  /** Play a forward somersault (the mid-air jump). */
+  flip(): void;
   setElement(element: string): void;
   setAura(css: string): void;
   dispose(): void;
+}
+
+/** Somersault timing shared by every body. */
+export const FLIP_SECONDS = 0.45;
+
+/** Rotation (rad) for a flip that started `t` seconds ago: ease-out full turn, 0 when done. */
+export function flipAngle(t: number): number {
+  if (t < 0 || t >= FLIP_SECONDS) return 0;
+  const f = t / FLIP_SECONDS;
+  return (1 - (1 - f) * (1 - f)) * Math.PI * 2;
 }

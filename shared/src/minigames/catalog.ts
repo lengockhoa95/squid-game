@@ -1,6 +1,6 @@
-export type MinigameId = 'RLGL' | 'GLASS_BRIDGE' | 'OBSTACLE_RACE' | 'FLOOR_COLLAPSE' | 'TOWER_CLIMB' | 'MAZE' | 'PARKOUR' | 'ICE_RACE' | 'LUCKY_DOORS' | 'PAINT' | 'ZOMBIE' | 'ROPE_CLIMB';
+export type MinigameId = 'RLGL' | 'GLASS_BRIDGE' | 'OBSTACLE_RACE' | 'FLOOR_COLLAPSE' | 'TOWER_CLIMB' | 'MAZE' | 'PARKOUR' | 'ICE_RACE' | 'LUCKY_DOORS' | 'PAINT' | 'ZOMBIE' | 'ROPE_CLIMB' | 'SHARK_SWIM';
 
-export const MINIGAME_IDS: readonly MinigameId[] = ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE', 'TOWER_CLIMB', 'MAZE', 'PARKOUR', 'ICE_RACE', 'LUCKY_DOORS', 'PAINT', 'ZOMBIE', 'ROPE_CLIMB'];
+export const MINIGAME_IDS: readonly MinigameId[] = ['RLGL', 'GLASS_BRIDGE', 'OBSTACLE_RACE', 'FLOOR_COLLAPSE', 'TOWER_CLIMB', 'MAZE', 'PARKOUR', 'ICE_RACE', 'LUCKY_DOORS', 'PAINT', 'ZOMBIE', 'ROPE_CLIMB', 'SHARK_SWIM'];
 
 export interface MinigameInfo {
   id: MinigameId;
@@ -168,6 +168,19 @@ export const MINIGAMES: Readonly<Record<MinigameId, MinigameInfo>> = {
       'Rơi sẽ quay lại bệ gần nhất. Về chậm nhất hoặc không kịp giờ bị loại.',
     ],
     timeLimit: 120,
+    movement: true,
+    needsEvenPlayers: false,
+  },
+  SHARK_SWIM: {
+    id: 'SHARK_SWIM',
+    title: 'Vượt Biển Cá Mập',
+    rules: [
+      'Bơi từ bãi biển sang hòn đảo bên kia (dưới nước bơi chậm hơn).',
+      'Cá mập tuần tra ngang, thấy bạn ở gần là lao tới đớp — để ý vây trên mặt nước!',
+      'Nhảy (và nhảy đôi) để né cú đớp. Bị cá mập đớp là thua.',
+      'Lên tới đảo để qua vòng.',
+    ],
+    timeLimit: 100,
     movement: true,
     needsEvenPlayers: false,
   },

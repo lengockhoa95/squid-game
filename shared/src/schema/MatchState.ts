@@ -45,8 +45,8 @@ export const PlayerState = schema(
     moveMul: t.float32().default(1),
     /** Picked Kenney character id ('' = slot default). */
     character: t.string(),
-    /** Double jump used (mirrors CharacterState.airJumped for reconciliation). */
-    airJumped: t.boolean(),
+    /** Mid-air jumps used (mirrors CharacterState.airJumps for reconciliation). */
+    airJumps: t.uint8(),
   },
   'PlayerState',
 );
@@ -116,6 +116,12 @@ export type DoorsState = InstanceType<typeof DoorsState>;
 export const PaintState = schema({ cells: t.array('uint8') }, 'PaintState');
 export type PaintState = InstanceType<typeof PaintState>;
 
+/** Vượt Biển Cá Mập: shark positions (server-driven). */
+export const SharkFin = schema({ x: t.float32(), z: t.float32(), yaw: t.float32(), lunge: t.boolean() }, 'SharkFin');
+export type SharkFin = InstanceType<typeof SharkFin>;
+export const SeaState = schema({ sharks: t.array(SharkFin) }, 'SeaState');
+export type SeaState = InstanceType<typeof SeaState>;
+
 export const MatchState = schema(
   {
     phase: t.string(),
@@ -149,6 +155,7 @@ export const MatchState = schema(
     maze: t.ref(MazeState).optional(),
     doors: t.ref(DoorsState).optional(),
     paint: t.ref(PaintState).optional(),
+    sea: t.ref(SeaState).optional(),
   },
   'MatchState',
 );

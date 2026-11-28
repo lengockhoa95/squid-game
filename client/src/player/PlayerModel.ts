@@ -3,7 +3,7 @@ import { CHARACTER_SCALE } from '@sp/shared';
 import type { MaterialLibrary } from '../core/MaterialLibrary.ts';
 import { ElementLook } from './ElementLook.ts';
 import { AnimationController } from './AnimationController.ts';
-import type { CharacterBody, Pose } from './CharacterBody.ts';
+import { FLIP_SECONDS, flipAngle, type CharacterBody, type Pose } from './CharacterBody.ts';
 
 export type Accessory = 'none' | 'cap' | 'glasses' | 'band';
 
@@ -59,6 +59,9 @@ function releaseGeometries(): void {
 export class PlayerModel implements CharacterBody {
   readonly tagHeight = 2.55;
   private anim: AnimationController | null = null;
+  /** group → flipGroup (pivot mid-body) → flipOffset → poseGroup */
+  private readonly flipGroup = new THREE.Group();
+  private flipT = -1;
   readonly group = new THREE.Group();
   /** Inner pivot used for whole-body poses (falling over) without touching position/yaw on `group`. */
   readonly poseGroup = new THREE.Group();
@@ -116,7 +119,12 @@ export class PlayerModel implements CharacterBody {
 
     this.addAccessory(accessory, g, materials, color);
     this.poseGroup.add(this.legL, this.legR, this.torso);
-    this.group.add(this.poseGroup);
+    this.flipGroup.position.y = 0.8;
+    const flipOffset = new THREE.Group();
+    flipOffset.position.y = -0.8;
+    flipOffset.add(this.poseGroup);
+    this.flipGroup.add(flipOffset);
+    this.group.add(this.flipGroup);
     this.group.scale.setScalar(CHARACTER_SCALE);
   }
 
@@ -137,6 +145,15 @@ export class PlayerModel implements CharacterBody {
   animate(dt: number, horizontalSpeed: number, grounded: boolean): void {
     this.anim ??= new AnimationController(this);
     this.anim.update(dt, horizontalSpeed, grounded);
+    if (this.flipT >= 0) {
+      this.flipT += dt;
+      this.flipGroup.rotation.x = flipAngle(this.flipT);
+      if (this.flipT >= FLIP_SECONDS) this.flipT = -1;
+    }
+  }
+
+  flip(): void {
+    this.flipT = 0;
   }
 
   setPose(pose: Pose): void {

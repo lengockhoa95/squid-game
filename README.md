@@ -43,7 +43,7 @@ Mở http://localhost:5173 → nhập tên → **Tạo phòng** (hoặc **Sân t
 | `PORT` | server | `2567` | Cổng Colyseus |
 | `VITE_SERVER_URL` | client (lúc build) | `http(s)://<host đang mở trang>:2567` | Địa chỉ server khi deploy khác máy/cổng |
 | `COLYSEUS_LATENCY` | server | – | Giả lập độ trễ (ms) để thử prediction |
-| `SP_GAMES` | server | – (tất cả) | Chỉ chơi các minigame này khi test, ví dụ `SP_GAMES=MAZE,PARKOUR` (RLGL, GLASS_BRIDGE, OBSTACLE_RACE, FLOOR_COLLAPSE, TOWER_CLIMB, MAZE, PARKOUR, ICE_RACE, LUCKY_DOORS, PAINT, ZOMBIE, ROPE_CLIMB) |
+| `SP_GAMES` | server | – (tất cả) | Chỉ chơi các minigame này khi test, ví dụ `SP_GAMES=MAZE,PARKOUR` (RLGL, GLASS_BRIDGE, OBSTACLE_RACE, FLOOR_COLLAPSE, TOWER_CLIMB, MAZE, PARKOUR, ICE_RACE, LUCKY_DOORS, PAINT, ZOMBIE, ROPE_CLIMB, SHARK_SWIM) |
 
 ## Chạy bằng Docker
 
@@ -85,6 +85,7 @@ docker compose down
 | Sơn Lãnh Thổ | Đi tới đâu sàn đổi màu mình tới đó, cướp ô người khác; ít ô nhất bị loại |
 | Zombie Lây Lan | 1 người hoá zombie, chạm ai lây người đó (đổi luôn thành nhân vật zombie); hết giờ còn là người thì qua |
 | Leo Dây Nhện | Cầu ván lắc lư nối các bệ cao dần, gió giật ngang từng đợt |
+| Vượt Biển Cá Mập | Bơi (chậm hơn đi bộ) từ bãi biển sang đảo; cá mập tuần tra và lao tới đớp, nhảy đôi để né |
 
 Mỗi người chọn nhân vật trong màn chờ (20 nhân vật [Kenney Mini Characters](https://kenney.nl/assets/mini-characters-1), CC0 — cảm ơn Kenney); NPC tự lấy nhân vật chưa ai chọn. Tên người chơi hiện trên đầu nhân vật.
 
@@ -103,7 +104,7 @@ Thẻ tự có tác dụng, không cần bấm gì. Chọn trùng thẻ thì lê
 
 | Thẻ | Cấp 1 → 2 | Thức tỉnh (cấp 3) |
 |---|---|---|
-| Chân Thỏ | Nhảy cao +15% → +30% | Nhảy đôi |
+| Chân Thỏ | Nhảy cao +15% → +30% | Nhảy 3 lần |
 | Giày Gió | Chạy +8% → +15% | +25%, không bị vũng lầy |
 | Da Trâu | Khó bị đẩy, giảm lực gió | Gần như bất động |
 | Cú Húc | Húc mạnh ×1.6 → ×2.2 | Húc khi đang chạy làm đối thủ bay lên |
@@ -144,7 +145,7 @@ Bàn phím để di chuyển, chuột để dùng nguyên tố và chọn kỹ n
 | Hành động | Bàn phím | Chuột |
 |---|---|---|
 | Di chuyển | WASD / mũi tên | — |
-| Nhảy | Space | — |
+| Nhảy | Space (bấm lần 2 trên không = nhảy đôi, lộn mèo) | — |
 | Xoay camera | Q / E | Giữ chuột phải + kéo |
 | Zoom | + / − | Con lăn |
 | Dùng nguyên tố | F (tại con trỏ) | Click trái xuống chỗ muốn dùng (hoặc nút nguyên tố góc phải dưới) |
